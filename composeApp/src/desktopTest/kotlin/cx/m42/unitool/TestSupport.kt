@@ -5,7 +5,7 @@ import cx.m42.superizer.host.SuperizerBuilder
 import cx.m42.superizer.host.storage.PrefsStorage
 import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.testing.FakeNetwork
-import java.io.File
+import java.nio.file.Files
 import kotlin.test.BeforeTest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,13 +28,16 @@ import kotlinx.coroutines.SupervisorJob
  */
 abstract class UnitoolTest {
 
+    /**
+     * A new directory on every test *and* on every run.
+     *
+     * A numbered name is not enough: these outlive the JVM, so the second run would inherit the
+     * first one's unlocked apps, its language and its session snapshot, and a failure would depend
+     * on what happened the day before.
+     */
     @BeforeTest
     fun isolateStorage() {
-        PrefsStorage.useDirectory(File(System.getProperty("java.io.tmpdir"), "unitool-test-${counter++}"))
-    }
-
-    private companion object {
-        var counter = 0
+        PrefsStorage.useDirectory(Files.createTempDirectory("unitool-test").toFile())
     }
 }
 

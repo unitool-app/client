@@ -111,3 +111,36 @@ class ConverterInstanceTest {
         assertTrue(forward > 0 && back > 0 && forward != back)
     }
 }
+
+/** The preference the app contributes to the host's Settings page, and what reads it back. */
+class ConverterSettingsTest {
+
+    private val url = ConverterConfig.DEFAULT_RATES_URL
+    private val payload =
+        """{"amount":1.0,"base":"USD","date":"2026-09-19","rates":{"EUR":0.92,"RUB":92.10}}"""
+
+    @Test
+    fun theStoredPreferenceDecidesWhatTheConverterOpensOn() = runAppTest(
+        ConverterApp(),
+        prepare = {
+            it.storage.entries[KEY_BASE] = "RUB"
+            it.network.respond(url, payload)
+        },
+    ) {
+        assertEquals("RUB", (instance as ConverterInstance).from.value)
+    }
+
+    @Test
+    fun aConfigThatNamesACurrencyOutranksThePreference() = runAppTest(
+        ConverterApp(),
+        config = AppConfig(Json.parseToJsonElement("""{"from":"EUR"}""") as JsonObject),
+        prepare = {
+            it.storage.entries[KEY_BASE] = "RUB"
+            it.network.respond(url, payload)
+        },
+    ) {
+        // A deep link or a QR code is an instruction about *this launch*; the preference is a
+        // standing wish, and an instruction wins.
+        assertEquals("EUR", (instance as ConverterInstance).from.value)
+    }
+}

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.Density
 import cx.m42.superizer.host.storage.PrefsStorage
 import java.awt.image.BufferedImage
 import java.io.File
+import java.nio.file.Files
 import javax.imageio.ImageIO
 import kotlin.test.Test
 
@@ -77,7 +78,9 @@ class Screenshots {
         offline: Boolean,
         drive: DriveScope.() -> Unit,
     ) {
-        PrefsStorage.useDirectory(File(System.getProperty("java.io.tmpdir"), "unitool-shots-$name-${viewport.name}"))
+        // A fresh store for every frame: a screenshot must show what a new install looks like,
+        // not what the previous capture left behind.
+        PrefsStorage.useDirectory(Files.createTempDirectory("unitool-shot").toFile())
         runDesktopComposeUiTest(width = viewport.widthPx, height = viewport.heightPx) {
             val superizer = testSuperizer(network = if (offline) offlineNetwork() else ratesNetwork())
             superizer.settings.chooseLanguage(lang)
@@ -178,6 +181,9 @@ class Screenshots {
     @Test
     fun captureEveryScreen() {
         for (viewport in listOf(Phone, PlayListing)) {
+            // Emptied first. A frame left over from a screen that no longer exists is worse than a
+            // missing one: it is the picture somebody uploads to a store listing by mistake.
+            File(viewport.directory).listFiles()?.forEach { if (it.name.endsWith(".png")) it.delete() }
             for (screen in screens) {
                 shot(viewport, screen.name, screen.lang, screen.offline, screen.drive)
             }

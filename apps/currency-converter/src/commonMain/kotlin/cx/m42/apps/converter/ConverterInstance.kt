@@ -49,6 +49,14 @@ internal class ConverterInstance(
 
     override suspend fun onLaunch() {
         runtime.analytics.screen("currency-converter")
+
+        // A currency named by the config wins: that is a deep link or a QR code saying what this
+        // *launch* is about. Otherwise the preference from Settings, and only then the default —
+        // the config is an instruction, the preference is a standing wish.
+        if (config.from == null) {
+            runtime.storage.get(KEY_BASE)?.let { stored -> from.value = stored }
+        }
+
         // Only the cache, and only if it is already there: reading it is cheap, and it means the
         // first frame has numbers on it rather than a spinner.
         repository.cached(config.base)?.let { _rates.value = RatesState.Ready(it, fromCache = true) }

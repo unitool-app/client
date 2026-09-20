@@ -148,6 +148,24 @@ class ShellTest : UnitoolTest() {
     }
 
     @Test
+    fun anAppsOwnBlockAppearsOnTheHostsSettingsPage() = runComposeUiTest {
+        // `ctx.settingsSection` (03): the host draws the page and the app's title, the app draws
+        // what is inside, and neither knows what the other put there.
+        setContent { UnitoolApp(testSuperizer()) }
+        waitForIdle()
+
+        onNodeWithContentDescription("Открыть меню").performClick()
+        waitForIdle()
+        onNodeWithContentDescription("Настройки").performClick()
+        waitForIdle()
+
+        onNodeWithTag("settings:section-currency-converter").assertExists()
+        onNodeWithTag("currency-converter:settings").assertExists()
+        // Under the app's own title, which comes from its manifest rather than from the host.
+        onNodeWithText("Конвертер валют").assertExists()
+    }
+
+    @Test
     fun anOfflineConverterSaysSoWithoutMakingARequest() = runComposeUiTest {
         // D32: "offline" comes from the connectivity signal, not from a failed request — the user
         // is told before waiting out a fifteen-second timeout.

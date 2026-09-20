@@ -11,6 +11,9 @@ internal interface ConverterStrings {
     val failed: String
     val retry: String
 
+    /** The line above the converter's own block on the host's Settings page. */
+    val settingsHint: String
+
     /**
      * The grey line under the answer. Whole phrase and not two fragments, because "from cache" is
      * an aside in English and a separate clause in Russian — assembling it at the call site is how
@@ -28,6 +31,7 @@ internal object ConverterStringsEn : ConverterStrings {
     override val offline = "Offline, and nothing cached yet"
     override val failed = "Could not get rates"
     override val retry = "Try again"
+    override val settingsHint = "Which currency to start from"
 
     override fun source(date: String, fromCache: Boolean): String =
         if (fromCache) "ECB rates for $date · cached, offline" else "ECB rates for $date · live"
@@ -42,6 +46,7 @@ internal object ConverterStringsRu : ConverterStrings {
     override val offline = "Офлайн, и в кэше пока пусто"
     override val failed = "Не удалось получить курсы"
     override val retry = "Повторить"
+    override val settingsHint = "С какой валюты начинать"
 
     override fun source(date: String, fromCache: Boolean): String =
         if (fromCache) "Курс ЕЦБ на $date · кэш, офлайн" else "Курс ЕЦБ на $date · сеть"

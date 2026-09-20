@@ -74,6 +74,12 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
         AppConfigSpec(ConverterConfig.serializer(), ConverterConfig())
 
     override fun setup(ctx: AppSetupContext) {
+        // The app's own block on the host's Settings page (03). The host draws the frame and the
+        // title; what is inside is the app's, and the host never learns what.
+        ctx.settingsSection { runtime ->
+            ConverterSettingsSection(runtime, configSpec.default.favorites)
+        }
+
         // `unitool://app/currency-converter/rate?pair=USD-RUB` — the path a push carries in its
         // `link` (13 §2), and the same one a QR code or a pasted URL would. The app turns the
         // query into a config and never learns which of those it was.

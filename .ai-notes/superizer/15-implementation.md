@@ -33,8 +33,25 @@ Unitool потребляет библиотеку **только по maven-ко
 | 5 | фикстуры миграций — файлы `fixtures/config-v1.json` (12 §4.7) | `configFixtures`/`stateFixtures` — списки строк в подклассе `AppContractTest` | Загрузчика ресурсов, одинакового в desktopTest, Robolectric и Karma, не существует. Тест миграций, который нельзя запустить на wasm, сгниёт |
 | 6 | `AppContractTest` в `commonMain` библиотеки `testing` | в `desktopMain` | `kotlin.test.Test` в *main*-сорсете на JVM есть только во «вкусе» JUnit. Тесты приложений и так живут в `desktopTest` (12 §4.1) |
 | 7 | `fixture` собирается и под Android | только desktop + wasmJs | Android покрывает настоящий хост; вторая `AndroidManifest.xml` — это второй файл, который расходится с первым |
-| 8 | Kover с порогами (D44) | не подключён | Не сделано; см. §4 |
-| 9 | эталоны скриншотов + pixelmatch (D43) | скриншоты снимаются и складываются, сравнения с эталоном нет | Не сделано; см. §4 |
+| 8 | Kover с порогами (D44) | не подключён | Не сделано; см. §5 |
+| 9 | эталоны скриншотов + pixelmatch (D43) | скриншоты снимаются и складываются, сравнения с эталоном нет | Не сделано; см. §5 |
+
+Ловушки, которые стоили времени и записаны, чтобы не стоить его снова:
+
+- **BCV на Gradle 9.5 обрывает выполнение корневого скрипта молча.** Сборка «успешна», задачи из
+  корневого `build.gradle.kts` просто не зарегистрированы. Диагностируется только бисекцией
+  `println`-ами.
+- **`runTest` ждёт всех детей своего scope.** Хост и приложение оба запускают бесконечные
+  коллекторы; если отдать им scope от `runTest`, каждый тест падает по таймауту в минуту. Scope
+  для handler-а и для `FakeAppRuntime` в TCK — отдельный, с `UnconfinedTestDispatcher(testScheduler)`.
+- **Каталоги во временной папке переживают JVM.** Нумерованное имя (`unitool-test-1`) означает, что
+  второй прогон читает то, что записал первый: три теста падали в зависимости от того, что
+  происходило вчера. Только `Files.createTempDirectory`.
+- **`testTag` на рамке поля ввода — это узел без text-input-семантики**, и `performTextInput` на нём
+  падает. `AppTextField` вешает modifier вызывающего на сам `BasicTextField`.
+- **Комментарий — не зависимость.** `checkDependencyRules` сначала вырезает комментарии: KDoc
+  каждого модуля говорит словами ровно то, что задача проверяет кодом, и проверка, которая ловит
+  собственную документацию, удовлетворяется только её удалением.
 
 Мелочи, которые стоит знать при чтении кода:
 
@@ -47,7 +64,20 @@ Unitool потребляет библиотеку **только по maven-ко
 - `AppTextField` вешает `modifier` вызывающего на сам `BasicTextField`, а не на рамку: `testTag` на
   рамке даёт узел без text-input-семантики, и `performTextInput` на нём падает.
 
-## 3. Как проверялось
+## 3. Definition of Done (12 §5) — четыре факта
+
+Все четыре проверены, каждый своей командой:
+
+| Факт | Чем доказан |
+|---|---|
+| Четвёртое приложение добавляется одной строкой | `ExtensibilityTest` в `composeApp/desktopTest`: `WeatherApp` живёт только в тестовом сорсете, появляется на Home и открывается; `core`, `ui`, `host` не тронуты |
+| `samples/consumer` собирается из mavenLocal | `./scripts/verify.sh` в библиотеке — шаг 5, PASS |
+| Unitool зелёный против опубликованного пакета | `SUPERIZER_FROM_MAVEN=1 ./scripts/verify.sh` — RESULT: PASS, включая `assembleDebug` и `assembleRelease` |
+| web-smoke проходит активацию через `?activate=` в wasm | `scripts/web-smoke.mjs` — «an activation payload unlocks and opens the hidden app», и лента событий в браузере даёт `Activated → RuntimeCreated → Configured → Created → Launched → Active` |
+
+Отчёты: `superizer/build/verify/report.md` и `unitool/build/verify/report.md`, оба `RESULT: PASS`.
+
+## 4. Как проверялось
 
 - `core`: 21 юнит-тест — `AppId`, `AppConfigSpec` (слияние, битый payload, миграция,
   `schemaVersion`), `AppRegistry` (дубликат, `minHostContract`, `requires`, скрытые), `AppHandler`
@@ -62,9 +92,13 @@ Unitool потребляет библиотеку **только по maven-ко
 - `composeApp`: сквозные — Home, drawer, открытие приложения в рамке хоста, язык, back, конвертер
   онлайн и офлайн; активация промокодом, QR и deep link; `ExtensibilityTest` (§24).
 - Скриншоты: 11 кадров × 2 viewport, просмотрены глазами.
-- Android: `assembleDebug` зелёный; устройства в этой среде нет.
+- Android: `assembleDebug` и `assembleRelease` (R8, без keystore) зелёные; устройства в этой среде нет.
+- wasm: `wasmJsTest` проходит (Karma на системном Chromium); web-smoke проверяет, что бандл
+  стартует, **рисует** (доля не-белых пикселей на скриншоте, а не чтение canvas — у WebGL-канваса
+  нет `getImageData`, и он вежливо отвечает нулём, что выглядит ровно как сломанный рендер),
+  и что маршрут дошёл до handler-а.
 
-## 4. Что из 12–14 осталось не сделанным
+## 5. Что из 12–14 осталось не сделанным
 
 Честный список, чтобы не всплыло как «забыли»:
 
