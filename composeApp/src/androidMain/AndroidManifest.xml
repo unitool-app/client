@@ -18,11 +18,28 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:label="@string/app_name"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density|uiMode|smallestScreenSize|fontScale">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              The two link shapes of 06, as one filter: `unitool://activate?…` carries a payload
+              and may unlock a hidden app, `unitool://app/<id>/<path>` merely names one and may not
+              (D25). Both arrive at the same place — MainActivity hands the URL to the route, and
+              ActivationService is what decides which is which.
+
+              singleTask so a second link reaches onNewIntent rather than stacking a second copy of
+              the host on top of the first; the host is one process with one open app (D4).
+            -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="unitool" />
             </intent-filter>
         </activity>
     </application>

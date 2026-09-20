@@ -7,6 +7,13 @@ androidxActivityCompose = "1.13.0"
 androidCompileSdk = "36"
 androidMinSdk = "24"
 androidTargetSdk = "36"
+kotlinxCoroutines = "1.10.2"
+kotlinxSerializationJson = "1.9.0"
+
+# The library, as a dependency. Bumped by an explicit commit ("bump superizer to 0.2.0") so the
+# version this host is built against is a decision in the history rather than whatever was in
+# mavenLocal that afternoon.
+superizer = "0.1.0"
 
 [libraries]
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
@@ -15,9 +22,21 @@ compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMul
 compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "composeMultiplatform" }
 compose-unstyled = { module = "com.composables:core", version.ref = "composeUnstyled" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivityCompose" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+
+superizer-core = { module = "cx.m42.superizer:core", version.ref = "superizer" }
+superizer-ui-theme = { module = "cx.m42.superizer:ui-theme", version.ref = "superizer" }
+superizer-ui = { module = "cx.m42.superizer:ui", version.ref = "superizer" }
+superizer-host = { module = "cx.m42.superizer:host", version.ref = "superizer" }
+superizer-testing = { module = "cx.m42.superizer:testing", version.ref = "superizer" }
+# Apps version themselves; the library version says nothing about them (02).
+superizer-test-app = { module = "cx.m42.superizer.apps:test-app", version = "1.0.0" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
+androidLibrary = { id = "com.android.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

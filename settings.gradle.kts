@@ -14,8 +14,27 @@ pluginManagement {
     }
 }
 
+/**
+ * The library, as a package.
+ *
+ * Unitool always writes Maven coordinates (`cx.m42.superizer:core:…`), never `project(":core")`.
+ * When the library's checkout is next door, `includeBuild` substitutes the local sources for those
+ * coordinates and a change to the contract is visible here on the next build — Gradle's `npm link`.
+ * When it is not — CI, a clone without it, or `SUPERIZER_FROM_MAVEN=1` on purpose — the same
+ * coordinates resolve out of a repository instead, which is the only way to find out whether the
+ * thing actually publishes.
+ *
+ * That is why no build file in this repository may name a library project directly: the two modes
+ * have to be the same text.
+ */
+val superizerDir = file("../superizer")
+if (superizerDir.exists() && System.getenv("SUPERIZER_FROM_MAVEN") != "1") {
+    includeBuild(superizerDir)
+}
+
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         google {
             mavenContent {
                 includeGroupAndSubgroups("androidx")
@@ -28,3 +47,8 @@ dependencyResolutionManagement {
 }
 
 include(":composeApp")
+
+// Unitool's own apps. They live here rather than in the library because they are the product;
+// the bench app lives there because it is part of the framework (12 §1).
+include(":apps:calculator")
+include(":apps:currency-converter")

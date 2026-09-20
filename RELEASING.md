@@ -158,3 +158,27 @@ keytool -genkeypair -v \
 ```
 
 `-validity 10000` is not arbitrary: Play requires an upload certificate valid past 22 October 2033.
+
+---
+
+## What the Superizer migration changed here
+
+The procedure above is unchanged. Three facts about the build are new and worth knowing before a
+release:
+
+- **The library is a dependency now.** `gradle/libs.versions.toml` pins `superizer = "0.1.0"`. A
+  release build must not be made against a local checkout by accident — run
+  `SUPERIZER_FROM_MAVEN=1 ./scripts/verify.sh` first, which resolves the library from a repository
+  and fails if the published artifacts are incomplete.
+- **`assembleRelease` is part of verification.** R8 with an empty `proguard-rules.pro` only works
+  because registration is explicit and the serialization keep rules travel inside
+  `superizer:core`'s consumer rules. `scripts/verify.sh` builds a release on every run for that
+  reason; it does not need a keystore to do it.
+- **The listing screenshots moved.** `build/screenshots/play/` now holds eleven frames rather than
+  five. The four that belong in the Play listing are `01-all-apps`, `03-calculator`, `05-converter`
+  and `08-settings`; the rest exist for the README and for review.
+
+The hidden bench app is in the release build. That is deliberate — it is how a problem on a real
+device gets diagnosed — and it is unreachable without the promo code, which is the same code that
+opens the Service Menu. Changing `SERVICE_CODE` in `UnitoolHost.kt` before a public release is the
+one thing to remember.

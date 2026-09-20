@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 /**
@@ -107,6 +108,22 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.ui)
             implementation(libs.compose.unstyled)
+
+            // The library, by Maven coordinates and never by project path (02): with the checkout
+            // next door Gradle substitutes the sources, without it the same text resolves out of a
+            // repository, and the two modes need no edit between them.
+            implementation(libs.superizer.core)
+            implementation(libs.superizer.ui.theme)
+            implementation(libs.superizer.ui)
+            implementation(libs.superizer.host)
+            implementation(libs.superizer.test.app)
+
+            // Unitool's own apps.
+            implementation(project(":apps:calculator"))
+            implementation(project(":apps:currency-converter"))
+
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
@@ -117,6 +134,7 @@ kotlin {
         desktopTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.compose.ui.test)
+            implementation(libs.superizer.testing)
         }
     }
 }
@@ -141,6 +159,12 @@ val keystorePath = signingValue("ANDROID_KEYSTORE_FILE", "storeFile")
 android {
     namespace = "cx.m42.unitool"
     compileSdk = libs.versions.androidCompileSdk.get().toInt()
+
+    buildFeatures {
+        // D34: the host has to know whether it is a debug build, because that is what decides
+        // whether seven taps on the build stamp can reach the Service Menu.
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "cx.m42.unitool"

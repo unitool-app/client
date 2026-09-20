@@ -46,6 +46,14 @@ __pycache__/
 # committed as a dangling symlink for everyone else.
 /example-app
 
+# A symlink to the Node/TypeScript framework this one is modelled on, kept as a reference while
+# working. It is somebody else's repository, not a dependency of this build.
+/adminizer
+
+# The library's checkout, when it is next door. settings.gradle.kts picks it up automatically;
+# it has its own git.
+/superizer
+
 # OS droppings.
 .DS_Store
 Thumbs.db
