@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The window the app composes into. Everything visible is drawn by Compose from
+      cx.m42.unitool.theme.AppTheme, so this styles only what exists before the first frame and
+      what Compose cannot reach: the window background behind the composition, and the colour the
+      system draws its own status-bar glyphs in.
+
+      windowLightStatusBar is what makes the clock and the battery *dark*. The app is a white
+      surface, and the platform default of light glyphs would render them white on white —
+      invisible. The navigation-bar equivalent arrives in API 27; see values-v27.
+
+      The bars themselves are left transparent here and the insets are consumed in Compose
+      (WindowInsets.safeDrawing in AppScaffold), which is the arrangement targetSdk 35+ enforces
+      anyway.
+    -->
+    <style name="Theme.Unitool" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

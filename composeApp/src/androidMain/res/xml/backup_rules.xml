@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 11 and below (android:fullBackupContent). The app stores exactly one thing worth
+  carrying to a new device — the chosen language and whether keys vibrate — and nothing that
+  would be wrong on different hardware, so the preferences file is included and nothing else is.
+-->
+<full-backup-content>
+    <include domain="sharedpref" path="cx.m42.unitool.settings.xml" />
+</full-backup-content>

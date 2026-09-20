@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The themed-icon layer (Android 13+). Identical geometry to the foreground, but filled with an
+  opaque placeholder the system re-tints from the wallpaper — a monochrome layer that carried the
+  brand colour would come out the wrong colour on a tinted home screen.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36.5,40 H71.5 A4.5,4.5 0 0 1 76,44.5 A4.5,4.5 0 0 1 71.5,49 H36.5 A4.5,4.5 0 0 1 32,44.5 A4.5,4.5 0 0 1 36.5,40 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36.5,59 H71.5 A4.5,4.5 0 0 1 76,63.5 A4.5,4.5 0 0 1 71.5,68 H36.5 A4.5,4.5 0 0 1 32,63.5 A4.5,4.5 0 0 1 36.5,59 Z" />
+</vector>

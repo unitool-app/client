@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppTheme.Primary. The launcher is the first surface the app owns, so it uses the same
+         near-black the "=" key does rather than a colour invented for the icon. -->
+    <color name="ic_launcher_background">#18181B</color>
+</resources>

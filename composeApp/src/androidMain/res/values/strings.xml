@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher label and the name Play shows. A proper noun, so it is the same in every
+         language — but it lives here rather than hardcoded in the manifest so a language that
+         does need its own spelling has somewhere to put it (see values-ru). -->
+    <string name="app_name" translatable="false">Unitool</string>
+</resources>

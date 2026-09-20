@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppTheme.Background. The window behind the composition, so the frame before Compose's
+         first draw is already the colour the app is about to paint rather than a grey flash. -->
+    <color name="window_background">#FFFFFF</color>
+</resources>

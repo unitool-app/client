@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (android:dataExtractionRules). Two separate questions, answered separately:
+
+  cloud-backup  — what Google may hold in a backup of this device.
+  device-transfer — what may be copied straight to a new phone during setup.
+
+  Both carry the same single preferences file. Declaring the rules explicitly rather than leaving
+  allowBackup to sweep up the whole data directory is what keeps a future cache or log out of a
+  backup by default.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="cx.m42.unitool.settings.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="cx.m42.unitool.settings.xml" />
+    </device-transfer>
+</data-extraction-rules>

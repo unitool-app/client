@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages the app actually has tables for, declared so Android 13+ lists it under
+  Settings > Apps > Unitool > Language. Without this the per-app language picker does not appear
+  at all, and cx.m42.unitool.i18n.Lang is the only way in.
+  Kept in step with that enum: a language added there needs a line here.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ru" />
+</locale-config>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      API 31+ shows a system splash screen on every cold start whether or not the app asks for
+      one. Left undeclared it takes windowBackground — white — and draws the launcher icon on it,
+      which puts a white "=" on white. Naming the icon's own near-black here makes the splash the
+      icon rather than an accident of it, and hands over to a white window with no flash between.
+    -->
+    <style name="Theme.Unitool" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+    </style>
+</resources>

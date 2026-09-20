@@ -1,0 +1,51 @@
+# Build output. `build/` has no leading slash, so it matches the root project's and every
+# module's, at any depth — including composeApp/build/outputs/mapping/, R8's symbol map, which
+# is a build artifact even though RELEASING.md says to keep a copy of it.
+build/
+out/
+captures/
+
+# Gradle's and Kotlin's own caches. Machine-local and regenerated on demand.
+.gradle/
+.kotlin/
+*.hprof
+
+# Where the Android SDK lives on this machine. Every checkout has a different answer, which is
+# why the build reads it from here rather than from a committed file.
+local.properties
+
+# Anything that could sign or publish a release. The directory rather than a pattern per file,
+# so a secret added later is ignored before anyone has to remember to add it — and the keystore
+# patterns as well, for a key someone drops outside it.
+.secrets/
+composeApp/keystore.properties
+*.jks
+*.keystore
+
+# IDEs and editors. The Gradle build is the source of truth; nobody should need another
+# checkout's project files to open this one.
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*~
+
+# The web target's toolchain. `kotlin-js-store/yarn.lock` is deliberately *not* here: it pins
+# the Wasm build's npm dependencies and belongs in the repository.
+node_modules/
+
+# Scratch output from tools that run against the app — MCP browser sessions, the Python in
+# play/ — none of which is part of the app.
+.playwright-mcp/
+__pycache__/
+*.pyc
+
+# A symlink to an unrelated checkout on one machine, used as reference material. It would be
+# committed as a dangling symlink for everyone else.
+/example-app
+
+# OS droppings.
+.DS_Store
+Thumbs.db
