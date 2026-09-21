@@ -315,10 +315,11 @@ jobs:
           track: ${{ inputs.track || vars.PLAY_TRACK || 'alpha' }}
           status: completed
           releaseName: ${{ github.run_number }}
-          # Edited before a release, not generated: Play shows these to a person. That directory
-          # holds locale files and nothing else — the action turns every entry in it into a
-          # locale, so a stray README would ask Play to publish notes in a language called
-          # "README.md". The explanation lives in play/WHATSNEW.md, one level up, for that reason.
+          # Edited before a release, not generated: Play shows these to a person. One file per
+          # locale, no extension — the action reads the locale out of everything after
+          # `whatsnew-`. See play/WHATSNEW.md, which is one level up so that this directory stays
+          # locale files only; that is tidiness rather than a requirement, since the action does
+          # filter on the prefix.
           whatsNewDirectory: play/whatsnew
 
       - name: Summary

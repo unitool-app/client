@@ -1,27 +1,34 @@
 # Release notes, as Play wants them
 
-*This file deliberately does **not** live in `play/whatsnew/`.*
+*This file deliberately does **not** live in `play/whatsnew/`.* Keeping that directory to locale
+files only is a habit rather than a requirement — the upload action does filter on the `whatsnew-`
+prefix, verified by a run that had a `README.md` sitting in there and published cleanly anyway.
 
-`android-play.yml` passes this directory to the upload action as `whatsNewDirectory`, so whatever
+`android-play.yml` passes `play/whatsnew/` to the upload action as `whatsNewDirectory`, so whatever
 is in these files is what Play shows under **What's new** for the release that run creates.
 
-Three rules, all of which fail quietly rather than loudly:
-
-* **Nothing but locale files in that directory.** The upload action reads the directory and turns
-  each entry into a locale. A `README.md` sitting there is an attempt to publish release notes in
-  a language called `README.md`, which is why this explanation is one level up.
+## What is actually true about the filenames
 
 * **No extension.** The action reads the locale out of everything after `whatsnew-`, so
-  `whatsnew-en-US.txt` asks Play for a locale called `en-US.txt` and the notes are dropped.
-* **The locale must be one the listing has.** Right now that is `en-US` and nothing else —
-  `edits.listings.list` was asked. A locale the listing does not have is rejected with the upload,
-  not with the file, so it fails the publish step of an otherwise green run after the bundle is
-  already built. The finished Russian notes are parked in `play/listing/pending/` for exactly this
-  reason; see the README there.
+  `whatsnew-en-US.txt` would ask Play for a locale called `en-US.txt`.
+* **The limit is 500 characters** per locale, counted after the upload finishes.
+* **A locale does not have to be in the store listing.** This was the assumption worth writing
+  down, because it was assumed the other way round first. The listing for `cx.m42.unitool` has
+  exactly one locale, `en-US` — `edits.listings.list` was asked and answered — and the release
+  notes for `ru-RU` were nonetheless accepted and are visible on the release. Store listings and
+  release notes are separate things in the API, and Play does not require the second to be a subset
+  of the first.
 
-The limit is **500 characters** per locale. Play counts them after the upload has finished.
+  The Russian notes were pulled out of this directory on the strength of the opposite guess. They
+  are back, because the run proved the guess wrong. Prefer the run to the guess.
 
-These are edited by a person before a release — they are the one part of a publish that is written
-rather than computed, and a file that still describes the previous version is worse than an empty
-one. If a run should publish no notes at all, delete the files; the action skips a directory with
-nothing in it.
+## Still worth doing
+
+The app ships a Russian interface and the finished Russian store copy sits in
+`play/listing/description-ru.md`, but the listing itself is English-only. That is a real gap, and
+it closes once in **Play Console → Main store listing → Manage translations → Add your own
+translation → Русский**. It is a publishing decision, not something CI should do on anyone's
+behalf, so nothing here does it.
+
+These notes are edited by a person before a release — the one part of a publish that is written
+rather than computed. A file that still describes the previous version is worse than an empty one.

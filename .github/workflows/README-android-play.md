@@ -161,10 +161,9 @@ and run the script again; setting the first four a second time costs nothing.
   under. Only ever read by a person, so it is the one number that opens the run that built it; the
   run knows its own commit, which is why no SHA is carried. It tracks the versionCode by
   construction — release `4` is versionCode `1004`.
-* **What's new** — `play/whatsnew/`, edited by a person before a release. Locale files only, no
-  README: the action turns every entry in that directory into a locale. See `play/WHATSNEW.md`,
-  and note the listing currently has `en-US` and nothing else, so the finished Russian notes are
-  parked in `play/listing/pending/` until a Russian listing exists in the console.
+* **What's new** — `play/whatsnew/`, edited by a person before a release, one file per locale with
+  no extension. A locale does **not** have to exist in the store listing: this app's listing is
+  `en-US` only and its `ru-RU` notes publish fine. See `play/WHATSNEW.md`.
 
 ## Before the first run
 
