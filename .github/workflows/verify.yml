@@ -35,7 +35,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # `packages` named explicitly. The action's default is `tools platform-tools`, and the SDK
+      # repository no longer has `tools` — it fails with "Failed to find package 'tools'" and takes
+      # the whole job with it, which is what happened on the first run of this file. The list
+      # matches android-play.yml so the two jobs build against the same SDK.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
 
       - uses: actions/setup-node@v4
         with:
