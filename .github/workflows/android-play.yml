@@ -322,6 +322,27 @@ jobs:
           # filter on the prefix.
           whatsNewDirectory: play/whatsnew
 
+      # The upload action reports what it *sent*. This reports what Play *has*, which is not the
+      # same question — a release has already gone to `internal`, a track with no testers on it,
+      # through a run where every single step was green. Failing here turns that into a red run
+      # instead of a quiet one.
+      - name: Confirm the release is on the track it was sent to
+        if: github.event_name == 'push' || inputs.upload
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          TRACK="${{ inputs.track || vars.PLAY_TRACK || 'alpha' }}"
+          python3 scripts/play-track-check.py cx.m42.unitool "$ANDROID_VERSION_CODE" "$TRACK" \
+            | tee "$RUNNER_TEMP/track.txt"
+          {
+            echo "### Where the build landed"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/track.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Summary
         if: always()
         run: |

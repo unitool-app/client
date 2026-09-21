@@ -33,6 +33,10 @@ record is created and can never be changed for that listing afterwards.
    on a real device). Both, plus `mapping.txt`, are kept as run artifacts for 90 days.
 7. Verifies the APK is actually signed and that the bundle carries its `proguard.map`.
 8. Uploads the bundle with `r0adkll/upload-google-play`.
+9. **Asks Play where the build actually landed** (`scripts/play-track-check.py`) and fails if the
+   versionCode is not on the intended track. The upload action reports what it *sent*; this
+   reports what Play *has*. Those came apart once already — a release went to `internal`, a track
+   with nobody on it, through a run where every step was green — and nothing in the run said so.
 
 ## The library
 
@@ -81,6 +85,13 @@ about the source.
 This is what the `SUPERIZER_REF` variable is for once the pace picks up: pin a release build to
 the exact library commit it was tested against, instead of to whatever the default branch holds
 at the moment the job starts.
+
+## Every build goes to closed testing
+
+Push to `main`, and the bundle is published to the `alpha` track. There is nothing to choose and
+nothing to remember: the track is the `PLAY_TRACK` repository variable (set to `alpha`), the
+workflow's default is `alpha` as well, and step 9 above fails the run if the release is anywhere
+else. A manual run can override the track for a one-off; a push never does.
 
 ## Which track a build lands on
 
