@@ -72,6 +72,10 @@ public fun buildUnitool(
     // code below — which is also the only way the Service Menu opens in a release.
     register(TestApp())
 
+    // What a fresh install has on Home (D48): the calculator, because that is what Unitool was.
+    // The converter is one tap away in the catalog; the bench app gets there by its promo code.
+    home("calculator")
+
     promoCodes(
         mapOf(
             // The visible effect of a config, reachable by typing five characters (07).

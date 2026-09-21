@@ -192,8 +192,16 @@ fun SuperizerShell(superizer: Superizer, modifier: Modifier = Modifier)
 - **Back**: `SystemBackHandler` shell-а активен на любом destination кроме Home. Порядок
   вложенности: drawer (в `AppScaffold`) → приложение (в `Content()`) → shell. При back из
   `App` shell вызывает `handler.close()`; veto из `onCloseRequested` показывает диалог хоста.
-- **All Apps (Home)** — сетка плиток: `AppIcon`, `metadata.title`, `category`. Скрытые не
-  показываются. Пустая категория → без заголовка. Тап → `handler.launch(id)`.
+- **Home** — сетка плиток *выбранных* приложений (D48): `AppIcon`, `metadata.title`, `category`,
+  в порядке добавления; последней — плитка «Добавить», ведущая в каталог. Тап → `handler.launch(id)`.
+  **Долгий тап** по любой плитке → `Superizer.removeFromHome(id)`, без диалога: дорога назад — один
+  тап в каталоге. Пустой Home — подпись и кнопка «Добавить». Экран сам ничего не решает —
+  `HomeScreen(apps, onOpen, onRemove, onAdd)` только сообщает о жестах.
+- **All Apps (каталог)** — `ShellDestination.Catalog(from)`, как Settings: открывается поверх
+  текущего экрана, «назад» возвращает туда, откуда пришли. Список всего видимого (не скрытого или
+  разблокированного) по категориям; у того, что уже на Home, — галочка; тап переключает
+  `addToHome`/`removeFromHome`. Скрытые до активации не показываются (D8). Вход: плитка «+» на
+  Home и пункт «Все приложения» в drawer.
 - **Settings** — существующий экран (язык, вибрация, о приложении) + секции, зарегистрированные
   через `ctx.settingsSection` (заголовок = `metadata.title`). Семь тапов по «Сборка …» открывают
   Service Menu **только при `HostInfo.debug`** (D34); в release единственный вход — промокод из
@@ -202,7 +210,9 @@ fun SuperizerShell(superizer: Superizer, modifier: Modifier = Modifier)
   причиной): id, version, `minHostContract`, state, unlocked; последний `ConfigRejected` по приложению;
   раскрывающийся манифест (D47): `requires` с отметкой есть/нет у хоста, `deepLinks`, `pushTopics`,
   `networkHosts` — видно **до** запуска, что приложение просит;
-  кнопки «Запустить», «Запустить с конфигом…» (JSON-поле), «Разблокировать/скрыть»,
+  кнопки «Запустить», «Запустить с конфигом…» (JSON-поле), «Разблокировать/Скрыть»
+  (`DiagnosticsPort.unlock/lock`: разблокировка кладёт на Home, замок убирает с Home и закрывает
+  сессию, D48),
   «Disable/Enable», «Сбросить» (D35: `Superizer.reset(id)` — storage-namespace, темы пушей, снимок,
   unlock; с подтверждением); поле ввода промокода; поле вставки QR-payload; «Simulate push» (13);
   лента `SuperizerEvent`; лог из `LogBuffer`. Это и есть аналог `ModuleManagerApp`.

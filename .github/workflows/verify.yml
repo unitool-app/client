@@ -15,9 +15,14 @@ jobs:
 
       # The library, next door, exactly as it is on a developer's machine. Without it the build
       # falls back to Maven coordinates, which is mode C and a different thing to test.
+      #
+      # This said `m42cx/superizer` until it was checked: no such repository exists, so this job
+      # had never got past here. The slug now comes from the same repository variable
+      # android-play.yml reads, so a rename is one setting rather than two files that drift.
       - uses: actions/checkout@v4
         with:
-          repository: m42cx/superizer
+          repository: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
+          ref: ${{ vars.SUPERIZER_REF || '' }}
           path: superizer-checkout
 
       - name: Put the library where settings.gradle.kts looks for it

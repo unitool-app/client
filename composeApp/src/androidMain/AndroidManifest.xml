@@ -4,6 +4,23 @@
     <!-- Normal permission: granted at install time, never prompts the user. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!--
+      The network, and the two things that use it: the converter's exchange-rate table, and Firebase
+      Cloud Messaging.
+
+      Repeated here even though `superizer:host` declares it and manifest merging would bring it in
+      anyway. A permission that changes what this app may claim about itself in its store listing is
+      not something to discover by reading the merged manifest in a build directory — the listing
+      and play/PRIVACY.md are written against this line.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      Android 13+. Asked for at runtime, by PushTransport.requestPermission(), and refusable: the
+      calculator and the converter do not need it and do not change when it is denied.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

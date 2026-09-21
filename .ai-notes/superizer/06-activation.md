@@ -133,3 +133,15 @@ Home (05).
 Открытие с QR-текстом, с промокодом, из Service Menu с произвольным JSON, из deep link — и в
 каждом случае Test App показывает **одинаковый** экран «config = {…}». Отсутствие поля «откуда»
 на этом экране — намеренное, это и есть §12–13.
+
+## Конфиг после активации и ссылка из камеры (план, 16)
+
+Сейчас конфиг из QR доходит только до одного `launch`: закрыл приложение — снимок стёрт, открыл с
+Home — `AppConfig.Empty`. План в [16](16-app-config-store-and-bundle.md): активация с
+`unlock = true` **провижинит** — запись `Provisioning(appId, config, audience)` уходит в
+`ProvisioningStore` (интерфейс в `core`, реализация у хоста, prefs по умолчанию), каждый `launch`
+получает `default ⊕ stored ⊕ transient`, все записи экспортируются файлом `app_config_bundle` и
+импортируются в другом хосте через тот же `QrPayloadParser` (`ActivationResult.Bundle`).
+Автоматический режим: `https://<linkDomain>/activate?a=…&au=…&c=…` из системного сканера —
+App Link на Android, тот же URL открывает wasm-сборку, если Unitool не установлен (D59).
+`audience` рядом с `config` — адресат для пушей от сервера приложения через сервер Unitool (D60–D61).

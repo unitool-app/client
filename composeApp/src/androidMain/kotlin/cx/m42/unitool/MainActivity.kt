@@ -56,10 +56,29 @@ class MainActivity : ComponentActivity() {
         deliver(intent)
     }
 
+    /**
+     * The POST_NOTIFICATIONS answer, handed back to the transport that asked for it.
+     *
+     * Forwarded blind rather than filtered on a request code: `PushTransport` ignores a code that
+     * is not its own, so this stays correct if anything else here ever asks for a permission too.
+     * It has to be here because only an Activity receives this callback, and the transport is an
+     * object reached from a `FirebaseMessagingService` that has no activity at all.
+     */
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        PushTransport.onPermissionResult(requestCode, grantResults)
+    }
+
     private fun deliver(intent: Intent?) {
         intent?.data?.toString()?.let { Holder.superizer?.route?.deliver(it) }
-        // A notification tap carries its payload as extras, not as data (13 §1). Absent a
-        // transport there is nothing to receive one yet, but the path is the same one FCM will use.
+        // A notification tap carries its payload as extras, not as data (13 §1). This is the path
+        // FCM uses: the notification Firebase itself draws for a `notification` payload arrives
+        // here as extras, and the one AndroidNotifier draws arrives as `data` on the VIEW intent
+        // above. Both end at the same route.
         intent?.extras?.let { extras ->
             val data = extras.keySet().mapNotNull { key ->
                 extras.getString(key)?.let { key to it }
@@ -72,7 +91,12 @@ class MainActivity : ComponentActivity() {
         val existing = Holder.superizer
         if (existing != null) return existing
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        return buildUnitool(scope, debug = BuildConfig.DEBUG).also { Holder.superizer = it }
+        // The application context, not this activity: a notification can be drawn long after the
+        // activity that happened to build the host is gone.
+        val notifier = AndroidNotifier(applicationContext)
+        return buildUnitool(scope, debug = BuildConfig.DEBUG) {
+            notifier(notifier)
+        }.also { Holder.superizer = it }
     }
 
     /**

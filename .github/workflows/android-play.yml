@@ -1,0 +1,329 @@
+# Build, sign and publish the Android bundle to Google Play.
+#
+# Same shape as the reference pipeline in example-app: Gradle plus one upload action, and no
+# Fastlane — nothing on the Android path needs a keychain, a provisioning profile or Xcode.
+#
+# One thing here is Unitool's own and is not in that reference:
+#
+#   * The library has to come from somewhere. RELEASING.md is explicit that a release must not be
+#     built against whatever happens to be in a checkout next door, so this workflow publishes
+#     Superizer to mavenLocal at the version `gradle/libs.versions.toml` pins and then builds with
+#     SUPERIZER_FROM_MAVEN=1 — mode C of 12 §2. A composite substitution would ship a library that
+#     no version number describes.
+name: Build and Deploy Android to Google Play
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload the bundle to Google Play (off = build and keep the artifact only)'
+        required: false
+        type: boolean
+        default: true
+      track:
+        description: 'Play track to publish to'
+        required: false
+        type: choice
+        default: internal
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+# A second push must not resolve a versionCode while the first is still uploading one.
+concurrency:
+  group: android-play-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build_and_deploy:
+    name: Build, Sign and Deploy to Google Play
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          MISSING=""
+          for NAME in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS \
+                      ANDROID_KEY_PASSWORD PLAY_SERVICE_ACCOUNT_JSON GOOGLE_SERVICES_JSON_BASE64; do
+            if [ -z "${!NAME:-}" ]; then
+              MISSING="$MISSING $NAME"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Missing repository secrets:$MISSING" >&2
+            echo "Run scripts/push-play-secrets.sh, or see .github/workflows/README-android-play.md." >&2
+            exit 1
+          fi
+          echo "All required secrets are present."
+
+      # Per-deployment Firebase config, gitignored and therefore absent from the checkout. Without
+      # it composeApp/build.gradle.kts does not apply the Google Services plugin at all, and the
+      # build quietly produces an app that can never receive a push — a failure with no error.
+      - name: Install google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > composeApp/google-services.json
+          # A truncated or wrongly-encoded secret is far easier to diagnose here than as a failure
+          # inside the Google Services plugin, which reports it as a parse error in a generated file.
+          python3 -c 'import json; json.load(open("composeApp/google-services.json"))'
+          PKG=$(python3 -c 'import json; d=json.load(open("composeApp/google-services.json")); print(" ".join(c["client_info"]["android_client_info"]["package_name"] for c in d["client"]))')
+          echo "Firebase clients in this config: $PKG"
+          # The plugin fails the build on a missing client anyway, but it does so several minutes
+          # later and names the package without saying which ones the file *does* have.
+          case " $PKG " in
+            *" cx.m42.unitool "*) ;;
+            *) echo "::error::google-services.json has no client for cx.m42.unitool — push would be inert"; exit 1 ;;
+          esac
+
+      # The upload key, written into RUNNER_TEMP and never into the workspace, so it cannot be
+      # swept up by the artifact upload below or left behind in a cached directory.
+      - name: Install upload keystore
+        id: keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/upload.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
+
+      # The library's sources, checked out somewhere settings.gradle.kts will *not* find them.
+      # `../superizer` is the one path that turns this into a composite build, and a release built
+      # that way is a release built against an unnamed version of the library — see the header.
+      - name: Checkout Superizer
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
+          ref: ${{ vars.SUPERIZER_REF || '' }}
+          # Only needed while the library repository is private; the default token cannot read
+          # another repository, so a PAT goes in SUPERIZER_TOKEN when it is.
+          token: ${{ secrets.SUPERIZER_TOKEN || github.token }}
+          path: superizer-src
+
+      - name: Move it out of the composite-build path
+        run: mv superizer-src "$RUNNER_TEMP/superizer"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Only the release branches refresh the shared cache entry; everything else reads it.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Named explicitly rather than left to the action's default, which is the `tools`
+          # package — no longer in the SDK repository, and its absence fails the whole job with
+          # "Failed to find package 'tools'".
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Verify the keystore holds the alias the build will ask for
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+        run: |
+          set -euo pipefail
+          # Gradle's own failure for a wrong password or a missing alias arrives deep inside a
+          # signing task and names neither; keytool says which of the two it is.
+          keytool -list -keystore "$KEYSTORE_PATH" -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+                  -alias "$ANDROID_KEY_ALIAS" >/dev/null
+          echo "Keystore contains alias $ANDROID_KEY_ALIAS."
+
+      # The versions this host actually asks for, read out of the catalogue rather than repeated
+      # here. Publishing the library at anything else would resolve to whatever mavenLocal already
+      # had, or to nothing at all.
+      - name: Read the Superizer version this build pins
+        id: superizer
+        run: |
+          set -euo pipefail
+          LIB=$(sed -n 's/^superizer = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+          APPS=$(sed -n 's/^superizer-test-app = .*version = "\([^"]*\)".*/\1/p' gradle/libs.versions.toml)
+          [ -n "$LIB" ] && [ -n "$APPS" ] || { echo "::error::could not read the superizer versions from gradle/libs.versions.toml"; exit 1; }
+          echo "library=$LIB" >> "$GITHUB_OUTPUT"
+          echo "apps=$APPS" >> "$GITHUB_OUTPUT"
+          echo "Superizer $LIB, apps $APPS"
+
+      # Real artifacts — POMs, Gradle module metadata, the consumer ProGuard rules that make
+      # composeApp/proguard-rules.pro able to stay almost empty. A composite build produces none of
+      # those, which is why this is also the only step that can prove the library publishes at all.
+      - name: Publish Superizer to mavenLocal
+        working-directory: ${{ runner.temp }}/superizer
+        run: |
+          ./gradlew publishToMavenLocal \
+            -Psuperizer.version=${{ steps.superizer.outputs.library }} \
+            -Psuperizer.appsVersion=${{ steps.superizer.outputs.apps }} \
+            --stacktrace
+
+      # Everything from here on resolves the library out of mavenLocal. Exported rather than set
+      # per step so a step that forgot it cannot quietly fall back to a different resolution mode.
+      - name: Resolve the library from a repository, not from a checkout
+        run: echo "SUPERIZER_FROM_MAVEN=1" >> "$GITHUB_ENV"
+
+      # The dependency rules of 02 and every test that needs no browser or device. Deliberately
+      # before the bundle: a release that skips its tests is not cheaper, it is just later.
+      - name: Verify
+        run: ./gradlew verify --stacktrace
+
+      # Screenshots for the listing are written by the desktop test above, so this costs nothing
+      # more than the Python. It catches the things Play rejects *after* a long upload — a
+      # screenshot of the wrong shape or with an alpha channel, a description one character over,
+      # a privacy policy still carrying a TODO.
+      #
+      # Fatal only for a production release, which is how Play itself behaves: internal testing
+      # tolerates most of the content forms being incomplete, and production does not. A listing
+      # problem must not stop a bundle from reaching testers — the listing is not in the bundle.
+      # It is always in the job summary, so "advisory" does not mean "invisible".
+      - name: Check the Play listing material
+        id: listing
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python3 play/check-listing.py 2>&1 | tee "$RUNNER_TEMP/listing.txt"
+
+      # Separate from the check itself because `continue-on-error` swallows the exit code, and the
+      # decision "fatal or not" depends on the track rather than on the check.
+      - name: Report the listing check
+        if: always() && steps.listing.outcome != ''
+        run: |
+          set -euo pipefail
+          TRACK="${{ inputs.track || vars.PLAY_TRACK || 'internal' }}"
+          {
+            echo "### Play listing check — ${{ steps.listing.outcome }}"
+            echo
+            echo '```'
+            grep -E 'FAIL|SKIP|problem' "$RUNNER_TEMP/listing.txt" || echo 'everything Play checks is in order'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.listing.outcome }}" = "failure" ] && [ "$TRACK" = "production" ]; then
+            echo "::error::the listing is not fit for production — see the job summary"
+            exit 1
+          fi
+          if [ "${{ steps.listing.outcome }}" = "failure" ]; then
+            echo "::warning::the listing has problems Play would reject; fatal only for the production track"
+          fi
+
+      # Play refuses a versionCode it has already accepted. run_number only ever grows within a
+      # repository, including across re-runs of older commits, so it can never collide with another
+      # CI build. The 1000 offset keeps it from colliding with a hand-made one either: codes below
+      # 1000 belong to bundles built on a laptop, and the first release had to be uploaded that way
+      # because the Play API cannot create it.
+      #
+      # The sum is computed by the shell and not in a `${{ }}` expression: GitHub's expression
+      # language has no arithmetic operators, and a workflow containing one is rejected when it is
+      # *dispatched* — the file parses as YAML and fails only at the API, saying
+      # "Unexpected symbol: '+'".
+      - name: Choose the versionCode
+        run: echo "ANDROID_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Build the release bundle
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ steps.keystore.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :composeApp:bundleRelease --stacktrace
+
+      # An APK as well, for installing on a phone directly — a Play bundle cannot be sideloaded,
+      # and RELEASING.md §2 wants the *release* build on a real device before it goes anywhere.
+      - name: Build the release APK
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ steps.keystore.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :composeApp:assembleRelease --stacktrace
+
+      - name: Confirm the bundle is signed and carries its symbol map
+        run: |
+          set -euo pipefail
+          APK=$(ls composeApp/build/outputs/apk/release/*.apk | head -1)
+          AAB=$(ls composeApp/build/outputs/bundle/release/*.aab | head -1)
+          # Located by glob rather than named: a compileSdk bump changes the directory, and a
+          # hard-coded 36.0.0 would fail here rather than where the version was changed.
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          # An unsigned artifact is what this build produces with no keystore, and Play rejects it
+          # with a message that does not mention signing at all.
+          "$APKSIGNER" verify --print-certs "$APK"
+          # R8 renames everything, so a Play Console crash is unreadable without the map. AGP puts
+          # it inside the bundle (RELEASING.md §3) — verified here rather than assumed, because the
+          # failure mode is a stack trace nobody can read months later.
+          unzip -l "$AAB" | grep -q 'proguard.map' \
+            || { echo "::error::the bundle carries no proguard.map — a crash report would be unreadable"; exit 1; }
+          echo "Signed, and the symbol map is in the bundle."
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ github.run_number }}
+          path: |
+            composeApp/build/outputs/bundle/release/*.aab
+            composeApp/build/outputs/apk/release/*.apk
+            composeApp/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      # `releaseName` is the label Play Console lists the release under, and it is read by people
+      # rather than by anything. It is the CI run number and nothing else: the run number opens the
+      # Actions run, and the run knows its own commit. It tracks the versionCode by construction —
+      # release `4` is versionCode `1004`.
+      #
+      # The track is an API id, not the heading the console shows. `internal` is what RELEASING.md
+      # §5 says the first upload goes to; a closed track created by hand in the console gets an id
+      # of its own that nothing here can guess, so that case is the PLAY_TRACK repository variable
+      # rather than an edit to this file. A wrong id fails with `Track not found`, which is the
+      # whole error — it does not list the tracks that do exist.
+      - name: Publish to Google Play
+        if: github.event_name == 'push' || inputs.upload
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: cx.m42.unitool
+          releaseFiles: composeApp/build/outputs/bundle/release/*.aab
+          track: ${{ inputs.track || vars.PLAY_TRACK || 'internal' }}
+          status: completed
+          releaseName: ${{ github.run_number }}
+          # Edited before a release, not generated: Play shows these to a person. See
+          # play/whatsnew/README.md.
+          whatsNewDirectory: play/whatsnew
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Android release ${{ github.run_number }}"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| versionCode | \`$((1000 + GITHUB_RUN_NUMBER))\` |"
+            echo "| Superizer | \`${{ steps.superizer.outputs.library }}\` (from mavenLocal) |"
+            echo "| Track | \`${{ inputs.track || vars.PLAY_TRACK || 'internal' }}\` |"
+            echo "| Uploaded | ${{ github.event_name == 'push' || inputs.upload }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

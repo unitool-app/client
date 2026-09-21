@@ -1,0 +1,13 @@
+# Which of the generated screenshots go into the Play listing, in the order Play shows them.
+#
+# The generator writes twelve frames into composeApp/build/screenshots/play/ and Play accepts at
+# most eight, so something has to choose — and a directory listing cannot: it has no way to know
+# that 10-service-menu and 11-test-app are the *hidden* diagnostic surfaces (D8), which a store
+# listing would be advertising. Naming them here makes the choice reviewable, and lets the
+# generator go on producing every frame for the README and for review.
+#
+# Blank lines and # comments are ignored. The four below are the set RELEASING.md §4 records.
+01-home.png
+03-calculator.png
+05-converter.png
+08-settings.png

@@ -4,19 +4,44 @@ Everything below assumes the upload key already exists. It does — see [The upl
 
 ---
 
+## 0. The short version: CI already does all of this
+
+`.github/workflows/android-play.yml` builds, signs, verifies and uploads. Every step below is in
+it, which is the point — a release that only one laptop can produce is a release nobody else can
+make. Set the secrets once and the rest is a button:
+
+```bash
+./scripts/push-play-secrets.sh unitool-app/client
+```
+
+Then **Actions → Build and Deploy Android to Google Play → Run workflow**. Turn `upload` off for a
+run that only builds; that artifact is what the first, manual upload needs (see §5 — the Play API
+cannot create an app's first release).
+
+[`.github/workflows/README-android-play.md`](.github/workflows/README-android-play.md) is the
+reference for it: the secrets, the tracks, the version numbering, and why the library is published
+to mavenLocal mid-run instead of being built from the checkout next door.
+
+The rest of this file is the same procedure by hand — worth reading once, because it is what the
+workflow is doing, and worth doing by hand exactly twice: for the first upload, and on the day CI
+disagrees with a laptop about what it built.
+
+---
+
 ## 1. Build the artifact
 
-### First: make it a git checkout
+### First: commit
 
 `generateBuildInfo` stamps the commit into `BuildInfo`, and the drawer's footer and Settings →
-About both print it. This directory is **not a git repository**, so today both read
+About both print it — with a `*` when the tree was dirty:
 
 ```
-Сборка 1.0 (unknown)
+Сборка 1.0 (162049b*)
 ```
 
-— which is the one thing a bug report is supposed to quote. Run `git init && git add -A &&
-git commit` before the build you actually ship, or the stamp identifies nothing.
+That string is the one thing a bug report is supposed to quote, and an asterisk in it means the
+build cannot be reproduced from any commit. Commit before the build you actually ship. In CI the
+question does not arise: a runner only ever has a clean checkout.
 
 ### Then build
 
@@ -32,8 +57,9 @@ export ANDROID_VERSION_CODE=1
 ./gradlew :composeApp:assembleRelease   # device smoke test → composeApp/build/outputs/apk/release/
 ```
 
-Both come out signed, because `composeApp/keystore.properties` exists. Confirm it before uploading
-— an unsigned bundle is rejected at the end of a long upload rather than the start:
+Both come out signed, because `.secrets/keystore.properties` exists and the build reads it. Confirm
+it before uploading — an unsigned bundle is rejected at the end of a long upload rather than the
+start:
 
 ```bash
 $ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs \
@@ -85,10 +111,11 @@ confident nonsense, so it must be the one from the exact build you shipped.
 |---|---|
 | App icon | `play/listing/icon-512.png` |
 | Feature graphic | `play/listing/feature-graphic-1024x500.png` |
-| Phone screenshots | `composeApp/build/screenshots/play/*.png` — see below |
+| Phone screenshots | the four named in `play/listing/screenshots.txt` — see below |
 | Short & full description | `play/listing/description-en.md`, `description-ru.md` |
-| Privacy policy URL | host `play/PRIVACY.md`; the URL is required even though nothing is collected |
-| Data safety | no data collected, no data shared — see `play/PRIVACY.md` |
+| Release notes | `play/whatsnew/`, one file per locale, no extension |
+| Privacy policy URL | host `play/PRIVACY.md` somewhere public; the URL is required |
+| Data safety | **Device or other IDs — collected, not shared**: the FCM registration token and the Firebase installation ID, for app functionality (notifications). Everything else is still "no". See `play/PRIVACY.md`, which is written to be the long answer to this form |
 | Ads | none |
 | Content rating | questionnaire only; a calculator rates Everyone / PEGI 3 |
 | Target audience | 13+ avoids the Families policy programme, which this app has no reason to enter |
@@ -106,7 +133,17 @@ python3 play/check-listing.py
 wrong shape or with an alpha channel, a short description one character over, a privacy policy
 still carrying a TODO. All of those otherwise fail *after* the upload rather than before it.
 
-`build/screenshots/play/` is the Play-legal set: 1080×1920, 9:16, no alpha channel. The set in
+`android-play.yml` runs it on every release build, and treats it the way Play does: advisory for
+internal testing, fatal for production. A listing problem must not stop a bundle from reaching
+testers, because the listing is not in the bundle.
+
+Which screenshots reach the listing is named in `play/listing/screenshots.txt`, not taken from
+whatever is in the directory. The generator writes twelve frames, Play accepts eight, and two of
+the twelve are the hidden Service Menu and bench app — a listing assembled by `ls` would put those
+on the store page. The file holds the four §4 records, in the order Play shows them.
+
+`build/screenshots/play/` is the Play-legal shape — 1080×1920, 9:16, no alpha channel — for all
+twelve frames; the manifest above picks which of them ship. The set in
 `build/screenshots/` is 412×915dp at 2x — the true shape of a modern phone, for the README — and
 Play **rejects** it, because at 20:9 its long side is more than twice its short one.
 
@@ -128,22 +165,31 @@ Play **rejects** it, because at 20:9 its long side is more than twice its short 
 Generated for this project and **not** in the repository:
 
 ```
-key:         /prj/unitool/.secrets/upload-keystore.jks
+key:         .secrets/upload-keystore.jks
 alias:       upload
-referenced:  composeApp/keystore.properties  (gitignored; holds the password)
+referenced:  .secrets/keystore.properties  (gitignored; holds the password)
 ```
+
+The build looks for that properties file in two places — next to `composeApp/build.gradle.kts`,
+which is where AGP's documentation puts it, and in `.secrets/`, which is where this project's key
+actually is. The second exists so the passwords sit beside the `.jks` they open: a key backed up
+without them is a key nobody can use.
 
 **Back it up somewhere other than this machine, today.** With Play App Signing on, losing it is
 recoverable — Google can reset the upload key — but it costs a support round-trip and days of not
 being able to ship. Losing it *without* Play App Signing means the listing can never be updated
 again.
 
-The build takes the same values from the environment when they are set, which is what CI should
-do rather than carrying the file:
+The build takes the same values from the environment when they are set, which is what CI does
+rather than carrying the file:
 
 ```
 ANDROID_KEYSTORE_FILE  ANDROID_KEYSTORE_PASSWORD  ANDROID_KEY_ALIAS  ANDROID_KEY_PASSWORD
 ```
+
+`scripts/push-play-secrets.sh` is what puts them there: it reads the same `.secrets/` material,
+checks the keystore actually opens with that password and holds that alias, and sets the five
+repository secrets on `unitool-app/client`.
 
 With neither the file nor the variables, `release` builds unsigned and still succeeds — a clone
 must not need a secret to compile.
@@ -169,13 +215,16 @@ release:
 - **The library is a dependency now.** `gradle/libs.versions.toml` pins `superizer = "0.1.0"`. A
   release build must not be made against a local checkout by accident — run
   `SUPERIZER_FROM_MAVEN=1 ./scripts/verify.sh` first, which resolves the library from a repository
-  and fails if the published artifacts are incomplete.
+  and fails if the published artifacts are incomplete. `android-play.yml` enforces this rather than
+  asking: it publishes the library to mavenLocal at the pinned version and builds with that
+  variable set, and it checks the sources out somewhere `settings.gradle.kts` cannot turn into a
+  composite build.
 - **`assembleRelease` is part of verification.** R8 with an empty `proguard-rules.pro` only works
   because registration is explicit and the serialization keep rules travel inside
   `superizer:core`'s consumer rules. `scripts/verify.sh` builds a release on every run for that
   reason; it does not need a keystore to do it.
 - **The listing screenshots moved.** `build/screenshots/play/` now holds eleven frames rather than
-  five. The four that belong in the Play listing are `01-all-apps`, `03-calculator`, `05-converter`
+  five. The four that belong in the Play listing are `01-home`, `03-calculator`, `05-converter`
   and `08-settings`; the rest exist for the README and for review.
 
 The hidden bench app is in the release build. That is deliberate — it is how a problem on a real

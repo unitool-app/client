@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.composeMultiplatform) apply false
     alias(libs.plugins.composeCompiler) apply false
     alias(libs.plugins.kotlinxSerialization) apply false
+    // Declared here only to put it on the build classpath. composeApp applies it by id, and only
+    // when google-services.json is actually present — see that build script.
+    alias(libs.plugins.googleServices) apply false
 }
 
 /**

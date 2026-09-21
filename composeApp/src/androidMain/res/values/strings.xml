@@ -4,4 +4,5 @@
          language — but it lives here rather than hardcoded in the manifest so a language that
          does need its own spelling has somewhere to put it (see values-ru). -->
     <string name="app_name" translatable="false">Unitool</string>
+    <string name="notification_channel_name">Notifications</string>
 </resources>

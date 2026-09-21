@@ -1,0 +1,8 @@
+First public release.
+
+Unitool is a calculator that opens on the keypad: no splash, no account, no banner. A currency
+converter and a settings page live behind the drawer, and the language switch takes effect without
+a restart.
+
+Nothing you type leaves the phone. The converter downloads published exchange rates, and the app
+can receive notifications — on Android 13 and later it asks first, and works the same if you say no.

@@ -141,7 +141,7 @@ class Screenshots {
      * README cannot go missing from the store listing.
      */
     private val screens: List<Screen> = listOf(
-        Screen("01-all-apps") {},
+        Screen("01-home") {},
         Screen("02-menu") { tapIcon("Открыть меню") },
         Screen("03-calculator") { tapTag(CALCULATOR_TILE) },
         Screen("04-calculator-scientific") {
@@ -150,8 +150,8 @@ class Screenshots {
             typeInto("activate:promo", "SCI")
             tapTag("activate:apply")
         },
-        Screen("05-converter") { tapTag(CONVERTER_TILE) },
-        Screen("06-converter-offline", offline = true) { tapTag(CONVERTER_TILE) },
+        Screen("05-converter") { addConverter(); tapTag(CONVERTER_TILE) },
+        Screen("06-converter-offline", offline = true) { addConverter(); tapTag(CONVERTER_TILE) },
         Screen("07-activate") {
             tapIcon("Открыть меню")
             tapIcon("Активировать")
@@ -176,7 +176,15 @@ class Screenshots {
             typeInto("activate:promo", cx.m42.apps.testapp.TestApp.PROMO_CODE)
             tapTag("activate:apply")
         },
+        Screen("12-all-apps") { tapTag("home:add") },
     )
+
+    /** The converter is not on a fresh Home (D48); the way it gets there is the catalog. */
+    private fun DriveScope.addConverter() {
+        tapTag("home:add")
+        tapTag("catalog:row-currency-converter")
+        tapIcon("Назад")
+    }
 
     @Test
     fun captureEveryScreen() {

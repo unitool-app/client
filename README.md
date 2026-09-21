@@ -6,7 +6,7 @@ codebase renders the same UI on **Android**, **desktop (JVM)** and **web (Wasm)*
 Unitool is a *host*: it ships a home screen of apps, a drawer, settings, activation by promo code or
 QR payload, deep links and a service menu — and the apps themselves are independent modules that
 know nothing about it. The framework that makes that work is
-[Superizer](https://github.com/m42cx/superizer), developed alongside this repository and consumed
+[Superizer](https://github.com/adminization/superizer), developed alongside this repository and consumed
 here as an ordinary package.
 
 Three apps ship today:
@@ -16,6 +16,16 @@ Three apps ship today:
 | **Калькулятор** | four functions, percent, and a scientific mode a config turns on |
 | **Конвертер валют** | ECB rates over the network, with a cache that works offline |
 | **Test App** | hidden; one card per runtime service, for whoever is building on this |
+
+Android builds receive push notifications through Firebase. The routing — which app a message is
+for, which screen a tap opens, and the rule that a push never unlocks a hidden app — is Superizer's
+and is the same on every target; Unitool supplies the Firebase config and the code that draws the
+notification. A build without `composeApp/google-services.json` compiles and runs exactly as
+before, and simply never receives one.
+
+Home is what you chose, not everything installed: a fresh install starts with the calculator, the
+"+" tile opens All Apps where a tap puts an app on Home, and a long press on any tile takes it off
+again. A hidden app lands on Home the moment its promo code or QR unlocks it.
 
 ---
 
@@ -57,8 +67,8 @@ http://localhost:8082/?activate=%7B%22type%22%3A%22app_activation%22%2C%22appId%
 ```
 
 Promo codes this build ships: `SCI` opens the calculator in scientific mode, `TEST-2026` unlocks the
-hidden bench app, `SERVICE` opens the Service Menu. Seven taps on the build stamp in Settings do the
-same, but only in a debug build — in a release the promo code is the only door.
+hidden bench app and puts it on Home, `SERVICE` opens the Service Menu. Seven taps on the build stamp
+in Settings do the same, but only in a debug build — in a release the promo code is the only door.
 
 ## Screenshots
 

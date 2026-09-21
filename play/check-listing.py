@@ -63,13 +63,25 @@ check_image(os.path.join(ROOT, "play/listing/feature-graphic-1024x500.png"), (10
 
 print("\nPhone screenshots")
 shots_dir = os.path.join(ROOT, "composeApp/build/screenshots/play")
-shots = sorted(f for f in os.listdir(shots_dir) if f.endswith(".png")) if os.path.isdir(shots_dir) else []
+# The listing set is named, not globbed. The generator writes twelve frames and Play takes eight,
+# and two of the twelve are the hidden diagnostic surfaces — so which ones ship is a decision, and
+# it lives in a file somebody can review rather than in whatever `ls` happens to return.
+manifest = os.path.join(ROOT, "play/listing/screenshots.txt")
+with open(manifest, encoding="utf-8") as f:
+    shots = [ln.strip() for ln in f if ln.strip() and not ln.startswith("#")]
+
 # Two is the bare minimum Play accepts; four at 1080px+ is what makes a listing eligible to be
 # promoted on the store, which is free and worth not missing by one.
-check(len(shots) >= 4, f"at least 4 screenshots (found {len(shots)})")
-check(len(shots) <= 8, f"at most 8 screenshots (found {len(shots)})")
+check(len(shots) >= 4, f"at least 4 screenshots listed (found {len(shots)})")
+check(len(shots) <= 8, f"at most 8 screenshots listed (found {len(shots)})")
+# A name in the manifest that the generator does not produce would silently shrink the listing,
+# so a missing file is an error here rather than a skip.
 for shot in shots:
-    check_image(os.path.join(shots_dir, shot), None, "screenshot")
+    path = os.path.join(shots_dir, shot)
+    if os.path.isdir(shots_dir) and not os.path.exists(path):
+        check(False, f"{shot} is listed in screenshots.txt but was not generated")
+        continue
+    check_image(path, None, "screenshot")
 
 print("\nStore text")
 LIMITS = {

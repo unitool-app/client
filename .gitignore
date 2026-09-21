@@ -14,6 +14,15 @@ captures/
 # why the build reads it from here rather than from a committed file.
 local.properties
 
+# The Firebase config. Per-deployment, names the Play package, and is the difference between a
+# build that can receive a push and one that cannot — so it is a credential, not configuration.
+# CI writes it from GOOGLE_SERVICES_JSON_BASE64; a clone without it still builds and runs.
+composeApp/google-services.json
+# And wherever a copy gets dropped on the way in. The pattern rather than the one path that exists
+# today: these arrive from a browser download with names like `google-services (4).json`, and the
+# copy nobody meant to keep is the one that gets committed.
+google-services*.json
+
 # Anything that could sign or publish a release. The directory rather than a pattern per file,
 # so a secret added later is ignored before anyone has to remember to add it — and the keystore
 # patterns as well, for a key someone drops outside it.

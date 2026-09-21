@@ -13,6 +13,21 @@ plugins {
 }
 
 /**
+ * Firebase config is a per-deployment secret and is not in the repository. Applying the plugin
+ * without it fails the Android build outright, so it is applied only when the file is actually
+ * there: a clone with no credentials still builds, installs and runs — it just never receives a
+ * notification, because `PushTransport.available` is false without a FirebaseApp to find.
+ *
+ * Drop the file from the Firebase console next to this build script to turn push on.
+ */
+val googleServicesJson = layout.projectDirectory.file("google-services.json").asFile
+if (googleServicesJson.exists()) {
+    apply(plugin = libs.plugins.googleServices.get().pluginId)
+} else {
+    logger.lifecycle("composeApp: no google-services.json — push will be inert in this build")
+}
+
+/**
  * Version and commit as they were when the binary was built. Read from git here rather than at
  * runtime because no target ships a git checkout alongside the app — the numbers have to be baked
  * into the source.
@@ -146,8 +161,15 @@ kotlin {
  * by hand has). With neither, `release` stays unsigned and still builds — a clone must not need a
  * keystore to compile.
  */
-val keystoreProperties = layout.projectDirectory.file("keystore.properties").asFile
-    .takeIf { it.exists() }
+val keystoreProperties = listOf(
+    // Next to this build script, which is where AGP's own documentation puts it.
+    layout.projectDirectory.file("keystore.properties").asFile,
+    // And in `.secrets/`, which is where this project's key actually lives. That directory is
+    // gitignored whole — so a credential added later is ignored before anyone has to remember a
+    // pattern for it — and keeping the properties beside the `.jks` they describe is what stops
+    // the two from being backed up separately and arriving apart.
+    rootProject.layout.projectDirectory.file(".secrets/keystore.properties").asFile,
+).firstOrNull { it.exists() }
     ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
 
 fun signingValue(env: String, property: String): String? =

@@ -69,7 +69,8 @@ kotlinx-serialization (NetworkService), `Push`-объект с `StateFlow` ка�
   по зависимостям; контракт активации от него не зависит.
 - **D8. Скрытые приложения.** `metadata.hidden = true` → не показываются на All Apps, пока не
   разблокированы активацией (QR/промокод). Факт разблокировки хранится в storage хоста. Service Menu
-  показывает всё независимо от скрытости.
+  показывает всё независимо от скрытости. Разблокированное скрытое приложение попадает на Home
+  (D48); убрать его с Home — обычный жест, а вернуть под замок может только Service Menu.
 - **D9 (ревизия 2, см. 12). Библиотека живёт в отдельной папке и репозитории `/prj/superizer`**
   со своей сборкой, fixture-хостом и `samples/consumer`. Unitool потребляет её **только по
   maven-координатам**: через `includeBuild("../superizer")` при разработке и из `mavenLocal` при
@@ -180,6 +181,21 @@ kotlinx-serialization (NetworkService), `Push`-объект с `StateFlow` ка�
   (`SetupMismatch`); Service Menu показывает манифест до запуска; манифест web-расширения (10) —
   это он же. `runtime.require(key)` для объявленных ключей падает на необъявленном в первом же
   тесте. Декларация и поведение разведены: манифест говорит «что», `setup` — «как».
+- **D48 (ревизия 6). Home — это выбранные приложения, а не «всё видимое».** Свежая установка
+  показывает на Home только то, что хост назвал в `SuperizerBuilder.home("calculator")`; всё
+  остальное лежит в каталоге «Все приложения» (`ShellDestination.Catalog`) и попадает на Home по
+  тапу. Скрытое приложение (D8) в каталоге не показывается, пока его не разблокировала
+  активация, и любая разблокировка — QR, промокод, Service Menu — сразу кладёт его на Home
+  (`reveal` = `unlock` + `addToHome`, одно место в хосте). Долгий тап по **любой** плитке убирает
+  её с Home без диалога: жест одинаков для всех, потому что каждая плитка попала туда по выбору,
+  а дорога назад — один тап в каталоге. Убрать с Home ≠ запереть: приложение остаётся
+  разблокированным, остаётся в каталоге и не теряет данных; `DiagnosticsPort.lock` (Service Menu)
+  и `reset` (D35) — единственное, что снимает разблокировку, и они же убирают плитку и закрывают
+  открытую сессию. Хранится упорядоченный список `host.home`; «ключа нет» = первый запуск и
+  применяются умолчания хоста, «пустой список» = выбор пользователя, который следующая сборка
+  не перебивает. Drawer показывает то же, что Home, в том же порядке. `restoreLastSession`
+  больше не запускает снимок с `force`: запертое приложение не возвращается через вчерашний
+  экран. События: `AddedToHome`, `RemovedFromHome`, `Locked` (парное к `Unlocked`).
 
 Явно **не в MVP** (чтобы не всплывало как «забыли»): remote config как источник конфига (D2
 допускает, но не проектируется); общий `PermissionService` (разрешение есть только у пушей);
@@ -204,7 +220,8 @@ kotlinx-serialization (NetworkService), `Push`-объект с `StateFlow` ка�
 | QR activation | `host` — `QrPayloadParser` + `ActivationService`; ввод текстом / deep link | ✔ (камера — позже) |
 | Promo-code activation | `host` — `PromoCodeResolver` (локальная таблица) | ✔ (remote — позже) |
 | Hidden Apps | `metadata.hidden` + `UnlockStore` | ✔ |
-| All Apps screen | `ui` — `AllAppsScreen` | ✔ |
+| Home как выбранный набор + каталог (D48) | `Superizer.home/addToHome/removeFromHome`; `HomeScreen`, `CatalogScreen`; долгий тап убирает плитку | ✔ |
+| All Apps screen | `ui` — `CatalogScreen` (список всего доступного, тап добавляет на Home) | ✔ |
 | Service Menu | `ui` — `ServiceMenuScreen` | ✔ |
 | Calculator App | `apps/calculator` | ✔ (перенос существующего) |
 | Currency Converter App | `apps/currency-converter` | ✔ |
