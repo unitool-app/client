@@ -14,9 +14,9 @@ make. Set the secrets once and the rest is a button:
 ./scripts/push-play-secrets.sh unitool-app/client
 ```
 
-Then **Actions → Build and Deploy Android to Google Play → Run workflow**. Turn `upload` off for a
-run that only builds; that artifact is what the first, manual upload needs (see §5 — the Play API
-cannot create an app's first release).
+Then **Actions → Build and Deploy Android to Google Play → Run workflow**, or just push to `main`.
+Turn `upload` off for a run that only builds and keeps the artifact. The first release already
+exists on the `alpha` track (§5), so there is nothing left that has to be uploaded by hand.
 
 [`.github/workflows/README-android-play.md`](.github/workflows/README-android-play.md) is the
 reference for it: the secrets, the tracks, the version numbering, and why the library is published
@@ -154,9 +154,14 @@ Play **rejects** it, because at 20:9 its long side is more than twice its short 
 2. Keep **Play App Signing** on (the default). Google then holds the key that signs what users
    install, and the key in `.secrets/` is only an *upload* key — which is what makes it
    replaceable if it leaks.
-3. Upload to **Internal testing** first. It reaches testers in minutes; production review takes
-   days, and the first upload is where a wrong version code or a missing icon shows up.
+3. Upload to a testing track first. It reaches testers in minutes; production review takes days,
+   and the first upload is where a wrong version code or a missing icon shows up.
 4. Promote to Production once the smoke test above passes on a real device.
+
+**This has already happened for `cx.m42.unitool`.** Release `1 (1.0)`, versionCode `1`, is on the
+`alpha` track — closed testing — and that upload is what registered the upload key with Play App
+Signing. So the API can create every release from here on, and CI does: `android-play.yml` defaults
+to `alpha` because that is where the testers are, not because it is the first track alphabetically.
 
 ---
 

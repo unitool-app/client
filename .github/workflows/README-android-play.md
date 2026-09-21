@@ -87,15 +87,17 @@ at the moment the job starts.
 Play names its tracks in the API, and the name is **not** the label the console shows. The four
 built-in ids are `internal`, `alpha` (closed testing), `beta` (open testing) and `production`.
 
-The default here is `internal`, because that is what RELEASING.md §5 says the first upload goes to:
-it reaches testers in minutes, where a production review takes days and the first upload is exactly
-where a wrong version code or a missing icon shows up. Promote from the console once the release
-build has been through the device smoke test in RELEASING.md §2.
+The default here is `alpha`, the built-in **closed testing** track — the one the console labels
+«Закрытое тестирование». Not a guess: `edits.tracks.list` reports release `1 (1.0)` sitting on
+`alpha`, and `internal`, `beta` and `production` empty. That is where this app's testers are, so
+that is where a build has to land. Publishing to an empty track is the failure that looks most like
+success — green run, uploaded bundle, nobody able to install it. Promote to production from the
+console once the release build has been through the device smoke test in RELEASING.md §2.
 
 A closed track created by hand in the console is a different matter: it gets an id of its own that
 CI cannot guess, so it goes in the `PLAY_TRACK` repository variable (**Settings → Secrets and
 variables → Actions → Variables**) rather than in this file. The manual run's `track` input beats
-the variable, which beats the `internal` default. An id no track has fails the upload with `Track
+the variable, which beats the `alpha` default. An id no track has fails the upload with `Track
 not found` and nothing else — the error does not list the tracks that do exist, so read the id off
 the Play Developer API (`edits.tracks.list`) rather than off the console's heading.
 
@@ -175,16 +177,17 @@ Play Developer API was asked, rather than the console being read over somebody's
    to it until somebody adds it there, and the grant takes a few minutes to propagate. A run
    started straight after it can fail with `The caller does not have permission` and then succeed
    on a re-run with nothing changed.
-3. **One release uploaded by hand.** ❌ Not yet — the API reports no release on any track, so Play
-   has never accepted a bundle for this app. Google does not let the API create an app's *first*
-   release: upload the signed `.aab` through Play Console → Testing → Internal testing → Create
-   new release. That upload is also what registers the upload key with Play App Signing, so it
-   must be the bundle signed with *this* keystore and not one Android Studio signed with a debug
-   key. A manual run of this workflow with `upload` turned off produces exactly that bundle as an
-   artifact — download it from the run and upload that file.
+3. **One release uploaded by hand.** ✅ Done, before any of this existed: release `1 (1.0)`,
+   versionCode `1`, on the `alpha` track. Google does not let the API create an app's *first*
+   release, and that upload is also what registered the upload key with Play App Signing — which
+   is why the certificate in `ANDROID_KEYSTORE_BASE64` is the one Play expects. Nothing here has
+   to be done by hand again.
 
-Until step 3 is done, a run that reaches the publish step fails there and nowhere else. That is
-the expected failure, not a broken pipeline.
+All three hold, so a run can publish end to end.
+
+> This section briefly said the opposite, on the strength of a script that read `track` where the
+> API returns `tracks` and therefore found an empty list every time. Read the raw response before
+> believing a summary of it — including this one.
 
 ## The upload key
 
