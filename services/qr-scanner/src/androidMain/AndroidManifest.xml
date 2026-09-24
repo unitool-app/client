@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Asked for by QrScanActivity when it opens, never before. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      The CAMERA permission alone makes Play treat a back camera with autofocus as required, and
+      hide the app from every device without one. The scanner is optional — a host registers it only
+      where AndroidQrScanner.available() says there is a camera — so neither is required.
+    -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <application>
+        <activity
+            android:name="cx.m42.services.qr.QrScanActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density|uiMode|smallestScreenSize|fontScale" />
+    </application>
+
+</manifest>
