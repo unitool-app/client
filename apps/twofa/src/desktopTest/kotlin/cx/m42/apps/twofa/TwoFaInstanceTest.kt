@@ -5,6 +5,8 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
@@ -178,9 +180,12 @@ class TwoFaInstanceTest {
         assertEquals("GitHub Enterprise", twofa.accounts.value[0].issuer)
         assertEquals("GitHub Enterprise", twofa.chrome.value.title)
 
-        click("2fa:delete")
+        // Delete sits at the bottom of the page, and where the fold falls depends on the fonts:
+        // with DejaVu (the CI runner) the confirm button starts below the window and a bare tap
+        // lands on nothing.
+        node("2fa:delete").performScrollTo().performClick()
         assertEquals(2, twofa.accounts.value.size, "the first tap only asks")
-        click("2fa:delete-confirm")
+        node("2fa:delete-confirm").performScrollTo().performClick()
         assertShown("2fa:list")
         assertEquals(listOf("b"), twofa.accounts.value.map { it.id })
         assertTrue(!runtime.storage.entries[KEY_ACCOUNTS]!!.contains("\"a\""))
