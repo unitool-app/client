@@ -52,3 +52,9 @@ include(":composeApp")
 // the bench app lives there because it is part of the framework (12 §1).
 include(":apps:calculator")
 include(":apps:currency-converter")
+include(":apps:twofa")
+
+// Platform capabilities an app may ask for by key (D19), each with its host-side implementation.
+include(":services:qr-scanner")
+include(":services:share")
+include(":services:vault")

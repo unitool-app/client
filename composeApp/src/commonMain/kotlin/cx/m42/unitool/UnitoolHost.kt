@@ -5,6 +5,7 @@ import cx.m42.apps.calculator.CalculatorApp
 import cx.m42.apps.calculator.CalculatorConfig
 import cx.m42.apps.converter.ConverterApp
 import cx.m42.apps.testapp.TestApp
+import cx.m42.apps.twofa.TwoFaApp
 import cx.m42.superizer.LanguageOption
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.SuperizerContract
@@ -25,7 +26,7 @@ import kotlinx.serialization.json.buildJsonObject
 /**
  * Unitool, in one function.
  *
- * This is the whole of what makes Unitool a product rather than a framework: a name, three apps and
+ * This is the whole of what makes Unitool a product rather than a framework: a name, four apps and
  * a table of promo codes. Everything else — the drawer, All Apps, Settings, activation, the app
  * container, the Service Menu — comes from the library and is identical in any other host.
  *
@@ -68,6 +69,8 @@ public fun buildUnitool(
 
     register(CalculatorApp())
     register(ConverterApp())
+    // Offline TOTP codes. In the catalog, not on a fresh Home (D48): not everyone has 2FA to manage.
+    register(TwoFaApp())
     // Hidden (D8). It is a diagnostic instrument, and it stays invisible until someone types the
     // code below — which is also the only way the Service Menu opens in a release.
     register(TestApp())

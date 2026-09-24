@@ -8,6 +8,12 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
+import cx.m42.services.qr.AndroidQrScanner
+import cx.m42.services.qr.QrScanner
+import cx.m42.services.share.AndroidFileSharer
+import cx.m42.services.share.FileSharer
+import cx.m42.services.vault.AndroidKeystoreVault
+import cx.m42.services.vault.SecretVault
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.host.platform.AndroidHost
 import cx.m42.superizer.host.push.PushTransport
@@ -96,6 +102,19 @@ class MainActivity : ComponentActivity() {
         val notifier = AndroidNotifier(applicationContext)
         return buildUnitool(scope, debug = BuildConfig.DEBUG) {
             notifier(notifier)
+            // The camera for QR codes (D19), only on a device that has one: the 2FA app draws its
+            // scan button from whether this is registered. The scanner's words follow the host's
+            // language setting, read at each scan because it can change while the process lives.
+            if (AndroidQrScanner.available(applicationContext)) {
+                service(QrScanner.Key, AndroidQrScanner(applicationContext) {
+                    Holder.superizer?.settings?.langTag?.value ?: "en"
+                })
+            }
+            // The share sheet (D19): the 2FA export hands its encrypted file to it.
+            service(FileSharer.Key, AndroidFileSharer(applicationContext))
+            // Encryption at rest (D19): the 2FA accounts are sealed under a Keystore key before
+            // they reach the prefs file, and without one registered they would be stored plain.
+            service(SecretVault.Key, AndroidKeystoreVault())
         }.also { Holder.superizer = it }
     }
 

@@ -21,6 +21,19 @@
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+      The 2FA app's QR scanner (services/qr-scanner, which declares it too). Asked for at runtime,
+      the first time someone taps "Scan QR code", and refusable: pasting the link still works. Frames
+      are read on the device and dropped; only the text of the code comes back, and nothing is saved
+      until the person taps Save.
+
+      Not required hardware: without these two lines the permission would make Play hide the app
+      from every device lacking a back camera with autofocus.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

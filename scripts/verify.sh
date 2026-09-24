@@ -57,8 +57,8 @@ fi
 
 # ---------------------------------------------------------------- 2. tests
 step "2. Unit and UI tests (desktop)"
-if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest \
-    --continue > "$out/test.log" 2>&1; then
+if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest :apps:twofa:desktopTest \
+    :services:qr-scanner:testDebugUnitTest --continue > "$out/test.log" 2>&1; then
   ok "host and app tests"
 else
   bad "tests — see $out/test.log"
@@ -112,8 +112,14 @@ if [ -n "${ANDROID_HOME:-}" ] || grep -q sdk.dir local.properties 2>/dev/null; t
     else
       bad "instrumented smoke test — see $out/android.log"
     fi
+    # The 2FA keys' encryption at rest against a real AndroidKeyStore, which exists nowhere else.
+    if ./gradlew --quiet :services:vault:connectedDebugAndroidTest >> "$out/android.log" 2>&1; then
+      ok "Keystore vault on the device"
+    else
+      bad "Keystore vault — see $out/android.log"
+    fi
   else
-    skip "instrumented test: no device attached"
+    skip "instrumented tests (smoke, Keystore vault): no device attached"
   fi
 else
   skip "Android: no SDK configured"

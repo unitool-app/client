@@ -136,6 +136,10 @@ kotlin {
             // Unitool's own apps.
             implementation(project(":apps:calculator"))
             implementation(project(":apps:currency-converter"))
+            implementation(project(":apps:twofa"))
+            implementation(project(":services:qr-scanner"))
+            implementation(project(":services:share"))
+            implementation(project(":services:vault"))
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

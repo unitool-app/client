@@ -9,12 +9,13 @@ know nothing about it. The framework that makes that work is
 [Superizer](https://github.com/adminization/superizer), developed alongside this repository and consumed
 here as an ordinary package.
 
-Three apps ship today:
+Four apps ship today:
 
 | | |
 |---|---|
 | **Калькулятор** | four functions, percent, and a scientific mode a config turns on |
 | **Конвертер валют** | ECB rates over the network, with a cache that works offline |
+| **Коды 2FA** | TOTP codes (RFC 6238) from a scanned QR code, an `otpauth://` link or a typed key, offline, with the keys encrypted at rest under an Android Keystore key; exports every account as an [age](https://age-encryption.org) file encrypted to a GitHub user's SSH keys, which a new phone takes back in one scan (`age -d … | qrencode -t ansiutf8`) or one paste |
 | **Test App** | hidden; one card per runtime service, for whoever is building on this |
 
 Android builds receive push notifications through Firebase. The routing — which app a message is
@@ -108,13 +109,20 @@ chromium --use-gl=angle --use-angle=swiftshader http://localhost:8082/
 
 ```
 composeApp/src/               THE HOST, and nothing else
-  commonMain/UnitoolHost.kt   the whole of it: a name, three register() calls, a promo table
+  commonMain/UnitoolHost.kt   the whole of it: a name, four register() calls, a promo table
   androidMain/                MainActivity, the deep-link intent filter, the launcher icon
   desktopMain/ wasmJsMain/    the window and the viewport entrypoints, and the wasm test bridge
   desktopTest/                end-to-end tests and the screenshots
 
 apps/calculator/              an app: manifest, config, instance, screen, its own strings
 apps/currency-converter/      an app: the same shape, plus a repository over runtime.network
+apps/twofa/                   an app: TOTP with its own SHA-1/256/512, since wasm has no JCA, and
+                              the export's age encryption (X25519, ChaCha20-Poly1305, RSA-OAEP)
+services/qr-scanner/          an optional service (D19): the contract apps ask for by key, and the
+                              Android camera behind it — CameraX frames, ZXing reading them
+services/share/               another: hand a file to the person — Android's share sheet
+services/vault/               another: encryption at rest — AES-GCM under a key that never leaves
+                              Android's Keystore (its tests run on a device: connectedAndroidTest)
 ```
 
 Everything the two directories *share* — the drawer, All Apps, Settings, the activation screens, the

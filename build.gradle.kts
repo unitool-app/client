@@ -69,5 +69,6 @@ tasks.register("verify") {
     group = "verification"
     description = "Static checks plus every test that needs no browser or device."
     dependsOn(checkDependencyRules)
-    dependsOn(":composeApp:desktopTest", ":apps:calculator:desktopTest", ":apps:currency-converter:desktopTest")
+    dependsOn(":composeApp:desktopTest", ":apps:calculator:desktopTest", ":apps:currency-converter:desktopTest",
+        ":apps:twofa:desktopTest", ":services:qr-scanner:testDebugUnitTest")
 }

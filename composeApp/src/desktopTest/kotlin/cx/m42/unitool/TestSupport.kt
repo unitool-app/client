@@ -65,7 +65,19 @@ internal fun ratesNetwork(): FakeNetwork = FakeNetwork().apply {
         "https://api.frankfurter.app/latest?from=USD",
         """{"amount":1.0,"base":"USD","date":"2026-09-19","rates":{"EUR":0.92,"GBP":0.79,"RUB":92.10}}""",
     )
+    respond("https://api.github.com/users/octocat/keys", GITHUB_KEYS)
 }
+
+/**
+ * What GitHub's API answers for an account with three keys — two age can encrypt to and one it
+ * cannot — so the export screen is drawn with every kind of row. Public keys `ssh-keygen` made for
+ * the tests; nothing holds their private halves.
+ */
+private val GITHUB_KEYS = listOf(
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOh1VbDdG6aEqkiUkfr6tLE1wlJZ/jm90yZxcCjDq3xS",
+    "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDF9f3LvEHB12a4AXHr0ZCeEBSJaK3MNbkcwnETRnaaOa35+LCIzEEtTxieW2gBAv84/UwqEIt/fuwF53f5xuvmUJsFCZvP4A/dHIOjwa8Fz7jGqaJAed6zD+7zPM/B7AyxsYKVFXQpdxqz8Pr/PoZ6yrC4cKQSqZsHSaisapKo5Z8Kq8Yxqgzli9ebKHMagjl/rhonjul5+pH2kJz1Dwt+JeJJ0C6/6tjz32N0BAwgfis792s+pY0dqBPOv0C2INmQXBtaWdV4OJmeH18LBuXdR4HZ4txjpnb+QrTGRO6xzuYB4Rx/va58dKYlB3+jCb7Ag0fXt/FUSmf3+crxJ0ARRTI7PLvCEYFsxRvsFFuBvGqx8R2i+CT6fOktLJEg1uoX0UGalIemP+8hx2TcRgnBfW9Hi7jAqEuO3OO48dtRMqQ2UD38751+AKqEYM5pvBK90nR7b9+ctv/UdB2ZfuNraZNcnFd9D835Y3O9dRZHzS2zgwFy3yrgxKsosWX8OOE=",
+    "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEIsMsXqmDgDTtFzJYG8gCJX0455Aa7IlDHEiYA0PtCHVoTPjGzWFYwQgxsQRhLRYXwgEw9EjUXF79TLbDAzMEo=",
+).mapIndexed { i, key -> """{"id":${i + 1},"key":"$key"}""" }.joinToString(",", "[", "]")
 
 /** The same source, unreachable — what the offline path and the retry button are drawn against. */
 internal fun offlineNetwork(): FakeNetwork = FakeNetwork().apply {
@@ -75,3 +87,4 @@ internal fun offlineNetwork(): FakeNetwork = FakeNetwork().apply {
 
 internal const val CALCULATOR_TILE = "home:tile-calculator"
 internal const val CONVERTER_TILE = "home:tile-currency-converter"
+internal const val TWOFA_TILE = "home:tile-2fa"

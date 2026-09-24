@@ -64,8 +64,8 @@ reinstall the app or clear its data.
 On Android 13 and later the app asks whether you want notifications at all. Refuse, and everything
 else works exactly the same.
 
-Permissions: internet, vibration (switchable off in Settings), and notifications on Android 13 and
-later (yours to refuse).
+Permissions: internet, vibration (switchable off in Settings), notifications on Android 13 and
+later (yours to refuse), and the camera — only when you scan a QR code in the 2FA app yourself.
 
 NO ADS. NO IN-APP PURCHASES. NO SUBSCRIPTION. NO SIGN-IN.
 ```

@@ -1,16 +1,18 @@
 # Privacy Policy — Unitool
 
-**Last updated: 21 September 2026**
+**Last updated: 24 September 2026**
 
 ## The short version
 
 Unitool has no account, no sign-in, no ads, no analytics and no crash reporter, and nothing you
-type into it is sent anywhere. Your arithmetic is done on your phone and stays there.
+type into it is sent anywhere — the one exception being a GitHub username, if you use the 2FA
+app's export and type one. Your arithmetic is done on your phone and stays there.
 
 It is not, however, an offline app any more. It has the internet permission, and it uses the
-network for exactly two things: the currency converter downloads published exchange rates, and the
-app can receive push notifications. Both are described below, because they are the only parts of
-this policy with anything in them.
+network for exactly three things: the currency converter downloads published exchange rates, the
+app can receive push notifications, and the 2FA app's export — only when you use it — looks up the
+public keys it encrypts to. All three are described below, because they are the only parts of this
+policy with anything in them.
 
 ## What the app stores
 
@@ -22,13 +24,26 @@ On your device only, in the app's private storage, which on Android only this ap
 | Whether key presses vibrate | so the app remembers the switch |
 | Which apps you put on the home screen | so your home screen survives a restart |
 | The last exchange-rate table it downloaded | so the converter still works with no signal |
+| The two-factor accounts you add: service, account name, secret key — encrypted, see below | so the 2FA app can show their codes |
+| The GitHub username your last 2FA export was encrypted for | so the next export offers it |
 
-Nothing you type is written anywhere. What you enter into the calculator or the converter exists
-while the app is open and is gone when it closes.
+The two-factor accounts are never written in readable form. Before they reach storage they are
+encrypted (AES-256-GCM) with a key that Android's Keystore generates for this app and keeps: the key
+never leaves the Keystore — in secure hardware on phones that have it — and cannot be read out, by
+the app or by anyone who copies its files. A copy of the app's data taken off the phone therefore
+holds the accounts only as ciphertext. The key is deleted with the app, and it cannot be moved to
+another phone, so neither can the accounts in this form; the 2FA app's export (below) is the way to
+move them.
+
+Nothing else you type is written anywhere. What you enter into the calculator or the converter
+exists while the app is open and is gone when it closes. A two-factor account is kept only once you
+tap Save, and its codes are computed on the phone from the stored key — no code is ever sent
+anywhere, and a key leaves the phone only inside an export you make and send yourself, encrypted
+(see below).
 
 ## What leaves the device
 
-Three things, and this is all of them.
+Four things, and this is all of them.
 
 **Exchange rates.** When you open the currency converter it requests a rate table published by the
 European Central Bank, from `api.frankfurter.app` (or the documented fallback, `open.er-api.com`).
@@ -49,7 +64,17 @@ reinstall the app or clear its data. Google's handling of them is covered by the
 it, the app tells Firebase which topics this installation is subscribed to. A topic is a word, not
 a profile.
 
-That is the list. No calculation, no converter input and no content you enter is transmitted.
+**A 2FA export, if you make one.** The 2FA app can export your two-factor accounts for moving them
+to a computer. You type a GitHub username and tap "Find keys"; the app then requests that account's
+public SSH keys from `api.github.com` — the same list anyone can read at `github.com/<username>.keys`.
+The request carries the username and nothing else, and GitHub, like any server, sees the address it
+came from. Your accounts are then encrypted **on the phone** to the keys you tick, in the open
+[age](https://age-encryption.org) format, so only the holder of one of those private keys can read
+them. The encrypted file goes only where you send it — through Android's share menu, or the
+clipboard if you copy it — and we never receive it. The unencrypted keys never leave the phone.
+
+That is the list. No calculation, no converter input and no two-factor key in readable form is
+transmitted.
 
 ## What the app collects
 
@@ -68,11 +93,12 @@ In the terms Google Play's Data safety form uses:
   Firebase installation ID described above, used only to deliver notifications.
 - **No app activity, diagnostics, crash logs or analytics.**
 
-Nothing is sold, and nothing is shared with anyone beyond what delivering a notification requires.
+Nothing is sold, and nothing is shared with anyone beyond what delivering a notification requires
+and the GitHub key lookup you start yourself.
 
 ## Permissions
 
-Six, which is all of them. This list was read off the built app, not off the source, because
+Seven, which is all of them. This list was read off the built app, not off the source, because
 three of them are added by the Firebase messaging library rather than written by us — and a
 permission list that omits those would be wrong in exactly the way nobody checks.
 
@@ -81,10 +107,15 @@ Asked for, and refusable:
 - `android.permission.POST_NOTIFICATIONS` — on Android 13 and later, as a dialog rather than
   silently. You can refuse it. The app works exactly as before if you do; you simply do not see
   notifications.
+- `android.permission.CAMERA` — only when you tap "Scan QR code" in the 2FA app, to read the setup
+  code a site shows you. The picture is examined on the phone as it arrives and is never saved or
+  sent; the one thing that comes out of it is the text of the code, and that is kept only if you
+  then tap Save. Refuse it and nothing else changes: the same link can be pasted instead.
 
 Granted at install time, never prompted for:
 
-- `android.permission.INTERNET` — to fetch exchange rates and to receive notifications.
+- `android.permission.INTERNET` — to fetch exchange rates, to receive notifications and, when you
+  export 2FA accounts, to fetch the public keys of the GitHub account you name.
 - `android.permission.VIBRATE` — the short tap you feel when a key is pressed. It cannot read
   anything, and the vibration itself can be turned off in Settings.
 - `android.permission.ACCESS_NETWORK_STATE` — added by Firebase, to tell whether there is a
@@ -111,7 +142,7 @@ Android's backup, not ours — we never see it. Nothing else in the app is inclu
 
 ## Children
 
-The app is a calculator and a currency converter. It contains no ads, no purchases, no user
+The app is a calculator, a currency converter and a two-factor code generator. It contains no ads, no purchases, no user
 content, no user-to-user communication and no way to sign in, and it collects no personal
 information — including from children.
 

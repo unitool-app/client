@@ -4,11 +4,21 @@ composeMultiplatform = "1.11.1"
 agp = "8.13.2"
 composeUnstyled = "1.36.1"
 androidxActivityCompose = "1.13.0"
+# FileProvider, for handing a file to the share sheet (services/share). The version activity-compose
+# already brings in, named so the dependency is declared rather than borrowed.
+androidxCore = "1.18.0"
 androidCompileSdk = "36"
 androidMinSdk = "24"
 androidTargetSdk = "36"
 kotlinxCoroutines = "1.10.2"
 kotlinxSerializationJson = "1.9.0"
+# The QR scanner (services/qr-scanner): CameraX for the frames, ZXing for reading them. ZXing rather
+# than ML Kit because what it reads is a 2FA secret, and ZXing is a jar that never talks to anyone.
+camerax = "1.6.2"
+zxing = "3.5.4"
+# On-device tests (services/vault's `connectedAndroidTest`): the Keystore exists nowhere else.
+androidxTestRunner = "1.7.0"
+androidxTestJunit = "1.3.0"
 # Reads google-services.json and turns it into the resources the Firebase SDK looks
 # up at runtime. Applied by the *app*, never by a library: the file it reads is a
 # per-deployment secret and names this exact package.
@@ -26,6 +36,13 @@ compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMul
 compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "composeMultiplatform" }
 compose-unstyled = { module = "com.composables:core", version.ref = "composeUnstyled" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivityCompose" }
+androidx-core = { module = "androidx.core:core", version.ref = "androidxCore" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
+androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 
