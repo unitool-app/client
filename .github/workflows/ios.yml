@@ -11,11 +11,15 @@
 #               signing secrets are present; otherwise it says so and stops, green, so the two
 #               jobs above never wait on it.
 #
-# Started by hand: macOS minutes cost ten Linux ones on a private repository. Add `push` once the
-# simulator job has had its first green run.
+# Started by hand, or by a pull request into main: macOS minutes cost ten Linux ones on a private
+# repository, so no `push`. The pull request is also the only way a new ios.yml can run at all —
+# GitHub dispatches a workflow only once its file is on the default branch. A pull request gets
+# the two unsigned lanes; a newer push to it stops the older build.
 name: ios
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       lanes:
@@ -24,6 +28,10 @@ on:
         default: simulator+device
         options: [simulator, simulator+device, device, testflight, all]
 
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   # Compose Multiplatform 1.11.1 references UIViewLayoutRegion, an iOS 26 class, behind an
   # availability check; an older SDK's linker has to be told to leave it undefined.
@@ -31,7 +39,7 @@ env:
 
 jobs:
   simulator:
-    if: contains(fromJSON('["simulator","simulator+device","all"]'), inputs.lanes)
+    if: contains(fromJSON('["simulator","simulator+device","all"]'), inputs.lanes || 'simulator+device')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +65,7 @@ jobs:
           path: build/ios-dd/Build/Products/Debug-iphonesimulator/*.app
 
   device:
-    if: contains(fromJSON('["device","simulator+device","all"]'), inputs.lanes)
+    if: contains(fromJSON('["device","simulator+device","all"]'), inputs.lanes || 'simulator+device')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +95,7 @@ jobs:
           if-no-files-found: error
 
   testflight:
-    if: contains(fromJSON('["testflight","all"]'), inputs.lanes)
+    if: contains(fromJSON('["testflight","all"]'), inputs.lanes || 'simulator+device')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
