@@ -9,6 +9,8 @@ import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.keyring.FileRecordStore
 import cx.m42.services.vault.VaultDiagnostics
 import cx.m42.superizer.host.SystemClock
+import cx.m42.unitool.i18n.securityStrings
+import cx.m42.unitool.security.IosSelfTest
 import cx.m42.unitool.security.KeyPrompts
 import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.superizer.Superizer
@@ -60,11 +62,15 @@ object UnitoolIos {
         superizer?.let { return it }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         // The Secure Enclave seals the host's secrets as it sealed the 2FA accounts before (Б4). The
-        // keyring is level 3 here until the enclave backend runs on a phone (step 5b, D180).
+        // keyring stays at level 3 until an iPhone's self-test report is green (D175, D180): the
+        // self-test runs the enclave's steps so that report can say so, and then this line becomes
+        // SshKeyringHost.ios(texts, …) with the same words as MainActivity's promptText.
         val prompts = KeyPrompts()
         val vault = IosKeychainVault()
         val keyring = SshKeyringHost.passphraseOnly(FileRecordStore(), prompts, SystemClock, cx.m42.superizer.runtime.Platform.Ios, scope)
-        val security = UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault)).also { this.security = it }
+        val selfTest = IosSelfTest { securityStrings(language()).selfTest }
+        val security = UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault), platformSelfTest = selfTest)
+            .also { this.security = it }
         val built = buildUnitool(scope, debug = Platform.isDebugBinary, security = security) {
             notifier(LocalNotifier)
             // The camera for QR codes (D19), only on a device that has one — the simulator has none,
@@ -84,6 +90,8 @@ object UnitoolIos {
         if (taps.isNotEmpty()) scope.launch { taps.forEach { PushTransport.deliverTap(it) } }
         return built
     }
+
+    private fun language(): String = superizer?.settings?.langTag?.value ?: "en"
 
     /** `unitool://…` from anywhere on the device — SwiftUI's `onOpenURL`. */
     fun deliverLink(url: String) {

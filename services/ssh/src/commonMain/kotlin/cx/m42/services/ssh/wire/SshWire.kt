@@ -86,10 +86,15 @@ internal class WireWriter {
         var start = 0
         while (start < magnitude.size && magnitude[start] == 0.toByte()) start++
         val trimmed = magnitude.copyOfRange(start, magnitude.size)
-        return if (trimmed.isNotEmpty() && trimmed[0].toInt() and 0x80 != 0) {
-            uint32(trimmed.size + 1L).byte(0).raw(trimmed)
-        } else {
-            string(trimmed)
+        // A private exponent passes through here too: the copy goes the way the buffer does.
+        return try {
+            if (trimmed.isNotEmpty() && trimmed[0].toInt() and 0x80 != 0) {
+                uint32(trimmed.size + 1L).byte(0).raw(trimmed)
+            } else {
+                string(trimmed)
+            }
+        } finally {
+            trimmed.fill(0)
         }
     }
 

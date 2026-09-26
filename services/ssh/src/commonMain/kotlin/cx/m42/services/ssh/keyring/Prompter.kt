@@ -20,6 +20,12 @@ public data class UseReason(
 )
 
 /**
+ * The words on the device's own prompt for one operation (01 §5.2) — `BiometricPrompt` on Android,
+ * the `LAContext` reason on iOS: the host's, from [UseReason]. This module has none of its own (07 §2.2).
+ */
+public class PromptText(public val title: String, public val subtitle: String?, public val description: String?)
+
+/**
  * The person, as the keyring asks them things. The host's UI implements it — a sheet over the shell
  * on every platform — and on Android and iOS the device's own prompt comes from the chip backend
  * instead, because only it can be bound to the key (01 §5.1).

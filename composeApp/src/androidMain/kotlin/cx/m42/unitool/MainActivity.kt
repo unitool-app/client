@@ -14,10 +14,14 @@ import cx.m42.services.share.AndroidFileSharer
 import cx.m42.services.share.FileSharer
 import cx.m42.services.vault.AndroidKeystoreVault
 import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.android
 import cx.m42.services.ssh.keyring.PrefsRecordStore
+import cx.m42.services.ssh.keyring.PromptText
+import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.services.vault.VaultDiagnostics
 import cx.m42.superizer.host.SystemClock
-import cx.m42.superizer.runtime.Platform
+import cx.m42.unitool.i18n.securityStrings
+import cx.m42.unitool.security.AndroidSelfTest
 import cx.m42.unitool.security.KeyPrompts
 import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.superizer.Superizer
@@ -53,6 +57,8 @@ class MainActivity : FragmentActivity() {
         // up, and the drawer can vibrate on the very first gesture.
         initPrefs(this)
         AndroidHost.init(this)
+        // The system's key prompt is drawn over whichever activity is in front (01 §5.1).
+        Holder.activity = this
 
         setContent {
             val superizer = remember { host() }
@@ -68,6 +74,11 @@ class MainActivity : FragmentActivity() {
      * It goes into the same consume-once route the cold start reads (13 §5), so there is one place
      * that decides what a link means and it does not care which of the two paths delivered it.
      */
+    override fun onDestroy() {
+        if (Holder.activity === this) Holder.activity = null
+        super.onDestroy()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -130,15 +141,38 @@ class MainActivity : FragmentActivity() {
 
     /**
      * The host's vault is the Keystore key the 2FA app sealed with before contract 3 — same alias,
-     * same format — so a tester's accounts open after the update (04 §9, Б4). The keyring's records
-     * have a prefs file of their own, out of every backup (I10).
+     * same format — so a tester's accounts open after the update (04 §9, Б4). SSH keys go into the
+     * Keystore where it is hardware (API 30+), under their passphrase where it is not; the records
+     * have a prefs file of their own, in no backup (I10). The system prompt says what the sheet
+     * would, in the host's language at the moment it is shown.
      */
     private fun androidSecurity(scope: CoroutineScope): UnitoolSecurity {
         val prompts = KeyPrompts()
         val vault = AndroidKeystoreVault()
-        val keyring = SshKeyringHost.passphraseOnly(PrefsRecordStore(applicationContext), prompts, SystemClock, Platform.Android, scope)
-        return UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault))
+        val keyring = SshKeyringHost.android(
+            context = applicationContext,
+            activity = { Holder.activity },
+            texts = ::promptText,
+            records = PrefsRecordStore(applicationContext),
+            prompter = prompts,
+            clock = SystemClock,
+            scope = scope,
+        )
+        val selfTest = AndroidSelfTest(applicationContext, { Holder.activity }) { securityStrings(language()).selfTest }
+        return UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault), platformSelfTest = selfTest)
     }
+
+    private fun promptText(reason: UseReason): PromptText {
+        val strings = securityStrings(language())
+        val key = reason.key
+        return PromptText(
+            title = strings.operation(reason, reason.app?.value),
+            subtitle = strings.keyLine(key.label, key.comment, key.id.fingerprint),
+            description = null,
+        )
+    }
+
+    private fun language(): String = Holder.superizer?.settings?.langTag?.value ?: "en"
 
     /**
      * One host per process, not per activity.
@@ -150,6 +184,7 @@ class MainActivity : FragmentActivity() {
     private object Holder {
         var superizer: Superizer? = null
         var security: UnitoolSecurity? = null
+        var activity: MainActivity? = null
     }
 
     private companion object {

@@ -65,3 +65,55 @@ jobs:
         with:
           name: verify
           path: build/verify/
+
+  # The Keystore has no stand-in (ssh-new 04 §9, Б11): the vault, the keyring's backend and the
+  # self-test run on an emulator here, as verify.sh runs them on one attached locally. API 33 is
+  # the oldest with Curve25519 in the Keystore — the floor the keyring's level 1 needs for Ed25519.
+  device:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
+          ref: ${{ vars.SUPERIZER_REF || '' }}
+          path: superizer-checkout
+
+      - name: Put the library where settings.gradle.kts looks for it
+        run: mv superizer-checkout ../superizer
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      # Hosted runners have KVM, but only root may open it until this rule says otherwise.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: ./gradlew :services:vault:connectedDebugAndroidTest :services:ssh:connectedDebugAndroidTest :composeApp:connectedDebugAndroidTest
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device
+          path: |
+            services/*/build/reports/androidTests/
+            composeApp/build/reports/androidTests/

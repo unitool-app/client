@@ -369,7 +369,9 @@ internal class PrivateKey(
         /** An Ed25519 key from its seed — how a key made on the device, or a test's canary, becomes one. */
         fun ed25519(seed: ByteArray, comment: String): PrivateKey {
             val point = cx.m42.services.ssh.crypto.Ed25519.publicKey(seed)
-            val fields = WireWriter().string(point).string(seed + point)
+            val private = seed + point
+            val fields = WireWriter().string(point).string(private)
+            private.fill(0)
             val bytes = fields.toByteArray()
             fields.wipe()
             return PrivateKey(SshPublicKey.ed25519(point), comment, SecretBytes(bytes))

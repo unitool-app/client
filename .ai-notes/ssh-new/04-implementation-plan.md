@@ -53,7 +53,7 @@ P10–P13; без Mac он откладывается, а Android, desktop и we
 | P6 | Импорт P-256 с `setIsStrongBoxBacked(true)` | на телефоне с `FEATURE_STRONGBOX_KEYSTORE` | — (нет `FEATURE_STRONGBOX_KEYSTORE`) | не подключён |
 | P7 | Какое исключение и на каком вызове бросает ключ «каждое использование» без промпта (`initSign`, `update` или `sign`)? | для `Signature` и `Cipher` | `initSign` и `update` проходят, `sign()` бросает `SignatureException` ← `KeyStoreException` «Key user not authenticated» (код −26, `KEY_USER_NOT_AUTHENTICATED`); AES-GCM: `init` проходит, `doFinal` бросает `IllegalBlockSizeException` ← тот же −26. **После снятия PIN ключи с привязкой к аутентификации система удаляет** (alias пропадает), а не оставляет с `KeyPermanentlyInvalidatedException` | не подключён |
 | P8 | `KeyInfo.securityLevel` и `isUserAuthenticationRequirementEnforcedBySecureHardware` для каждого типа | лог | все ключи `SECURITY_LEVEL_SOFTWARE` (программный KeyMint эмулятора), `isUserAuthenticationRequirementEnforcedBySecureHardware = false`; `KEYSTORE` feature 300 | не подключён |
-| P9 | Сколько идёт bcrypt_pbkdf с 24 раундами в нашем Kotlin на телефоне? | замер после шага 2, туда же | JVM (эта машина, JDK 21): **264 мс** на 48 байт ключа и IV (`BcryptTimingTest`); на эмуляторе — самопроверка шага 3 (`passphrase.roundtrip`) | не подключён |
+| P9 | Сколько идёт bcrypt_pbkdf с 24 раундами в нашем Kotlin на телефоне? | замер после шага 2, туда же | JVM (эта машина, JDK 21): **264 мс** на 48 байт ключа и IV (`BcryptTimingTest`); эмулятор `unitool35` (x86_64, API 35): **1,4–2,3 с** на весь `passphrase.roundtrip` самопроверки (разбор файла + bcrypt + расшифровка), пять прогонов 2026-09-26 — ниже порога 3 с (`passphrase.slow`) | не подключён |
 
 (05 §5) На Mac, в `iosSimulatorArm64Test` и на iPhone:
 
@@ -63,6 +63,13 @@ P10–P13; без Mac он откладывается, а Android, desktop и we
 | P11 | Требует ли `SecKeyCreateDecryptedData` Face ID для ключа с `UserPresence`, какой `CFError` без него | без `LAContext`; на симуляторе `Features → Face ID` | | |
 | P12 | `WhenPasscodeSetThisDeviceOnly` без кода и после снятия кода | лог | | |
 | P13 | Подпись P-256 из enclave проходит `ssh-keygen -Y verify` после DER → mpint | интероп | | |
+
+**(impl) Кто отвечает на P10–P13 без Mac (D180):** `SecureEnclaveSelfTest` (`services/ssh`
+iosMain) в самопроверке iOS: P10 — есть ли enclave (`enclave.sign` проваливается с «made no
+key»), P11 — `wrap.auth-required` с `interactionNotAllowed` пишет `CFError` отказа, P12 —
+`wrap.passcode-class`, P13 — `enclave.sign` проверяет SSHSIG нашим `SshSig.verify`, который
+на JVM сверен с `ssh-keygen -Y verify`. Написано, не выполнялось: столбцы заполнит первый отчёт
+с iPhone.
 | P14 | bcrypt_pbkdf 24 раунда в Kotlin/Native на iPhone и в wasm в браузере | замер, как P9 | | |
 
 **(impl) Прогон шага 0, 2026-09-26:** `KeystoreProbeTest` (`services/ssh`, `connectedDebugAndroidTest`) на
@@ -181,6 +188,31 @@ superizer-implemented).
 - Генерация (если вопрос 74 — да): P-256 с `setAttestationChallenge`, StrongBox, если есть.
 - **Готово.** Инструментальные тесты зелёные на `unitool35`. `KeystoreProbeTest` и отчёт
   уровня безопасности записаны. Тест кучи для Ed25519 — 0 находок.
+- **(impl) Как сделано, 2026-09-26.** Отступления от плана выше, каждое с причиной:
+  - `androidx.biometric` не нужен: системный `BiometricPrompt` на API 30+ умеет PIN как
+    запасной вход, а `KeyAgreement` в `CryptoObject` не держит ни он, ни AndroidX (01 §5.1,
+    impl: у X25519-близнеца окно 5 с).
+  - Отдельной `KeyPromptActivity` нет: лист разрешения и пароля — `KeyPromptSheet` хоста над
+    оболочкой (шаг 4, `SecureWindow` = `FLAG_SECURE`), системный промпт показывает бэкенд над
+    текущей активностью. `Busy` даёт keyring (один лист за раз), а не активность.
+  - `AndroidSshKeyring` + `KeystoreResidence` + `SealedResidence` = один `KeystoreBackend`
+    (`ChipBackend` из шага 3) за фабрикой `SshKeyringHost.android(...)`; ниже API 30 фабрика
+    не даёт чипа, и всё — уровень 3 (D145 без отдельной ветки).
+  - `setUserAuthenticationParameters` принимает `KeyProperties.AUTH_*`, а промпт —
+    `BiometricManager.Authenticators`: это два разных набора чисел; тест читает `KeyInfo` и
+    проверяет, что ключ записал именно STRONG | DEVICE_CREDENTIAL и окно 0.
+  - Сессии стираются по `ACTION_SCREEN_OFF` (`ScreenOffTest`).
+  - Самопроверка на устройстве — `SelfTestOnDeviceTest` в composeApp (без блокировки и с PIN
+    1111): до этого `:composeApp:connectedDebugAndroidTest` в `verify.sh` проходил, потому что
+    тестов в нём не было вовсе.
+  - Итог на `unitool35`: `KeystoreBackendTest` (5), `ScreenOffTest`, `KeystoreProbeTest`,
+    `AndroidKeystoreVaultTest` (+`hardware()`), `SelfTestOnDeviceTest` (2) — зелёные; тест кучи
+    для Ed25519 — 0 находок. Телефон владельца не подключался: его столбец пуст.
+- **(impl) Шаг 5b без Mac.** `SecureEnclaveBackend` и `SshKeyringHost.ios(...)` написаны и
+  компилируются в klib (iosArm64, iosSimulatorArm64); **не выполнялись**. По D175 iOS-хост
+  остаётся на уровне 3 (`passphraseOnly`), пока отчёт самопроверки с iPhone не зелёный;
+  самопроверка iOS уже гоняет шаги enclave (`SecureEnclaveSelfTest`), чтобы этот отчёт было
+  чем сделать.
 
 ### Шаг 6. UI (1,5 дня)
 
@@ -323,7 +355,7 @@ superizer-implemented).
 | Б8 | Сессия секретов хоста «одна на запуск» и правило кольца «каждое использование» — два разных таймера с одним ключом | шаг 3 | **Решено, D176:** `AgeVault` держит расшифрованные секреты, а не ключ; ключ после `open` стирается; подпись — снова пароль |
 | Б9 | Бэкап включает конфиги приложений из superizer/16, которого нет | шаг 7 | v1 бэкапа: `app.*`, `secret.*`, настройки хоста; конфиги 16 добавятся, когда появятся, схема с `schema: 1` это переживёт |
 | Б10 | Контракт 3 и правило D138: приложение с `backup` или `secrets` на хосте контракта 2 | шаг 4 | `minHostContract = 3` обязателен при любом из полей; реестр отклоняет несогласованный манифест, как для `protection` |
-| Б11 | CI не гоняет ни `AndroidKeystoreVaultTest`, ни будущие инструментальные тесты `ssh` | шаг 5 | job с эмулятором `api-33` в `verify.yml` для `:services:vault` и `:ssh` `connectedDebugAndroidTest`; самопроверка 06 §3 и есть этот тест |
+| Б11 | CI не гоняет ни `AndroidKeystoreVaultTest`, ни будущие инструментальные тесты `ssh` | шаг 5 | job с эмулятором `api-33` в `verify.yml` для `:services:vault` и `:ssh` `connectedDebugAndroidTest`; самопроверка 06 §3 и есть этот тест. **(impl)** job `device` написан (плюс `:composeApp:connectedDebugAndroidTest` — самопроверка), в CI не запускался: пуш за владельцем |
 | Б12 | `SecretBytes` на wasm и Kotlin/Native: обнуление `ByteArray` не гарантирует отсутствие копий | шаг 3 | принять и записать в надписи (02 §9); тест I15 на JVM, на wasm — только отчёт |
 | Б13 | Экспорт 2FA в otpauth и полный бэкап — два формата, оба на ключи GitHub; человек может спутать | шаг 7 | разные расширения и заголовки: `*.2fa.age` и `unitool-backup-*.age`; импорт распознаёт по заголовку и говорит, что это |
 | Б14 | `IosKeychainVault` и `SecureEnclaveBackend` делят CoreFoundation-код | шаг 5b | **Снято 07:** оба в Unitool; обёртки в `services/ssh` iosMain, `services/vault` зависит от него |

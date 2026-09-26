@@ -52,6 +52,7 @@ kotlin {
         }
         val androidInstrumentedTest by getting
         androidInstrumentedTest.dependencies {
+            implementation(libs.superizer.testing)
             implementation(libs.androidx.test.runner)
             implementation(libs.androidx.test.junit)
             implementation(kotlin("test"))

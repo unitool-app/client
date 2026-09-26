@@ -172,6 +172,14 @@ kotlin {
             implementation(libs.compose.ui.test)
             implementation(libs.superizer.testing)
         }
+        // The self-test on a real Keystore (ssh-new 06 §3): what the Settings button runs, on the
+        // emulator in verify.sh and on any phone attached to it.
+        val androidInstrumentedTest by getting
+        androidInstrumentedTest.dependencies {
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.junit)
+            implementation(kotlin("test"))
+        }
     }
 }
 
@@ -218,6 +226,7 @@ android {
         // keeps 1 — it never reaches Play.
         versionCode = providers.environmentVariable("ANDROID_VERSION_CODE").orNull?.toIntOrNull() ?: 1
         versionName = appVersionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {

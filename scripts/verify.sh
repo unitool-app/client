@@ -147,10 +147,12 @@ if [ -n "${ANDROID_HOME:-}" ] || grep -q sdk.dir local.properties 2>/dev/null; t
   fi
 
   if adb get-state > /dev/null 2>&1; then
+    # The self-test Settings runs (ssh-new 06 §3), with and without a screen lock; its steps go to
+    # logcat under `SelfTest`, which is how an attached phone's answers reach 04 §2.
     if ./gradlew --quiet :composeApp:connectedDebugAndroidTest >> "$out/android.log" 2>&1; then
-      ok "instrumented smoke test"
+      ok "self-test on the device"
     else
-      bad "instrumented smoke test — see $out/android.log"
+      bad "self-test on the device — see $out/android.log"
     fi
     # The 2FA keys' encryption at rest against a real AndroidKeyStore, which exists nowhere else.
     if ./gradlew --quiet :services:vault:connectedDebugAndroidTest >> "$out/android.log" 2>&1; then
@@ -166,7 +168,7 @@ if [ -n "${ANDROID_HOME:-}" ] || grep -q sdk.dir local.properties 2>/dev/null; t
       bad "SSH keyring on the device — see $out/android.log"
     fi
   else
-    skip "instrumented tests (smoke, Keystore vault, SSH keyring): no device attached"
+    skip "instrumented tests (self-test, Keystore vault, SSH keyring): no device attached"
   fi
 else
   skip "Android: no SDK configured"

@@ -118,6 +118,15 @@ class AndroidKeystoreVaultTest {
     }
 
     @Test
+    fun whereTheKeyLivesIsKnownOnceItExists() = runBlocking<Unit> {
+        assertNull(vault.hardware(), "before the first seal there is no key to ask about")
+        vault.seal("makes the key")
+        val where = vault.hardware()
+        assertTrue(where in setOf("strongbox", "tee", "software"), "$where")
+        Log.i("AndroidKeystoreVaultTest", "hardware=$where")
+    }
+
+    @Test
     fun racingFirstSealsMakeOneKey() = runBlocking<Unit> {
         val texts = (1..16).map { "account $it" }
         val sealed = texts.map { text -> async(Dispatchers.IO) { vault.seal(text) } }.awaitAll()
