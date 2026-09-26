@@ -72,8 +72,16 @@ Two ways to get a build onto a phone, both in `.github/workflows/ios.yml` (ssh-n
   |---|---|
   | `IOS_DIST_CERT_P12_BASE64` | Apple Distribution certificate with its private key, `.p12`, base64 |
   | `IOS_DIST_CERT_PASSWORD` | the `.p12` password |
+  | `IOS_PROFILE_BASE64` | App Store profile for `cx.m42.unitool` made with that certificate, `.mobileprovision`, base64 |
   | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | App Store Connect API key (App Manager), its issuer, the `.p8` base64 |
-  | `IOS_PROFILE_BASE64` | optional: an App Store profile; without it automatic signing fetches one with the API key |
+
+  Signing is manual, as in agentiz: automatic signing on a clean runner would mint a development
+  certificate every run, and an App Manager key is not sure to be allowed to. The certificate and
+  the key are the team's and agentiz's serve; the profile is per app. It is made at
+  developer.apple.com → Profiles → **+** → App Store Connect → App ID `cx.m42.unitool` (with Push
+  Notifications on, or `aps-environment` is missing) → the distribution certificate.
+  `scripts/ios-ci-signing.py` checks the profile against the certificate and the app before
+  anything is built and names the secret that is wrong.
 
   The App ID, the app record in App Store Connect and a TestFlight internal group are made in the
   console first. `CFBundleVersion` is the workflow run number, so every upload is a new build.

@@ -7,3 +7,8 @@ APP_NAME=Unitool
 // Kotlin builds the simulator framework for Apple silicon only (iosSimulatorArm64, no iosX64), so a
 // build for "any simulator" must not ask for an Intel slice the framework does not have.
 EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64
+// Automatic for a person at Xcode. The testflight lane of ios.yml signs by hand with an App Store
+// profile, and writes that into Signing.xcconfig for the one run (scripts/ios-ci-signing.py). Set
+// here rather than in the project, which would outrank this file.
+CODE_SIGN_STYLE=Automatic
+#include? "Signing.xcconfig"

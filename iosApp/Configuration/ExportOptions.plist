@@ -3,9 +3,10 @@
 <plist version="1.0">
 <!--
   What `xcodebuild -exportArchive` does with the archive in the testflight lane of ios.yml.
-  `destination: upload` sends it to App Store Connect; `signingStyle: automatic` lets Xcode pick the
-  distribution certificate from the runner's keychain and the profile for the explicit App ID, with
-  the App Store Connect key passed on the command line. Nothing here is a secret.
+  `destination: upload` sends it to App Store Connect with the App Store Connect key passed on the
+  command line. Signing is manual, as the archive's is: scripts/ios-ci-signing.py adds
+  `signingCertificate` and `provisioningProfiles` from the run's secrets to a copy of this file.
+  Nothing here is a secret.
 -->
 <dict>
 	<key>method</key>
@@ -15,7 +16,7 @@
 	<key>teamID</key>
 	<string>5K5GDFV386</string>
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>manageAppVersionAndBuildNumber</key>
