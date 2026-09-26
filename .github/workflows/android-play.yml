@@ -48,6 +48,21 @@ jobs:
     timeout-minutes: 90
 
     steps:
+      # A private repository's runner has 2 cores, 7 GB and a small disk. The Gradle daemon (4 GB
+      # heap, 3 GB metaspace), the Kotlin daemon (3 GB) and the test or R8 JVM do not fit in that,
+      # and by every sign the runner is killed rather than the build failing: the log ends in "The
+      # operation was canceled" in the middle of a task — twice, once in the tests and once in R8.
+      # Swap and the toolchains nothing here uses are the room.
+      - name: Make room
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /usr/local/share/powershell /opt/hostedtoolcache/CodeQL /usr/local/julia* /usr/share/swift
+          sudo fallocate -l 8G /mnt/build.swap && sudo chmod 600 /mnt/build.swap \
+            && sudo mkswap /mnt/build.swap && sudo swapon /mnt/build.swap \
+            || echo "::warning::no extra swap; the build may be killed for memory"
+          free -h
+          df -h / /mnt
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -191,6 +206,13 @@ jobs:
       # before the bundle: a release that skips its tests is not cheaper, it is just later.
       - name: Verify
         run: ./gradlew verify --stacktrace
+
+      # The daemons Verify warmed hold memory R8 needs more; the configuration cache makes the cold
+      # start cheap.
+      - name: Let go of the daemons the tests used
+        run: |
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
 
       # Screenshots for the listing are written by the desktop test above, so this costs nothing
       # more than the Python. It catches the things Play rejects *after* a long upload — a
