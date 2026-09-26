@@ -1,5 +1,6 @@
 package cx.m42.unitool.i18n
 
+import cx.m42.services.backup.GitHubKeys
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -190,7 +191,6 @@ internal object SecurityStringsRu : SecurityStrings {
 
     override val backup = "Резервная копия"
     override val backupHint = "Данные всех приложений в одном файле, зашифрованном на SSH-ключи вашего аккаунта GitHub. Ключей в нём нет."
-    override val backupScreen = "Резервная копия и восстановление"
     override val githubLogin = "Логин GitHub"
     override val findKeys = "Найти ключи"
     override val recipients = "Зашифровано на"
@@ -206,6 +206,21 @@ internal object SecurityStringsRu : SecurityStrings {
     override val backupExcludes = "Не войдут: SSH-ключи и приложения, которые просили их не брать."
     override val backupMade = "Копия сделана."
     override fun backupFailed(code: String) = "Копию сделать не удалось ($code)."
+    override fun githubProblem(problem: GitHubKeys.Problem) = when (problem) {
+        GitHubKeys.Problem.NoSuchUser -> "Такого аккаунта GitHub нет."
+        GitHubKeys.Problem.NoKeys -> "У этого аккаунта нет открытых SSH-ключей."
+        GitHubKeys.Problem.NoUsableKeys -> "Ни на один ключ этого аккаунта нельзя зашифровать: age берёт Ed25519 и RSA от 2048 бит."
+        GitHubKeys.Problem.RateLimited -> "GitHub ограничил запросы с этого адреса. Попробуйте через час."
+        GitHubKeys.Problem.Offline -> "Нет соединения."
+        GitHubKeys.Problem.Server -> "GitHub ответил не так, как ожидалось. Попробуйте позже."
+    }
+    override val cannotEncryptTo = "age не шифрует на такой ключ"
+    override val restoreHint = "Копия, сделанная на другом устройстве. Ключ, на который она зашифрована, сначала должен появиться здесь, в SSH-ключах; копия, открытая на компьютере (age -d … > backup.json), читается как есть."
+    override val restoreButton = "Восстановить"
+    override val cancelledText = "Ничего не сделано."
+    override val secretsLocked = "Не удалось открыть секрет, поэтому копия не сделана."
+    override val backupUnreadable = "Это не копия, которую открывают здешние ключи."
+    override fun entries(n: Int) = "записей: $n"
 }
 
 internal fun securityStrings(langTag: String): SecurityStrings =

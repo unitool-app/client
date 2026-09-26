@@ -110,10 +110,10 @@ class Screenshots {
             // These are phone screens, and a phone has a camera and a share sheet: without them the
             // 2FA form would be drawn as on desktop, with no scan button, and its export with no
             // main button. Never opened by a capture.
-            val tools = HostTools(qr = PhoneCamera, sharer = PhoneShareSheet)
+            val network = if (offline) offlineNetwork() else ratesNetwork()
+            val tools = HostTools(qr = PhoneCamera, sharer = PhoneShareSheet, network = network)
             val security = kind.security(scope)
-            val superizer = buildUnitool(scope, debug = true, security = security, tools = tools) {
-                network(if (offline) offlineNetwork() else ratesNetwork())
+            val superizer = buildUnitool(scope, debug = true, security = security, tools = tools, network = network) {
                 clock?.let { clock(it) }
                 // A screen lock: the 2FA app is behind it (06), and the finger that answers the
                 // sheet is this fake. A frame of the curtain itself sets it to say no.
@@ -338,6 +338,13 @@ class Screenshots {
         Screen("40-2fa-not-protected", clock = TwoFaClock, kind = HostKind.Desktop()) {
             openTwoFa()
             addTwoFa(TwoFaLinks.first())
+        },
+        // ssh-new step 7: the backup, to octocat's keys — one of them one age cannot encrypt to.
+        Screen("42-backup") {
+            openSettings()
+            tapTag("backup:open")
+            typeInto("backup:github", "octocat")
+            tapTag("backup:find-keys")
         },
         Screen("41-settings-keys-en", lang = "en", kind = HostKind.Phone(PhoneKeys)) {
             tapIcon("Open menu")

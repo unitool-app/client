@@ -3,6 +3,7 @@ package cx.m42.unitool.settings
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.superizer.runtime.FilePicker
+import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.ssh.KeyId
 import cx.m42.superizer.ssh.SshKeyAdmin
 import kotlinx.coroutines.flow.StateFlow
@@ -36,4 +37,8 @@ public class HostTools(
     public val files: FilePicker? = null,
     public val qr: QrScanner? = null,
     public val sharer: FileSharer? = null,
-)
+    /** The host's own network — the one the apps get — for the backup's GitHub keys. Set by [cx.m42.unitool.buildUnitool]. */
+    public val network: NetworkService? = null,
+) {
+    internal fun with(network: NetworkService): HostTools = HostTools(files, qr, sharer, network)
+}

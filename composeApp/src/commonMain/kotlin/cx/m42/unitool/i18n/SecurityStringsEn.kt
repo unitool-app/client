@@ -1,5 +1,6 @@
 package cx.m42.unitool.i18n
 
+import cx.m42.services.backup.GitHubKeys
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -185,7 +186,6 @@ internal object SecurityStringsEn : SecurityStrings {
 
     override val backup = "Backup"
     override val backupHint = "Every app's data in one file, encrypted to your GitHub account's SSH keys. Keys are never in it."
-    override val backupScreen = "Backup and restore"
     override val githubLogin = "GitHub login"
     override val findKeys = "Find keys"
     override val recipients = "Encrypted to"
@@ -201,4 +201,19 @@ internal object SecurityStringsEn : SecurityStrings {
     override val backupExcludes = "Left out: SSH keys, and apps that asked to be."
     override val backupMade = "Backup made."
     override fun backupFailed(code: String) = "The backup could not be made ($code)."
+    override fun githubProblem(problem: GitHubKeys.Problem) = when (problem) {
+        GitHubKeys.Problem.NoSuchUser -> "There is no such GitHub account."
+        GitHubKeys.Problem.NoKeys -> "This account has no public SSH keys."
+        GitHubKeys.Problem.NoUsableKeys -> "None of this account's keys can be encrypted to: age takes Ed25519 and RSA keys of 2048 bits or more."
+        GitHubKeys.Problem.RateLimited -> "GitHub is limiting requests from this address. Try again in an hour."
+        GitHubKeys.Problem.Offline -> "No connection."
+        GitHubKeys.Problem.Server -> "GitHub did not answer as expected. Try again later."
+    }
+    override val cannotEncryptTo = "age cannot encrypt to this kind of key"
+    override val restoreHint = "A backup made on another device. The SSH key it was encrypted to has to be here first, under SSH keys; a backup opened on a computer (age -d … > backup.json) is read as it is."
+    override val restoreButton = "Restore"
+    override val cancelledText = "Nothing was done."
+    override val secretsLocked = "A secret could not be opened, so no backup was made."
+    override val backupUnreadable = "This is not a backup the keys here can open."
+    override fun entries(n: Int) = if (n == 1) "1 entry" else "$n entries"
 }

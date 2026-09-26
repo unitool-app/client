@@ -111,7 +111,7 @@ internal class ImportKeyScreen(private val keys: KeysUi, private val tools: Host
                     ) { chars ->
                         scope.launch { if (wizard.creating) wizard.create(chars, done) else wizard.submit(chars, done) }
                     }
-                    Problem(wizard, strings)
+                    ProblemLine(wizard, strings)
                     PageButton(strings.back, "import:back", variant = ButtonVariant.Outline) { wizard.stepBack() }
                 }
             }
@@ -334,7 +334,7 @@ private fun CreateStep(wizard: ImportWizard, strings: SecurityStrings, device: K
         )
     }
     PolicyChoice(wizard, strings)
-    Problem(wizard, strings)
+    ProblemLine(wizard, strings)
     PageButton(if (wizard.busy) strings.working else strings.create, "import:create-key", enabled = !wizard.busy) { create() }
     PageButton(strings.back, "import:back", variant = ButtonVariant.Outline) { wizard.stepBack() }
 }
@@ -397,7 +397,7 @@ private fun InspectStep(wizard: ImportWizard, strings: SecurityStrings, inBrowse
             )
         }
     }
-    Problem(wizard, strings)
+    ProblemLine(wizard, strings)
     PageButton(
         text = if (wizard.busy) strings.importing else strings.add,
         tag = "import:add",
@@ -421,7 +421,7 @@ private fun PolicyChoice(wizard: ImportWizard, strings: SecurityStrings) {
 }
 
 @Composable
-private fun Problem(wizard: ImportWizard, strings: SecurityStrings) {
+private fun ProblemLine(wizard: ImportWizard, strings: SecurityStrings) {
     val text = when (val p = wizard.problem) {
         null -> return
         Problem.WrongPassphrase -> strings.wrongPassphrase

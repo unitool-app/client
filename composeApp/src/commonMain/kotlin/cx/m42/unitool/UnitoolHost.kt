@@ -33,6 +33,8 @@ import cx.m42.unitool.settings.HostTools
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.superizer.runtime.FilePicker
+import cx.m42.superizer.runtime.NetworkService
+import cx.m42.superizer.host.net.KtorNetworkService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -56,8 +58,24 @@ public fun buildUnitool(
     debug: Boolean,
     security: UnitoolSecurity? = null,
     tools: HostTools = HostTools(),
+    network: NetworkService? = null,
     extra: SuperizerBuilder.() -> Unit = {},
+): Superizer {
+    // Made here rather than left to the library's default, so the host's own screens — the
+    // backup's GitHub keys — use the very service the apps do. A test hands in its fake.
+    val net = network ?: KtorNetworkService(KtorNetworkService.defaultClient())
+    return buildHost(scope, debug, security, tools.with(net), net, extra)
+}
+
+private fun buildHost(
+    scope: CoroutineScope,
+    debug: Boolean,
+    security: UnitoolSecurity?,
+    tools: HostTools,
+    network: NetworkService,
+    extra: SuperizerBuilder.() -> Unit,
 ): Superizer = Superizer.build(scope) {
+    network(network)
     host(
         HostInfo(
             name = "Unitool",

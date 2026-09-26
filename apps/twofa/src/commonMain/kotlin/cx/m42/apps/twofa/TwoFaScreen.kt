@@ -455,6 +455,28 @@ private fun AddPage(instance: TwoFaInstance, strings: TwoFaStrings) {
                     variant = if (instance.canScan) ButtonVariant.Secondary else ButtonVariant.Default,
                     modifier = Modifier.fillMaxWidth().testTag("2fa:read-link"),
                 )
+                // The export itself, opened here with the SSH key it was encrypted to (02 §6.1).
+                if (instance.canImportFile) {
+                    val opening by instance.opening.collectAsState()
+                    val fileProblem by instance.fileProblem.collectAsState()
+                    Spacer(Modifier.height(20.dp))
+                    AppButton(
+                        text = strings.importFile,
+                        onClick = instance::importFile,
+                        enabled = !opening,
+                        variant = ButtonVariant.Ghost,
+                        modifier = Modifier.fillMaxWidth().testTag("2fa:import-file"),
+                    )
+                    Hint(strings.importFileHint)
+                    fileProblem?.let {
+                        Text(
+                            text = strings.fileProblem(it),
+                            style = tokens.body,
+                            color = tokens.danger,
+                            modifier = Modifier.padding(top = 8.dp).testTag("2fa:file-problem"),
+                        )
+                    }
+                }
             }
 
             AddMode.Key -> {

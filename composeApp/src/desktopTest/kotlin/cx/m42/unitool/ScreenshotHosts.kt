@@ -21,6 +21,7 @@ import cx.m42.superizer.testing.FakeClock
 import cx.m42.superizer.testing.FakeSecretVault
 import cx.m42.unitool.security.KeyPrompts
 import cx.m42.unitool.security.UnitoolSecurity
+import cx.m42.unitool.settings.BackupSection
 import cx.m42.unitool.settings.DiagnosticsBanner
 import cx.m42.unitool.settings.HostTools
 import cx.m42.unitool.settings.SshKeysSection
@@ -55,6 +56,7 @@ internal sealed interface HostKind {
             if (lost) builder.diagnosticsSource(DiagnosticsSource { Inspected(listOf(DiagnosticsCode.VaultKeyLost.finding(Subject.HostSecrets))) })
             builder.hostSection(SshKeysSection(fake, tools))
             builder.hostSection(StorageSecuritySection(fake, tools))
+            builder.hostSection(BackupSection(tools))
             builder.homeBanner(DiagnosticsBanner(fake, tools))
         }
 

@@ -58,7 +58,7 @@ class KeysScreensTest : UnitoolTest() {
     }
 
     private fun host(security: UnitoolSecurity): Superizer =
-        buildUnitool(scope, debug = true, security = security, tools = HostTools()) { network(ratesNetwork()) }
+        buildUnitool(scope, debug = true, security = security, tools = HostTools(), network = ratesNetwork())
             .also { it.settings.chooseLanguage("en") }
 
     private fun ComposeUiTest.tap(tag: String) {

@@ -25,6 +25,7 @@ import cx.m42.superizer.ssh.KeyOperation
 import cx.m42.superizer.ssh.SshAgent
 import cx.m42.superizer.ssh.SshKeyAdmin
 import cx.m42.superizer.ssh.SshKeyring
+import cx.m42.superizer.ssh.SshOutcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -73,6 +74,15 @@ public class SshKeyringHost internal constructor(
     /** Opens a file encrypted to one of the person's keys, for the host itself: the backup (05 §3.4). Null: declined or no key. */
     public suspend fun decryptForHost(file: ByteArray): ByteArray? =
         keyring.decryptForHost(listOf(file), KeyOperation.Decrypt)?.firstOrNull()
+
+    /**
+     * [decryptForHost] with the reason kept (05 §3.4): the backup needs "declined" and "no key of
+     * yours opens this" told apart, because only the second has something to do about it.
+     */
+    public suspend fun openForHost(file: ByteArray): SshOutcome<ByteArray> {
+        val opened = keyring.decryptForHost(listOf(file), KeyOperation.Decrypt) ?: return SshOutcome.Cancelled
+        return opened.firstOrNull()?.let { SshOutcome.Ok(it) } ?: SshOutcome.NoKey
+    }
 
     /** The names of the keys, for the backup's hint (D170). */
     public fun keyNames(): List<BackupKeyName> =

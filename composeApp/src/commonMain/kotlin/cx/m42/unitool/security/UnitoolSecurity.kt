@@ -2,6 +2,8 @@ package cx.m42.unitool.security
 
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.diagnostics.PlatformSelfTest
+import cx.m42.services.backup.AgeBackupCipher
+import cx.m42.unitool.settings.BackupSection
 import cx.m42.unitool.settings.DiagnosticsBanner
 import cx.m42.unitool.settings.HostTools
 import cx.m42.unitool.settings.KeysUi
@@ -72,10 +74,13 @@ public class UnitoolSecurity(
         chipVaultDiagnostics?.let { builder.diagnosticsSource(it) }
         builder.selfTest(keyring.selfTest(hostVersion, platformSelfTest) { superizer?.storage?.exportText().orEmpty() })
         builder.backupKeys { keyring.keyNames() }
+        // age to the GitHub account's keys, opened by the keyring through its sheet (05 §3.1).
+        builder.backupCipher(AgeBackupCipher(keyring::openForHost))
         // The host's own screens (07 §2.4): keys first, then how everything is kept; the banner on
         // Home whenever that is worse than the listing promises (06 §7).
         builder.hostSection(SshKeysSection(keysUi, tools))
         builder.hostSection(StorageSecuritySection(keysUi, tools))
+        builder.hostSection(BackupSection(tools))
         builder.homeBanner(DiagnosticsBanner(keysUi, tools))
     }
 

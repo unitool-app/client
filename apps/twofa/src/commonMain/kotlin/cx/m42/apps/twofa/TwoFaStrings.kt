@@ -71,6 +71,9 @@ internal interface TwoFaStrings {
     val alreadyHere: String
     val scanMore: String
     val scanMoreHint: String
+    val importFile: String
+    val importFileHint: String
+    fun fileProblem(problem: FileProblem): String
 
     fun seconds(n: Int): String
     fun error(error: DraftError): String
@@ -167,6 +170,13 @@ internal object TwoFaStringsRu : TwoFaStrings {
     override val importTitle = "Импорт аккаунтов"
     override val alreadyHere = "Уже есть на этом устройстве"
     override val scanMore = "Сканировать ещё QR-код"
+    override val importFile = "Импорт из файла"
+    override val importFileHint = "Файл экспорта (.age) откроется вашим SSH-ключом из Настройки → SSH-ключи; файл, уже расшифрованный на компьютере, читается как есть."
+    override fun fileProblem(problem: FileProblem) = when (problem) {
+        FileProblem.NoKey -> "Ни один SSH-ключ здесь не открывает этот файл. Добавьте ключ, на который он зашифрован, в Настройки → SSH-ключи."
+        FileProblem.NotOpened -> "Файл не удалось открыть."
+        FileProblem.NoAccounts -> "В этом файле нет аккаунтов."
+    }
     override val scanMoreHint =
         "Если аккаунты показаны несколькими QR-кодами, отсканируйте следующий — он добавится к этому списку."
 
@@ -326,6 +336,13 @@ internal object TwoFaStringsEn : TwoFaStrings {
     override val importTitle = "Import accounts"
     override val alreadyHere = "Already on this device"
     override val scanMore = "Scan another QR code"
+    override val importFile = "Import from a file"
+    override val importFileHint = "The export file (.age) opens with your SSH key from Settings → SSH keys; a file already opened on a computer is read as it is."
+    override fun fileProblem(problem: FileProblem) = when (problem) {
+        FileProblem.NoKey -> "None of the SSH keys here opens this file. Add the key it was encrypted to in Settings → SSH keys."
+        FileProblem.NotOpened -> "The file could not be opened."
+        FileProblem.NoAccounts -> "There are no accounts in this file."
+    }
     override val scanMoreHint = "If the accounts come as several QR codes, scan the next one — it joins this list."
 
     override fun seconds(n: Int): String = "${n}s"

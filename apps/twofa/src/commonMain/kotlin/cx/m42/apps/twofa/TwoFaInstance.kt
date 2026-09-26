@@ -13,6 +13,9 @@ import cx.m42.superizer.runtime.InstanceRuntime
 import kotlin.random.Random
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import cx.m42.superizer.runtime.FilePicker
+import cx.m42.superizer.ssh.SshKeyring
+import cx.m42.superizer.ssh.SshOutcome
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -124,6 +127,19 @@ internal class TwoFaInstance(
 
     /** While the scanner is on screen, so a second tap does not open a second one. */
     val scanning = MutableStateFlow(false)
+
+    /**
+     * "Import from a file" (ssh-new 02 §6.1): the export itself, opened here with the person's SSH
+     * key — the keyring asks, the grant first, then the key's own prompt — or a file already opened
+     * on a computer, read as it is. Only where the host has both a file picker and a keyring (D19).
+     */
+    private val files: FilePicker? = runtime.service(FilePicker.Key)
+    private val keyring: SshKeyring? = runtime.service(SshKeyring.Key)
+    val canImportFile: Boolean get() = files != null && keyring != null
+
+    /** While the picker or the keyring's sheet is up. */
+    val opening = MutableStateFlow(false)
+    val fileProblem = MutableStateFlow<FileProblem?>(null)
 
     /**
      * The links being imported, and which of them are ticked. Only in memory, and only while the
@@ -407,6 +423,48 @@ internal class TwoFaInstance(
             addMode.value = AddMode.Link
             link.value = text.trim()
             if (readLink()) runtime.haptics.tick()
+        }
+    }
+
+    /**
+     * Picks a file and reads its accounts into the import page. Closing the picker or the keyring's
+     * sheet changes nothing; the picked bytes are wiped as soon as they are read.
+     */
+    fun importFile() {
+        val picker = files ?: return
+        val keys = keyring ?: return
+        if (opening.value) return
+        opening.value = true
+        fileProblem.value = null
+        runtime.scope.launch {
+            try {
+                val picked = picker.pick() ?: return@launch
+                val text = try {
+                    open(picked.bytes, keys)
+                } finally {
+                    picked.bytes.fill(0)
+                } ?: return@launch
+                if (Import.links(text).isEmpty()) {
+                    fileProblem.value = FileProblem.NoAccounts
+                    return@launch
+                }
+                runtime.analytics.event("2fa_import_file")
+                startImport(text)
+            } finally {
+                opening.value = false
+            }
+        }
+    }
+
+    /** The file's text: as it is when it is text already, else what the keyring opened; null when nothing was. */
+    private suspend fun open(bytes: ByteArray, keys: SshKeyring): String? {
+        val plain = bytes.decodeToString()
+        if (Import.links(plain).isNotEmpty()) return plain
+        return when (val opened = keys.decrypt(bytes)) {
+            is SshOutcome.Ok -> opened.value.decodeToString().also { opened.value.fill(0) }
+            SshOutcome.Cancelled, SshOutcome.Refused -> null
+            SshOutcome.NoKey -> null.also { fileProblem.value = FileProblem.NoKey }
+            else -> null.also { fileProblem.value = FileProblem.NotOpened }
         }
     }
 

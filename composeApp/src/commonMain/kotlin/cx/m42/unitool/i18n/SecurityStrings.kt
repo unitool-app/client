@@ -1,5 +1,6 @@
 package cx.m42.unitool.i18n
 
+import cx.m42.services.backup.GitHubKeys
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -120,7 +121,6 @@ internal interface SecurityStrings {
     // Backup
     val backup: String
     val backupHint: String
-    val backupScreen: String
     val githubLogin: String
     val findKeys: String
     val recipients: String
@@ -136,4 +136,12 @@ internal interface SecurityStrings {
     val backupExcludes: String
     val backupMade: String
     fun backupFailed(code: String): String
+    fun githubProblem(problem: GitHubKeys.Problem): String
+    val cannotEncryptTo: String
+    val restoreHint: String
+    val restoreButton: String
+    val cancelledText: String
+    val secretsLocked: String
+    val backupUnreadable: String
+    fun entries(n: Int): String
 }

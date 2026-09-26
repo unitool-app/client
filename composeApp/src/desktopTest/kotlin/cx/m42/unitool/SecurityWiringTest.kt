@@ -43,9 +43,7 @@ class SecurityWiringTest : UnitoolTest() {
         return UnitoolSecurity(keyring, prompts, chipVault = chipVault)
     }
 
-    private fun host(security: UnitoolSecurity): Superizer = buildUnitool(scope, debug = true, security = security) {
-        network(ratesNetwork())
-    }
+    private fun host(security: UnitoolSecurity): Superizer = buildUnitool(scope, debug = true, security = security, network = ratesNetwork())
 
     private fun stored(): Map<String, String> = PrefsStorage.keys().associateWith { PrefsStorage.get(it).orEmpty() }
 

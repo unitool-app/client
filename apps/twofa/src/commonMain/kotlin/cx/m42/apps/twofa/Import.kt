@@ -22,6 +22,9 @@ internal data class ImportBatch(
     val addable: List<Int> get() = found.indices.filter { !found[it].known }
 }
 
+/** Why a picked file gave no accounts. */
+internal enum class FileProblem { NoKey, NotOpened, NoAccounts }
+
 internal object Import {
 
     private val SCHEME = Regex("otpauth(-migration)?://", RegexOption.IGNORE_CASE)

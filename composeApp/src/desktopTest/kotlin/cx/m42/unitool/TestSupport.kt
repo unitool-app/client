@@ -48,8 +48,8 @@ internal fun testSuperizer(
 ): Superizer = buildUnitool(
     scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
     debug = debug,
+    network = network,
 ) {
-    network(network)
     extra()
 }.also {
     // Pinned, and it has to be *pinned* rather than defaulted: without this the host resolves the

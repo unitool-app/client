@@ -159,8 +159,7 @@ internal class StorageSecurityScreen(private val keys: KeysUi?, private val tool
                 DiagnosticsAction.EnableScreenLock -> superizer.lock.openDeviceSettings()
                 DiagnosticsAction.RunSelfTest -> runSelfTest()
                 DiagnosticsAction.ShareReport -> shareReport()
-                // The backup screen is step 7 of ssh-new; until it exists the action has nowhere to go.
-                DiagnosticsAction.MakeBackup -> Unit
+                DiagnosticsAction.MakeBackup -> open(BackupScreen(tools))
             }
         }
 
@@ -313,6 +312,5 @@ private fun about(subject: Subject, superizer: Superizer, langTag: String, keyNa
 /** An action has a button only where this host can do it. */
 private fun DiagnosticsAction.available(keys: KeysUi?): Boolean = when (this) {
     DiagnosticsAction.AddSshKey, DiagnosticsAction.ImportKeyAgain, DiagnosticsAction.SetPassphrase, DiagnosticsAction.Rekey -> keys != null
-    DiagnosticsAction.MakeBackup -> false
     else -> true
 }

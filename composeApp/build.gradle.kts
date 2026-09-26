@@ -158,9 +158,12 @@ kotlin {
             implementation(project(":services:vault"))
             implementation(project(":services:ssh"))
             implementation(project(":services:file-picker"))
+            implementation(project(":services:backup"))
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            // KtorNetworkService's constructor names HttpClient (UnitoolHost.kt).
+            implementation(libs.ktor.client.core)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
