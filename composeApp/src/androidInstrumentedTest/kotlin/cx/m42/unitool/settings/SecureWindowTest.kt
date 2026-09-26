@@ -61,13 +61,13 @@ class SecureWindowTest {
 
         val flags = { activity!!.window.attributes.flags }
         assertTrue(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "the wizard's window is secure")
-        assertTrue(settles { blank(screencap()) }, "a screenshot of the wizard shows nothing of it; ${seen()}")
+        assertTrue(settles { showsNothing(screencap()) }, "a screenshot of the wizard shows nothing of it; ${seen()}")
 
         onNode(hasContentDescription("Back").or(hasContentDescription("Назад"))).performClick()
         waitForIdle()
         onNodeWithTag("settings:host:ssh-keys").assertExists()
         assertFalse(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "Settings is not")
-        assertTrue(settles { !blank(screencap()) }, "and Settings can be captured; ${seen()}")
+        assertTrue(settles { screencap()?.let { !blank(it) } == true }, "and Settings can be captured; ${seen()}")
     }
 
     /**
@@ -77,8 +77,18 @@ class SecureWindowTest {
      */
     private fun screencap(): Bitmap? {
         val png = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("screencap -p")).use { it.readBytes() }
+        lastOutput = png
         return BitmapFactory.decodeByteArray(png, 0, png.size)
     }
+
+    private var lastOutput = ByteArray(0)
+
+    /**
+     * No image at all is nothing shown too: on the API 33 emulator in CI `screencap` gives none while a
+     * secure window is on screen, where API 35's gives a black one. That `screencap` works at all is
+     * the second half's to prove — Settings has to come out as a picture.
+     */
+    private fun showsNothing(shot: Bitmap?): Boolean = shot == null || blank(shot)
 
     /**
      * The attribute reads secure at once; the compositor learns it with the window's next layout,
@@ -95,7 +105,8 @@ class SecureWindowTest {
 
     /** What the last capture was of, for a failure to say. */
     private fun seen(): String {
-        val shot = screencap() ?: return "no capture; in front: ${front()}"
+        val shot = screencap()
+            ?: return "no image, ${lastOutput.size} bytes: \"${lastOutput.copyOf(minOf(120, lastOutput.size)).decodeToString().trim()}\"; in front: ${front()}"
         val colours = (shot.height / 4 until shot.height * 3 / 4 step 16).flatMap { y ->
             (shot.width / 8 until shot.width * 7 / 8 step 16).map { x -> shot.getPixel(x, y) }
         }.toSet()
@@ -103,8 +114,7 @@ class SecureWindowTest {
     }
 
     /** The middle of the screen, away from the system bars, is one flat colour: what a secure layer becomes in a capture. */
-    private fun blank(shot: Bitmap?): Boolean {
-        shot ?: return false
+    private fun blank(shot: Bitmap): Boolean {
         val first = shot.getPixel(shot.width / 2, shot.height / 2)
         val step = 8
         for (y in shot.height / 4 until shot.height * 3 / 4 step step) {
