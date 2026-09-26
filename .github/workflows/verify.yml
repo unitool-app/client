@@ -72,6 +72,15 @@ jobs:
   device:
     runs-on: ubuntu-latest
     steps:
+      # The emulator checks free space before it boots and refuses on a stock runner: "Your device
+      # does not have enough disk space to run avd", then ten minutes of "device not found" until the
+      # boot timeout — which is how this job failed the first time it ran. None of these is used here.
+      - name: Free disk space for the emulator
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+            /usr/local/share/powershell /opt/hostedtoolcache/CodeQL /usr/local/julia* /usr/share/swift
+          df -h /
+
       - uses: actions/checkout@v4
 
       - uses: actions/checkout@v4
