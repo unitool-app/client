@@ -1,5 +1,6 @@
 package cx.m42.apps.twofa
 
+import cx.m42.services.ssh.SshPublicKey
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -761,7 +762,7 @@ private fun KeyRow(key: GitHubKey, checked: Boolean, index: Int, strings: TwoFaS
             Text(text = key.key.fingerprint, style = tokens.footnote, color = tokens.muted)
             if (!key.usable) {
                 Text(
-                    text = if (key.key is SshKey.Rsa) strings.weakKey else strings.unsupportedKey,
+                    text = if (key.key.type == SshPublicKey.RSA) strings.weakKey else strings.unsupportedKey,
                     style = tokens.footnote,
                     color = tokens.muted,
                 )

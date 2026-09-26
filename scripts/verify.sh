@@ -55,10 +55,23 @@ else
   ok "the library is referenced by Maven coordinates only"
 fi
 
+# I-net (ssh-new 03): the module that holds keys has no way to send anything. Checked on the resolved
+# graph, not the build file: a network library arriving transitively is the case that matters.
+if ./gradlew --quiet :services:ssh:dependencies --configuration desktopRuntimeClasspath > "$out/ssh-deps.txt" 2>&1 &&
+  ./gradlew --quiet :services:ssh:dependencies --configuration debugRuntimeClasspath >> "$out/ssh-deps.txt" 2>&1; then
+  if grep -qiE 'ktor|okhttp|java-websocket' "$out/ssh-deps.txt"; then
+    bad "services/ssh reaches a network library — see $out/ssh-deps.txt"
+  else
+    ok "services/ssh has no network in its dependencies (I-net)"
+  fi
+else
+  bad "services/ssh dependencies — see $out/ssh-deps.txt"
+fi
+
 # ---------------------------------------------------------------- 2. tests
 step "2. Unit and UI tests (desktop)"
 if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest :apps:twofa:desktopTest \
-    :services:qr-scanner:testDebugUnitTest --continue > "$out/test.log" 2>&1; then
+    :services:ssh:desktopTest :services:qr-scanner:testDebugUnitTest --continue > "$out/test.log" 2>&1; then
   ok "host and app tests"
 else
   bad "tests — see $out/test.log"
@@ -66,6 +79,10 @@ fi
 mkdir -p "$out/junit"
 find . -path '*/build/test-results/*' -name '*.xml' -not -path "./$out/*" -exec cp {} "$out/junit/" \; 2>/dev/null
 say "  ($(ls "$out/junit" 2>/dev/null | wc -l) result files)"
+# The interop tests skip rather than pass when a tool is missing (03 §4, D158); say which, by name.
+for tool in ssh-keygen ssh-add age; do
+  command -v "$tool" > /dev/null || skip "interop tests that need $tool: not installed here"
+done
 
 # ---------------------------------------------------------------- 3. screenshots
 step "3. Screenshots"

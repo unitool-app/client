@@ -1,4 +1,10 @@
-package cx.m42.apps.twofa
+package cx.m42.services.ssh
+
+import cx.m42.services.ssh.crypto.ChaCha20Poly1305
+import cx.m42.services.ssh.crypto.Curve25519
+import cx.m42.services.ssh.crypto.Montgomery
+import cx.m42.services.ssh.crypto.Rsa
+import cx.m42.services.ssh.crypto.hkdfSha256
 
 import java.io.File
 import java.math.BigInteger
@@ -19,9 +25,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private fun hex(text: String): ByteArray = text.filter { it.isLetterOrDigit() }.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-
-private fun ByteArray.hex(): String = joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
 
 /**
  * The export's cryptography, primitive by primitive and then as a whole file.
@@ -174,7 +177,7 @@ class AgeTest {
             val public = pair.keys.public as RSAPublicKey
             val label = "age-encryption.org/v1/ssh-rsa".toByteArray()
             val message = bytes(16)
-            val sealed = RsaOaep.encrypt(public.modulus.toByteArray(), public.publicExponent.toByteArray(), message, label, bytes(32))
+            val sealed = Rsa.oaepEncrypt(public.modulus.toByteArray(), public.publicExponent.toByteArray(), message, label, bytes(32))
             assertEquals(bits / 8, sealed.size)
             val opened = Cipher.getInstance("RSA/ECB/OAEPPadding").run {
                 init(
@@ -193,38 +196,36 @@ class AgeTest {
     @Test
     fun fingerprintsAreTheOnesSshKeygenPrints() {
         // Lines and fingerprints from `ssh-keygen -lf`, so this is the tool's word, not ours.
-        val ed = SshKey.parse("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOh1VbDdG6aEqkiUkfr6tLE1wlJZ/jm90yZxcCjDq3xS fixture")
-        assertIs<SshKey.Ed25519>(ed)
+        val ed = SshPublicKey.parse("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOh1VbDdG6aEqkiUkfr6tLE1wlJZ/jm90yZxcCjDq3xS fixture")!!
+        assertIs<SshPublicKey.Kind.Ed25519>(ed.kind)
         assertEquals("SHA256:38iHjJmQ3ZgyVqQbwzzs8/a9uWDpucwF7wkjYr9AnMw", ed.fingerprint)
         assertEquals("ED25519", ed.label)
         assertTrue(Age.supports(ed))
 
-        val rsa = SshKey.parse(Fixtures.RSA_3072)
-        assertIs<SshKey.Rsa>(rsa)
-        assertEquals(3072, rsa.bits)
+        val rsa = SshPublicKey.parse(Fixtures.RSA_3072)!!
+        assertEquals(3072, assertIs<SshPublicKey.Kind.Rsa>(rsa.kind).bits)
         assertEquals("SHA256:aMOCCj4NOZ36Zw/kBy/OKKmCgXajBtSgik6S4BuNh+A", rsa.fingerprint)
         assertTrue(Age.supports(rsa))
 
-        val short = SshKey.parse(Fixtures.RSA_1024)
-        assertIs<SshKey.Rsa>(short)
-        assertEquals(1024, short.bits)
+        val short = SshPublicKey.parse(Fixtures.RSA_1024)!!
+        assertEquals(1024, assertIs<SshPublicKey.Kind.Rsa>(short.kind).bits)
         assertEquals("SHA256:yCAseW4QsGJ9vlG8MT0IB3B6Q3fq1hml2khfTwU/Xqk", short.fingerprint)
         assertTrue(!Age.supports(short), "age refuses RSA under 2048 bits")
 
-        val ecdsa = SshKey.parse(Fixtures.ECDSA)
-        assertIs<SshKey.Other>(ecdsa)
-        assertEquals("ECDSA", ecdsa.label)
+        val ecdsa = SshPublicKey.parse(Fixtures.ECDSA)!!
+        assertIs<SshPublicKey.Kind.Ecdsa>(ecdsa.kind)
+        assertEquals("ECDSA 256", ecdsa.label)
         assertEquals("SHA256:whxBWDesIgwmYs1gc16q/7VE2jQtbXN4eUJ84iLnu5A", ecdsa.fingerprint)
         assertTrue(!Age.supports(ecdsa))
     }
 
     @Test
     fun aLineThatIsNotAKeyIsNull() {
-        assertNull(SshKey.parse(""))
-        assertNull(SshKey.parse("ssh-ed25519"))
-        assertNull(SshKey.parse("ssh-ed25519 not-base64!"))
+        assertNull(SshPublicKey.parse(""))
+        assertNull(SshPublicKey.parse("ssh-ed25519"))
+        assertNull(SshPublicKey.parse("ssh-ed25519 not-base64!"))
         // The type outside says RSA, the blob inside says Ed25519.
-        assertNull(SshKey.parse("ssh-rsa AAAAC3NzaC1lZDI1NTE5AAAAIOh1VbDdG6aEqkiUkfr6tLE1wlJZ/jm90yZxcCjDq3xS"))
+        assertNull(SshPublicKey.parse("ssh-rsa AAAAC3NzaC1lZDI1NTE5AAAAIOh1VbDdG6aEqkiUkfr6tLE1wlJZ/jm90yZxcCjDq3xS"))
     }
 
     // ------------------------------------------------------------ the file
@@ -233,7 +234,7 @@ class AgeTest {
     fun aFileForTwoKindsOfKeyOpensWithEither() {
         val ed = JcaAge.ed25519()
         val rsa = JcaAge.rsa(2048)
-        val recipients = listOf(ed, rsa).map { SshKey.parse(it.publicLine)!! }
+        val recipients = listOf(ed, rsa).map { SshPublicKey.parse(it.publicLine)!! }
         val plaintext = "otpauth://totp/GitHub:octocat?secret=JBSWY3DPEHPK3PXP&issuer=GitHub\n".toByteArray()
         val armored = Age.armor(Age.encrypt(plaintext, recipients))
         assertContentEquals(plaintext, JcaAge.decrypt(armored, ed))
@@ -244,7 +245,7 @@ class AgeTest {
     @Test
     fun theStreamChunksAtEveryBoundary() {
         val ed = JcaAge.ed25519()
-        val recipient = listOf(SshKey.parse(ed.publicLine)!!)
+        val recipient = listOf(SshPublicKey.parse(ed.publicLine)!!)
         for (length in listOf(0, 1, 65535, 65536, 65537, 150_000)) {
             val plaintext = bytes(length)
             assertContentEquals(plaintext, JcaAge.decrypt(Age.encrypt(plaintext, recipient), ed), "length $length")
@@ -256,15 +257,15 @@ class AgeTest {
         // 3072 bits = 384 bytes = 512 Base64 columns: eight full lines, then the empty one the
         // format requires. The reader fails on a missing one, since it cannot tell where the body ends.
         val rsa = JcaAge.Rsa(java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(3072) }.generateKeyPair())
-        val file = Age.encrypt("x".toByteArray(), listOf(SshKey.parse(rsa.publicLine)!!))
+        val file = Age.encrypt("x".toByteArray(), listOf(SshPublicKey.parse(rsa.publicLine)!!))
         assertTrue("\n\n--- " in String(file, Charsets.ISO_8859_1), "empty line after a full body")
         assertContentEquals("x".toByteArray(), JcaAge.decrypt(file, rsa))
     }
 
     @Test
     fun keysAgeCannotUseAreRefused() {
-        assertFailsWith<IllegalArgumentException> { Age.encrypt(ByteArray(1), listOf(SshKey.parse(Fixtures.ECDSA)!!)) }
-        assertFailsWith<IllegalArgumentException> { Age.encrypt(ByteArray(1), listOf(SshKey.parse(Fixtures.RSA_1024)!!)) }
+        assertFailsWith<IllegalArgumentException> { Age.encrypt(ByteArray(1), listOf(SshPublicKey.parse(Fixtures.ECDSA)!!)) }
+        assertFailsWith<IllegalArgumentException> { Age.encrypt(ByteArray(1), listOf(SshPublicKey.parse(Fixtures.RSA_1024)!!)) }
         assertFailsWith<IllegalArgumentException> { Age.encrypt(ByteArray(1), emptyList()) }
     }
 
@@ -286,7 +287,7 @@ class AgeTest {
                 run(listOf("ssh-keygen", "-q", "-N", "", "-C", "", "-f", key.path) + args)
                 key
             }
-            val recipients = identities.map { SshKey.parse(File(it.path + ".pub").readText())!! }
+            val recipients = identities.map { SshPublicKey.parse(File(it.path + ".pub").readText())!! }
             val plaintext = "otpauth://totp/%D0%93%D0%BE%D1%81%D1%83%D1%81%D0%BB%D1%83%D0%B3%D0%B8:ivan?secret=JBSWY3DPEHPK3PXP\n" +
                 "otpauth://totp/GitHub:octocat?secret=GEZDGNBVGY3TQOJQ&issuer=GitHub&digits=8\n"
 

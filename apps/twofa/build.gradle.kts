@@ -46,6 +46,8 @@ kotlin {
             implementation(project(":services:share"))
             // Encryption at rest for the accounts: the contract here, the Keystore in the host.
             implementation(project(":services:vault"))
+            // SSH public keys and age, for the export: pure functions of public keys (ssh-new 02 §4).
+            implementation(project(":services:ssh"))
         }
         val desktopTest by getting
         desktopTest.dependencies {

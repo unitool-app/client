@@ -390,7 +390,7 @@ class TwoFaExportTest {
             openExport(this)
             val loaded = twofa.exportKeys.value as KeysState.Loaded
             // Usable first, and only those ticked.
-            assertEquals(listOf("ED25519", "RSA 3072", "ECDSA", "RSA 1024"), loaded.keys.map { it.key.label })
+            assertEquals(listOf("ED25519", "RSA 3072", "ECDSA 256", "RSA 1024"), loaded.keys.map { it.key.label })
             assertEquals(loaded.keys.take(2).map { it.key.fingerprint }.toSet(), twofa.exportSelected.value)
             // One command per kind of key, each with the kind's default file.
             node("2fa:command-0").assertTextEquals("age -d -i ~/.ssh/id_ed25519 unitool-2fa-2023-11-14.age")

@@ -1,11 +1,10 @@
-package cx.m42.apps.twofa
+package cx.m42.services.ssh.crypto
 
 /**
- * ChaCha20-Poly1305 (RFC 8439), the sealing half: the cipher age wraps its keys and its payload in.
+ * ChaCha20-Poly1305 (RFC 8439): the cipher age wraps its keys and its payload in. Moved from the
+ * 2FA app (D156), which only sealed; opening is new, for `age -d` on the device (02 §6.1).
  *
- * Opening is not here because nothing on the phone ever decrypts an export — that happens on the
- * computer, with `age`. The tests open what this seals with the JVM's own implementation, which is
- * the stronger check anyway.
+ * Held to RFC 8439's vectors and to the JDK's implementation in `desktopTest`.
  */
 internal object ChaCha20Poly1305 {
 
@@ -22,6 +21,25 @@ internal object ChaCha20Poly1305 {
         macData.putLongLe(macData.size - 16, aad.size.toLong())
         macData.putLongLe(macData.size - 8, ciphertext.size.toLong())
         return ciphertext + poly1305(oneTimeKey, macData)
+    }
+
+    /** The plaintext, or null when the tag does not match — nothing of an unauthenticated message comes back. */
+    fun open(key: ByteArray, nonce: ByteArray, sealed: ByteArray, aad: ByteArray = ByteArray(0)): ByteArray? {
+        require(key.size == 32 && nonce.size == 12)
+        if (sealed.size < TAG_SIZE) return null
+        val ciphertext = sealed.copyOfRange(0, sealed.size - TAG_SIZE)
+        val oneTimeKey = block(key, 0, nonce).copyOf(32)
+        val macData = ByteArray(padded(aad.size) + padded(ciphertext.size) + 16)
+        aad.copyInto(macData, 0)
+        ciphertext.copyInto(macData, padded(aad.size))
+        macData.putLongLe(macData.size - 16, aad.size.toLong())
+        macData.putLongLe(macData.size - 8, ciphertext.size.toLong())
+        val expected = poly1305(oneTimeKey, macData)
+        oneTimeKey.fill(0)
+        var diff = 0
+        for (i in 0 until TAG_SIZE) diff = diff or (expected[i].toInt() xor sealed[sealed.size - TAG_SIZE + i].toInt())
+        if (diff != 0) return null
+        return xor(key, 1, nonce, ciphertext)
     }
 
     private fun padded(size: Int): Int = (size + 15) / 16 * 16

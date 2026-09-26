@@ -1,5 +1,6 @@
 package cx.m42.apps.twofa
 
+import cx.m42.services.ssh.SshPublicKey
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.performTextReplacement
 import cx.m42.services.qr.QrScanner
@@ -95,7 +96,7 @@ class TwoFaImportTest {
 
     @Test
     fun theTransferCommandPipesTheDecryptedLinksIntoOneQrCode() {
-        val ed = SshKey.parse(JcaAge.ed25519().publicLine)!!
+        val ed = SshPublicKey.parse(JcaAge.ed25519().publicLine)!!
         assertEquals(
             listOf("age -d -i ~/.ssh/id_ed25519 unitool-2fa-2023-11-14.age | qrencode -t ansiutf8"),
             Export.transferCommands(listOf(ed), "unitool-2fa-2023-11-14.age", printed(three)),
@@ -107,7 +108,7 @@ class TwoFaImportTest {
         val many = (1..60).map { TotpAccount("", "Google", "ivan.petrov$it@gmail.com", "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567") }
         val text = printed(many)
         assertTrue(text.length > Export.QR_BYTES)
-        val ed = SshKey.parse(JcaAge.ed25519().publicLine)!!
+        val ed = SshPublicKey.parse(JcaAge.ed25519().publicLine)!!
         val command = Export.transferCommands(listOf(ed), "f.age", text).single()
         val lines = Regex("""split -l (\d+) """).find(command)!!.groupValues[1].toInt()
         assertTrue(command.startsWith("age -d -i ~/.ssh/id_ed25519 f.age | split -l $lines --filter='clear; qrencode -t ansiutf8; read _ </dev/tty'"))

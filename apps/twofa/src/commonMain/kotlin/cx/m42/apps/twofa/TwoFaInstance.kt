@@ -3,6 +3,8 @@ package cx.m42.apps.twofa
 import androidx.compose.runtime.Composable
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
+import cx.m42.services.ssh.Age
+import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.vault.SecretVault
 import cx.m42.superizer.app.AppChrome
 import cx.m42.superizer.app.AppInstance
@@ -507,7 +509,7 @@ internal class TwoFaInstance(
     }
 
     /** The ticked keys, in the order GitHub listed them. */
-    fun exportRecipients(): List<SshKey> {
+    fun exportRecipients(): List<SshPublicKey> {
         val loaded = exportKeys.value as? KeysState.Loaded ?: return emptyList()
         val selected = exportSelected.value
         return loaded.keys.filter { it.usable && it.key.fingerprint in selected }.map { it.key }

@@ -53,7 +53,7 @@ P10–P13; без Mac он откладывается, а Android, desktop и we
 | P6 | Импорт P-256 с `setIsStrongBoxBacked(true)` | на телефоне с `FEATURE_STRONGBOX_KEYSTORE` | — (нет `FEATURE_STRONGBOX_KEYSTORE`) | не подключён |
 | P7 | Какое исключение и на каком вызове бросает ключ «каждое использование» без промпта (`initSign`, `update` или `sign`)? | для `Signature` и `Cipher` | `initSign` и `update` проходят, `sign()` бросает `SignatureException` ← `KeyStoreException` «Key user not authenticated» (код −26, `KEY_USER_NOT_AUTHENTICATED`); AES-GCM: `init` проходит, `doFinal` бросает `IllegalBlockSizeException` ← тот же −26. **После снятия PIN ключи с привязкой к аутентификации система удаляет** (alias пропадает), а не оставляет с `KeyPermanentlyInvalidatedException` | не подключён |
 | P8 | `KeyInfo.securityLevel` и `isUserAuthenticationRequirementEnforcedBySecureHardware` для каждого типа | лог | все ключи `SECURITY_LEVEL_SOFTWARE` (программный KeyMint эмулятора), `isUserAuthenticationRequirementEnforcedBySecureHardware = false`; `KEYSTORE` feature 300 | не подключён |
-| P9 | Сколько идёт bcrypt_pbkdf с 24 раундами в нашем Kotlin на телефоне? | замер после шага 2, туда же | | |
+| P9 | Сколько идёт bcrypt_pbkdf с 24 раундами в нашем Kotlin на телефоне? | замер после шага 2, туда же | JVM (эта машина, JDK 21): **264 мс** на 48 байт ключа и IV (`BcryptTimingTest`); на эмуляторе — самопроверка шага 3 (`passphrase.roundtrip`) | не подключён |
 
 (05 §5) На Mac, в `iosSimulatorArm64Test` и на iPhone:
 

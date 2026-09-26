@@ -6,15 +6,17 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  * in the chip or under its passphrase, and the agent — everything that implements the contracts
  * Superizer declares. Unitool's, not the library's (D181).
  *
+ * `commonMain` is the formats and the primitives, by hand and checked against the JDK and the real
+ * `ssh-keygen` and `age` in `desktopTest` (03 §4); the platforms add only what they alone have: the
+ * CSPRNG, ECDSA, and the chips.
+ *
  * No network, ever (I-net): a module with no way to send anything cannot send a key.
  * `scripts/verify.sh` checks that nothing here depends on Ktor.
- *
- * Step 0 only, so far: [cx.m42.services.ssh.probe.KeystoreProbe] and the instrumented test that
- * runs it (04 §2).
  */
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.kotlinxSerialization)
 }
 
 group = "cx.m42.services"
@@ -37,6 +39,13 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(libs.superizer.core)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
+        }
+        val desktopTest by getting
+        desktopTest.dependencies {
+            implementation(libs.superizer.testing)
+            implementation(kotlin("test"))
         }
         val androidInstrumentedTest by getting
         androidInstrumentedTest.dependencies {

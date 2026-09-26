@@ -52,6 +52,11 @@ jobs:
       - name: Install Chromium
         run: npx --yes playwright@1.49.0 install --with-deps chromium
 
+      # The real tools the keyring is held to (ssh-new 03 §4, D158). Without them the interop tests
+      # skip by name — fine on a laptop, not here: CI is where they must actually run.
+      - name: Install OpenSSH and age
+        run: sudo apt-get update && sudo apt-get install -y openssh-client openssh-server age
+
       - name: Verify
         run: ./scripts/verify.sh
 

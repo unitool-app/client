@@ -1,12 +1,14 @@
 package cx.m42.apps.twofa
 
+import cx.m42.services.ssh.Age
+import cx.m42.services.ssh.SshPublicKey
 import cx.m42.superizer.runtime.LenientJson
 import cx.m42.superizer.runtime.NetworkException
 import cx.m42.superizer.runtime.NetworkService
 import kotlinx.serialization.Serializable
 
 /** One key of the GitHub account, and whether the export can encrypt to it. */
-internal data class GitHubKey(val key: SshKey) {
+internal data class GitHubKey(val key: SshPublicKey) {
     val usable: Boolean get() = Age.supports(key)
 }
 
@@ -62,7 +64,7 @@ internal object GitHubKeys {
             else -> {
                 val keys = runCatching { LenientJson.decodeFromString<List<ApiKey>>(response.body) }
                     .getOrElse { return KeysState.Failed(KeysError.Server) }
-                    .mapNotNull { SshKey.parse(it.key) }
+                    .mapNotNull { SshPublicKey.parse(it.key) }
                     .map { GitHubKey(it) }
                 when {
                     keys.isEmpty() -> KeysState.Failed(KeysError.NoKeys)
@@ -97,7 +99,7 @@ internal object Export {
      * The links go to the terminal rather than into a file, so opening the export does not leave
      * the secrets on disk in the clear.
      */
-    fun commands(keys: List<SshKey>, fileName: String): List<String> =
+    fun commands(keys: List<SshPublicKey>, fileName: String): List<String> =
         keys.map { identityFile(it) }.distinct().map { "age -d -i ~/.ssh/$it $fileName" }
 
     /**
@@ -108,7 +110,7 @@ internal object Export {
      * One code while [plaintext] fits in one; past that, `split` cuts it into codes that do, shown
      * one after another on Enter, and the phone scans them onto one list.
      */
-    fun transferCommands(keys: List<SshKey>, fileName: String, plaintext: String): List<String> {
+    fun transferCommands(keys: List<SshPublicKey>, fileName: String, plaintext: String): List<String> {
         val qr = if (plaintext.encodeToByteArray().size <= QR_BYTES) {
             QRENCODE
         } else {
@@ -127,8 +129,8 @@ internal object Export {
      */
     internal const val QR_BYTES = 2953
 
-    private fun identityFile(key: SshKey): String = when (key) {
-        is SshKey.Rsa -> "id_rsa"
+    private fun identityFile(key: SshPublicKey): String = when (key.type) {
+        SshPublicKey.RSA -> "id_rsa"
         else -> "id_ed25519"
     }
 
@@ -151,7 +153,7 @@ internal object Export {
 }
 
 /** An export ready to hand over: armored age text and the name to give it. */
-internal data class ExportFile(val name: String, val text: String, val recipients: List<SshKey>, val login: String)
+internal data class ExportFile(val name: String, val text: String, val recipients: List<SshPublicKey>, val login: String)
 
 /** An export that left the app, and which way. */
 internal data class ExportDone(val fileName: String, val via: Via) {
