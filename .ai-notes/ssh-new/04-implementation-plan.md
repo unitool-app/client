@@ -45,14 +45,14 @@ P10–P13; без Mac он откладывается, а Android, desktop и we
 
 | # | Вопрос | Как проверяем | `unitool35` | телефон |
 |---|---|---|---|---|
-| P1 | Импортируется ли Ed25519 в Keystore (API 33+)? Какой объект `PrivateKey` для этого нужен: `KeyFactory("Ed25519")` / `("XDH")` из JCA Android или свой класс с PKCS#8 в `getEncoded()`? | `KeyStore.setEntry` с `KeyProtection(PURPOSE_SIGN)`, затем `Signature("Ed25519", AndroidKeyStore)` и проверка подписи на JVM | | |
-| P2 | Импортируется ли X25519 с `PURPOSE_AGREE_KEY`, и считает ли `KeyAgreement("XDH")` общий секрет, как наш `Curve25519.x25519`? | импорт скаляра из seed канарейки, сравнение с commonMain | | |
-| P3 | Принимает ли Keystore RSA OAEP с непустой меткой (`PSource.PSpecified`)? | `Cipher("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")` с меткой age | | |
-| P4 | Работает ли «сырое» RSA (`RSA/ECB/NoPadding`, `ENCRYPTION_PADDING_NONE`) на импортированном ключе? | расшифровка шифртекста, сделанного `RsaOaep.encrypt`, и снятие OAEP в коде | | |
-| P5 | Проверяет ли Keystore подпись сертификата в `PrivateKeyEntry`? | импорт с сертификатом с подписью-заглушкой | | |
-| P6 | Импорт P-256 с `setIsStrongBoxBacked(true)` | на телефоне с `FEATURE_STRONGBOX_KEYSTORE` | — | |
-| P7 | Какое исключение и на каком вызове бросает ключ «каждое использование» без промпта (`initSign`, `update` или `sign`)? | для `Signature` и `Cipher` | | |
-| P8 | `KeyInfo.securityLevel` и `isUserAuthenticationRequirementEnforcedBySecureHardware` для каждого типа | лог | | |
+| P1 | Импортируется ли Ed25519 в Keystore (API 33+)? Какой объект `PrivateKey` для этого нужен: `KeyFactory("Ed25519")` / `("XDH")` из JCA Android или свой класс с PKCS#8 в `getEncoded()`? | `KeyStore.setEntry` с `KeyProtection(PURPOSE_SIGN)`, затем `Signature("Ed25519", AndroidKeyStore)` и проверка подписи на JVM | **да** (2026-09-26, API 35, программный KeyMint): импорт — только своим `PrivateKey` с именем алгоритма `XDH` и PKCS#8 Ed25519 (OID 1.3.101.112) плюс свой объект сертификата; `KeyFactory("Ed25519")` у Android нет, имена `Ed25519`/`EdDSA` → «Unsupported key algorithm», `EC` → «Unexpected Key». Подпись `Signature("Ed25519")` совпадает с вектором RFC 8032 байт в байт. `KeyInfo` для импортированного Curve25519 не читается («Key size not available»). Генерация Ed25519 в Keystore тоже работает | не подключён |
+| P2 | Импортируется ли X25519 с `PURPOSE_AGREE_KEY`, и считает ли `KeyAgreement("XDH")` общий секрет, как наш `Curve25519.x25519`? | импорт скаляра из seed канарейки, сравнение с commonMain | **да**: импорт X25519 своим ключом `XDH` с `PURPOSE_AGREE_KEY`; `KeyAgreement("XDH", AndroidKeyStore)` с пиром из `KeyFactory("XDH")` даёт общий секрет вектора RFC 7748 | не подключён |
+| P3 | Принимает ли Keystore RSA OAEP с непустой меткой (`PSource.PSpecified`)? | `Cipher("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")` с меткой age | **нет**: «Only pSpecifiedEmpty (PSource.PSpecified.DEFAULT) supported» — OAEP с меткой age Keystore не принимает ни с MGF1-SHA-256, ни с SHA-1. Шифр — `Cipher.getInstance(…)` **без** имени провайдера: с `AndroidKeyStore` его нет вовсе | не подключён |
+| P4 | Работает ли «сырое» RSA (`RSA/ECB/NoPadding`, `ENCRYPTION_PADDING_NONE`) на импортированном ключе? | расшифровка шифртекста, сделанного `RsaOaep.encrypt`, и снятие OAEP в коде | **да**: `RSA/ECB/NoPadding` с `ENCRYPTION_PADDING_NONE` расшифровывает; OAEP age снимаем в коде (01 §4.1) | не подключён |
+| P5 | Проверяет ли Keystore подпись сертификата в `PrivateKeyEntry`? | импорт с сертификатом с подписью-заглушкой | **нет**: импорт с сертификатом, у которого подпись — мусор, проходит, ключ подписывает | не подключён |
+| P6 | Импорт P-256 с `setIsStrongBoxBacked(true)` | на телефоне с `FEATURE_STRONGBOX_KEYSTORE` | — (нет `FEATURE_STRONGBOX_KEYSTORE`) | не подключён |
+| P7 | Какое исключение и на каком вызове бросает ключ «каждое использование» без промпта (`initSign`, `update` или `sign`)? | для `Signature` и `Cipher` | `initSign` и `update` проходят, `sign()` бросает `SignatureException` ← `KeyStoreException` «Key user not authenticated» (код −26, `KEY_USER_NOT_AUTHENTICATED`); AES-GCM: `init` проходит, `doFinal` бросает `IllegalBlockSizeException` ← тот же −26. **После снятия PIN ключи с привязкой к аутентификации система удаляет** (alias пропадает), а не оставляет с `KeyPermanentlyInvalidatedException` | не подключён |
+| P8 | `KeyInfo.securityLevel` и `isUserAuthenticationRequirementEnforcedBySecureHardware` для каждого типа | лог | все ключи `SECURITY_LEVEL_SOFTWARE` (программный KeyMint эмулятора), `isUserAuthenticationRequirementEnforcedBySecureHardware = false`; `KEYSTORE` feature 300 | не подключён |
 | P9 | Сколько идёт bcrypt_pbkdf с 24 раундами в нашем Kotlin на телефоне? | замер после шага 2, туда же | | |
 
 (05 §5) На Mac, в `iosSimulatorArm64Test` и на iPhone:
@@ -64,6 +64,17 @@ P10–P13; без Mac он откладывается, а Android, desktop и we
 | P12 | `WhenPasscodeSetThisDeviceOnly` без кода и после снятия кода | лог | | |
 | P13 | Подпись P-256 из enclave проходит `ssh-keygen -Y verify` после DER → mpint | интероп | | |
 | P14 | bcrypt_pbkdf 24 раунда в Kotlin/Native на iPhone и в wasm в браузере | замер, как P9 | | |
+
+**(impl) Прогон шага 0, 2026-09-26:** `KeystoreProbeTest` (`services/ssh`, `connectedDebugAndroidTest`) на
+`unitool35`. Телефон владельца к машине не подключён — его столбец пуст, и это не «нет», а «не
+спрашивали»: на программном KeyMint эмулятора P1–P2 говорят о том, что умеет *Android 15*, а не
+о том, что умеет TEE конкретного телефона. P9 — после шага 2 (нужен bcrypt).
+
+Что это меняет. Эмулятор — `SOFTWARE`, значит по 05 §2.1 всё на нём — уровень 3, и ответы P1–P7
+нужны не для него, а как проверенный путь для телефона: Ed25519 и X25519 импортируются одним и
+тем же приёмом (`XDH` + свой сертификат), RSA для age — только «сырой» (P3 нет, P4 да), подпись
+сертификата не проверяется (P5), и снятие PIN **удаляет** ключ, а не ломает его: карточка ключа
+узнаёт о потере по отсутствию alias (01 §5.7 уточнён).
 
 Правило решения по Ed25519:
 
