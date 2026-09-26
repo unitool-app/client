@@ -1,6 +1,7 @@
 package cx.m42.unitool.i18n
 
 import cx.m42.services.ssh.keyring.UseReason
+import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
 import cx.m42.superizer.ssh.KeyOperation
 import cx.m42.superizer.ssh.KeyPurpose
@@ -125,6 +126,44 @@ internal object SecurityStringsEn : SecurityStrings {
     override val delete = "Delete"
     override val deleteAnchor = "Secrets are sealed with this key; seal them with another before deleting it."
     override val unusable = "This key can no longer be used here."
+    override val lockKeys = "Lock keys now"
+    override val storedAt = "Where it lives"
+    override val rekeyFailed = "The passphrase was not changed."
+    override fun atLeast(n: Int) = "at least $n"
+    override val working = "Working…"
+    override val create = "Create"
+    override val back = "Back"
+    override val continueLabel = "Continue"
+    override fun keyKind(kind: GeneratedKind) = when (kind) {
+        GeneratedKind.Ed25519 -> "Ed25519 — signs and decrypts"
+        GeneratedKind.EcdsaP256 -> "ECDSA P-256 — signs only, made inside the chip"
+    }
+    override val keyName = "Name"
+    override val qrHint = "On your computer, show the key file as a QR code:"
+    override val qrWarning = "A QR code of a key without a passphrase is the key itself, on a screen."
+    override val sessionHint = "In a session, anyone holding the unlocked device can use the key without being asked."
+    override fun purposeName(purpose: KeyPurpose) = when (purpose) {
+        is KeyPurpose.Sign -> "Sign for “${purpose.namespace}”"
+        KeyPurpose.Decrypt -> "Decrypt files"
+    }
+    override fun operationName(operation: KeyOperation) = when (operation) {
+        KeyOperation.Sign -> "sign"
+        KeyOperation.Decrypt -> "decrypt"
+        KeyOperation.AgentSign -> "SSH login"
+        KeyOperation.Import -> "added"
+        KeyOperation.Generate -> "created"
+        KeyOperation.Delete -> "delete"
+        KeyOperation.Rekey -> "passphrase changed"
+        KeyOperation.Grant -> "allowed"
+        KeyOperation.Revoke -> "revoked"
+    }
+    override fun outcomeName(outcome: String) = when {
+        outcome == "ok" -> "done"
+        outcome == "cancelled" -> "cancelled"
+        outcome == "refused" -> "refused"
+        outcome.startsWith("failed:") -> "failed (${outcome.removePrefix("failed:")})"
+        else -> outcome
+    }
 
     override val storageSecurity = "Storage & security"
     override val storageSecurityHint = "How secrets and keys are kept on this device, and a self-test that checks it."
@@ -138,6 +177,11 @@ internal object SecurityStringsEn : SecurityStrings {
     override val facts = "Facts"
     override val findings = "Findings"
     override val notRunHere = "not on this platform"
+    override val subjectSecrets = "Secrets"
+    override val subjectDevice = "This device"
+    override val subjectApps = "Apps"
+    override fun lastRun(at: String) = "Last run: $at"
+    override val copyReport = "Copy report"
 
     override val backup = "Backup"
     override val backupHint = "Every app's data in one file, encrypted to your GitHub account's SSH keys. Keys are never in it."

@@ -46,7 +46,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composeunstyled.Text
+import cx.m42.superizer.diagnostics.DiagnosticsCode
+import cx.m42.superizer.diagnostics.Finding
+import cx.m42.superizer.diagnostics.Status
+import cx.m42.superizer.diagnostics.Subject
 import cx.m42.superizer.runtime.LocalAppRuntime
+import cx.m42.superizer.ui.i18n.LocalDiagnosticsStrings
 import cx.m42.superizer.theme.AppTheme
 import cx.m42.superizer.ui.components.AppButton
 import cx.m42.superizer.ui.components.AppTextField
@@ -129,6 +134,7 @@ private fun ListPage(instance: TwoFaInstance, strings: TwoFaStrings) {
     val copiedId by instance.copiedId.collectAsState()
     val problem by instance.storageProblem.collectAsState()
     val clipboard = rememberCodeClipboard()
+    val findings by LocalAppRuntime.current.diagnostics.findings.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().testTag("2fa:list")) {
         Column(
@@ -138,6 +144,7 @@ private fun ListPage(instance: TwoFaInstance, strings: TwoFaStrings) {
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
+            Protection(findings)
             problem?.let {
                 Text(
                     text = strings.storageProblem(it),
@@ -226,6 +233,33 @@ private fun ListPage(instance: TwoFaInstance, strings: TwoFaStrings) {
             )
         }
     }
+}
+
+/**
+ * How the accounts are kept, in the host's words (06 §7, D179): protected by the chip, by an SSH
+ * key's passphrase, or not at all — the last in red, above everything, and what to do about it.
+ */
+@Composable
+private fun Protection(findings: List<Finding>) {
+    val finding = findings.firstOrNull { it.subject is Subject.AppSecrets && it.status >= Status.Missing }
+        ?: findings.firstOrNull { it.subject == Subject.HostSecrets && it.code != DiagnosticsCode.VaultSessionOpen.id }
+        ?: return
+    val words = LocalDiagnosticsStrings.current
+    val tokens = AppTheme
+    val bad = finding.status >= Status.Unsafe
+    val facts = finding.facts
+    val title = Regex("\\{([a-z]+)\\}").replace(words.title(finding.code)) { facts[it.groupValues[1]] ?: it.value }
+    // The fix is the host's (Settings → SSH keys); an app can say what it is, not open it.
+    val detail = if (bad) words.detail(finding.code, facts) else ""
+    Text(
+        text = listOf(title, detail).filter { it.isNotBlank() }.joinToString(" "),
+        style = if (bad) tokens.body else tokens.footnote,
+        color = if (bad) tokens.danger else tokens.muted,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+            .testTag("2fa:protection"),
+    )
 }
 
 @Composable

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- No permission: the system's picker hands over one file the person chose, and only that. -->
+    <application>
+        <activity
+            android:name="cx.m42.services.files.FilePickActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true" />
+    </application>
+
+</manifest>

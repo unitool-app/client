@@ -9,9 +9,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
 import androidx.fragment.app.FragmentActivity
 import cx.m42.services.qr.AndroidQrScanner
-import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.AndroidFileSharer
-import cx.m42.services.share.FileSharer
+import cx.m42.services.files.AndroidFilePicker
+import cx.m42.unitool.settings.HostTools
 import cx.m42.services.vault.AndroidKeystoreVault
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.android
@@ -124,18 +124,21 @@ class MainActivity : FragmentActivity() {
         // activity that happened to build the host is gone.
         val notifier = AndroidNotifier(applicationContext)
         val security = androidSecurity(scope).also { Holder.security = it }
-        return buildUnitool(scope, debug = BuildConfig.DEBUG, security = security) {
+        // The camera for QR codes (D19), only on a device that has one: the 2FA app draws its scan
+        // button from whether it is there. The scanner's words follow the host's language setting,
+        // read at each scan because it can change while the process lives. The share sheet takes the
+        // 2FA export; the system's picker opens a key file or a backup.
+        val tools = HostTools(
+            files = AndroidFilePicker(applicationContext),
+            qr = if (AndroidQrScanner.available(applicationContext)) {
+                AndroidQrScanner(applicationContext) { Holder.superizer?.settings?.langTag?.value ?: "en" }
+            } else {
+                null
+            },
+            sharer = AndroidFileSharer(applicationContext),
+        )
+        return buildUnitool(scope, debug = BuildConfig.DEBUG, security = security, tools = tools) {
             notifier(notifier)
-            // The camera for QR codes (D19), only on a device that has one: the 2FA app draws its
-            // scan button from whether this is registered. The scanner's words follow the host's
-            // language setting, read at each scan because it can change while the process lives.
-            if (AndroidQrScanner.available(applicationContext)) {
-                service(QrScanner.Key, AndroidQrScanner(applicationContext) {
-                    Holder.superizer?.settings?.langTag?.value ?: "en"
-                })
-            }
-            // The share sheet (D19): the 2FA export hands its encrypted file to it.
-            service(FileSharer.Key, AndroidFileSharer(applicationContext))
         }.also { Holder.superizer = it }
     }
 

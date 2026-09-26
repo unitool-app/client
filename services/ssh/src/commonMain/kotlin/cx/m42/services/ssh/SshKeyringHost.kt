@@ -2,6 +2,7 @@ package cx.m42.services.ssh
 
 import cx.m42.services.ssh.agent.AgentServer
 import cx.m42.services.ssh.agent.HostAgent
+import cx.m42.services.ssh.diagnostics.KeyFindings
 import cx.m42.services.ssh.diagnostics.SelfTest
 import cx.m42.services.ssh.keyring.ChipBackend
 import cx.m42.services.ssh.keyring.KeyPrompter
@@ -19,14 +20,11 @@ import cx.m42.superizer.diagnostics.finding
 import cx.m42.superizer.runtime.Clock
 import cx.m42.superizer.runtime.Logger
 import cx.m42.superizer.runtime.Platform
-import cx.m42.superizer.ssh.Chip
 import cx.m42.superizer.ssh.KeyId
 import cx.m42.superizer.ssh.KeyOperation
-import cx.m42.superizer.ssh.KeyStorage
 import cx.m42.superizer.ssh.SshAgent
 import cx.m42.superizer.ssh.SshKeyAdmin
 import cx.m42.superizer.ssh.SshKeyring
-import cx.m42.superizer.ssh.UsePolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -93,21 +91,7 @@ public class SshKeyringHost internal constructor(
         val findings = mutableListOf<Finding>()
         val device = keyring.device
         val anchor = keyring.secretsKey.value
-        keyring.keys.value.forEach { key ->
-            val subject = Subject.Key(key.id.fingerprint)
-            val hardware = hardware(key.storage)
-            findings += when {
-                !key.usable -> DiagnosticsCode.KeyUnusable.finding(subject)
-                key.storage.level == 1 -> DiagnosticsCode.KeyLevel1.finding(subject, mapOf("hardware" to hardware, "level" to "1"))
-                key.storage.level == 2 -> DiagnosticsCode.KeyLevel2.finding(subject, mapOf("hardware" to hardware, "level" to "2"))
-                inBrowser -> DiagnosticsCode.KeyLevel3Browser.finding(subject, mapOf("level" to "3"))
-                else -> DiagnosticsCode.KeyLevel3.finding(subject, mapOf("level" to "3"))
-            }
-            if (key.id == anchor) findings += DiagnosticsCode.KeySecretsAnchor.finding(subject)
-            (key.policy as? UsePolicy.Session)?.let {
-                findings += DiagnosticsCode.KeySessionPolicy.finding(subject, mapOf("minutes" to ((it.seconds + 59) / 60).toString()))
-            }
-        }
+        keyring.keys.value.forEach { key -> findings += KeyFindings.of(key, anchor, inBrowser) }
         if (device.levels.any { it < 3 } && !device.screenLockSet) {
             findings += DiagnosticsCode.DeviceNoScreenLock.finding(Subject.Device)
         }
@@ -141,18 +125,6 @@ public class SshKeyringHost internal constructor(
             facts["screen-lock"] = device.screenLockSet.toString()
         }
         return Inspected(findings, facts)
-    }
-
-    private fun hardware(storage: KeyStorage): String = when (storage) {
-        KeyStorage.StrongBox -> "StrongBox"
-        KeyStorage.Tee -> "TEE"
-        KeyStorage.SecureEnclave -> "Secure Enclave"
-        is KeyStorage.SealedByChip -> when (storage.under) {
-            Chip.StrongBox -> "StrongBox"
-            Chip.Tee -> "TEE"
-            Chip.SecureEnclave -> "Secure Enclave"
-        }
-        KeyStorage.SealedByPassphrase -> "none"
     }
 
     public companion object {

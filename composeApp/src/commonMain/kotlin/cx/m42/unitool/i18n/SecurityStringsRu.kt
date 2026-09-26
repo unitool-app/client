@@ -1,9 +1,11 @@
 package cx.m42.unitool.i18n
 
 import cx.m42.services.ssh.keyring.UseReason
+import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
 import cx.m42.superizer.ssh.KeyOperation
 import cx.m42.superizer.ssh.KeyPurpose
+import cx.m42.superizer.ssh.UseRecord
 
 internal object SecurityStringsRu : SecurityStrings {
     override val cancel = "Отмена"
@@ -127,6 +129,46 @@ internal object SecurityStringsRu : SecurityStrings {
     override val delete = "Удалить"
     override val deleteAnchor = "Этим ключом запечатаны секреты; перезапечатайте их другим, прежде чем удалять."
     override val unusable = "Этим ключом здесь больше пользоваться нельзя."
+    override val lockKeys = "Заблокировать ключи сейчас"
+    override val storedAt = "Где хранится"
+    override val rekeyFailed = "Пароль не изменён."
+    override fun atLeast(n: Int) = "нужно не меньше $n"
+    override val working = "Выполняю…"
+    override val create = "Создать"
+    override val back = "Назад"
+    override val continueLabel = "Далее"
+    override fun keyKind(kind: GeneratedKind) = when (kind) {
+        GeneratedKind.Ed25519 -> "Ed25519 — подписывает и расшифровывает"
+        GeneratedKind.EcdsaP256 -> "ECDSA P-256 — только подписывает, создаётся внутри чипа"
+    }
+    override val keyName = "Имя"
+    override val qrHint = "На компьютере покажите файл ключа QR-кодом:"
+    override val qrWarning = "QR-код ключа без пароля — это сам ключ на экране."
+    override val sessionHint = "В сеансе ключом может пользоваться без вопросов любой, у кого в руках разблокированное устройство."
+    override fun purposeName(purpose: KeyPurpose) = when (purpose) {
+        is KeyPurpose.Sign -> "Подпись для «${purpose.namespace}»"
+        KeyPurpose.Decrypt -> "Расшифровка файлов"
+    }
+    override fun operationName(operation: KeyOperation) = when (operation) {
+        KeyOperation.Sign -> "подпись"
+        KeyOperation.Decrypt -> "расшифровка"
+        KeyOperation.AgentSign -> "вход по SSH"
+        KeyOperation.Import -> "добавлен"
+        KeyOperation.Generate -> "создан"
+        KeyOperation.Delete -> "удаление"
+        KeyOperation.Rekey -> "пароль сменён"
+        KeyOperation.Grant -> "разрешено"
+        KeyOperation.Revoke -> "отозвано"
+    }
+    override fun journalLine(at: String, who: String, record: UseRecord) =
+        "$at · $who · " + operationName(record.operation) + (record.namespace?.let { " «$it»" } ?: "") + " · " + outcomeName(record.outcome)
+    override fun outcomeName(outcome: String) = when {
+        outcome == "ok" -> "готово"
+        outcome == "cancelled" -> "отменено"
+        outcome == "refused" -> "отказано"
+        outcome.startsWith("failed:") -> "ошибка (${outcome.removePrefix("failed:")})"
+        else -> outcome
+    }
 
     override val storageSecurity = "Хранение и безопасность"
     override val storageSecurityHint = "Как на этом устройстве хранятся секреты и ключи, и самопроверка, которая это проверяет."
@@ -140,6 +182,11 @@ internal object SecurityStringsRu : SecurityStrings {
     override val facts = "Факты"
     override val findings = "Находки"
     override val notRunHere = "не на этой платформе"
+    override val subjectSecrets = "Секреты"
+    override val subjectDevice = "Это устройство"
+    override val subjectApps = "Приложения"
+    override fun lastRun(at: String) = "Последний запуск: $at"
+    override val copyReport = "Скопировать отчёт"
 
     override val backup = "Резервная копия"
     override val backupHint = "Данные всех приложений в одном файле, зашифрованном на SSH-ключи вашего аккаунта GitHub. Ключей в нём нет."

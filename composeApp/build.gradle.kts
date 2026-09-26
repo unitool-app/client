@@ -157,6 +157,7 @@ kotlin {
             implementation(project(":services:share"))
             implementation(project(":services:vault"))
             implementation(project(":services:ssh"))
+            implementation(project(":services:file-picker"))
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
@@ -179,6 +180,8 @@ kotlin {
             implementation(libs.androidx.test.runner)
             implementation(libs.androidx.test.junit)
             implementation(kotlin("test"))
+            // SecureWindowTest drives the real activity to the import wizard (I13).
+            implementation(libs.compose.ui.test)
         }
     }
 }

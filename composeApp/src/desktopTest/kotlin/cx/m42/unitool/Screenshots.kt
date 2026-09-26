@@ -18,6 +18,14 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
+import cx.m42.superizer.diagnostics.SelfTestResult
+import cx.m42.superizer.host.storage.HostKeys
+import cx.m42.superizer.host.storage.SafePrefs
+import cx.m42.unitool.settings.HostTools
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.serialization.json.Json
 import cx.m42.superizer.host.storage.PrefsStorage
 import cx.m42.superizer.lock.AuthAvailability
 import cx.m42.superizer.lock.AuthOutcome
@@ -77,6 +85,7 @@ class Screenshots {
         val tapIcon: (String) -> Unit,
         val tapTag: (String) -> Unit,
         val typeInto: (String, String) -> Unit,
+        val scroll: (String) -> Unit,
     )
 
     @OptIn(ExperimentalTestApi::class)
@@ -87,29 +96,37 @@ class Screenshots {
         offline: Boolean,
         clock: Clock?,
         device: FakeDeviceAuthenticator,
+        kind: HostKind,
         drive: DriveScope.() -> Unit,
     ) {
         // A fresh store for every frame: a screenshot must show what a new install looks like,
         // not what the previous capture left behind.
         PrefsStorage.useDirectory(Files.createTempDirectory("unitool-shot").toFile())
         runDesktopComposeUiTest(width = viewport.widthPx, height = viewport.heightPx) {
-            val superizer = testSuperizer(network = if (offline) offlineNetwork() else ratesNetwork()) {
+            // A self-test that passed, stamped with this version: the host would otherwise run one at
+            // start, on every frame, and the storage screens would show a different date each time.
+            SafePrefs.put(HostKeys.SELF_TEST, Json.encodeToString(SelfTestResult.serializer(), PassedSelfTest))
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            // These are phone screens, and a phone has a camera and a share sheet: without them the
+            // 2FA form would be drawn as on desktop, with no scan button, and its export with no
+            // main button. Never opened by a capture.
+            val tools = HostTools(qr = PhoneCamera, sharer = PhoneShareSheet)
+            val security = kind.security(scope)
+            val superizer = buildUnitool(scope, debug = true, security = security, tools = tools) {
+                network(if (offline) offlineNetwork() else ratesNetwork())
                 clock?.let { clock(it) }
-                // These are phone screens, and a phone has a camera: without this the 2FA form
-                // would be drawn as on desktop, with no scan button. Never opened by a capture.
-                service(QrScanner.Key, PhoneCamera)
-                // And a share sheet, which is what the 2FA export's main button needs to be drawn.
-                service(FileSharer.Key, PhoneShareSheet)
-                // And a screen lock: the 2FA app is behind it (06), and the finger that answers the
+                // A screen lock: the 2FA app is behind it (06), and the finger that answers the
                 // sheet is this fake. A frame of the curtain itself sets it to say no.
                 deviceAuthenticator(device)
+                kind.install(this, tools)
             }
+            kind.prepare(security)
             superizer.settings.chooseLanguage(lang)
             setContent {
                 // The window is in pixels; the app is laid out in dp. Providing the density here is
                 // what makes an 824 px capture a 412 dp phone rather than a small tablet.
                 CompositionLocalProvider(LocalDensity provides Density(viewport.scale)) {
-                    UnitoolApp(superizer)
+                    UnitoolApp(superizer, security)
                 }
             }
             waitForIdle()
@@ -124,7 +141,12 @@ class Screenshots {
                     onNodeWithTag(tag).performClick()
                     waitForIdle()
                 },
-                typeInto = { tag, text -> onNodeWithTag(tag).performTextInput(text); waitForIdle() },
+                typeInto = { tag, text ->
+                    runCatching { onNodeWithTag(tag).performScrollTo() }
+                    onNodeWithTag(tag).performTextInput(text)
+                    waitForIdle()
+                },
+                scroll = { tag -> onNodeWithTag(tag).performScrollTo(); waitForIdle() },
             ).drive()
             waitForIdle()
 
@@ -172,6 +194,7 @@ class Screenshots {
         /** The phone's screen lock, and what the person answers when it asks. */
         val lock: AuthAvailability = AuthAvailability.Available,
         val answer: AuthOutcome = AuthOutcome.Success,
+        val kind: HostKind = HostKind.Phone(),
         val drive: DriveScope.() -> Unit,
     )
 
@@ -291,7 +314,51 @@ class Screenshots {
             typeInto("2fa:link", TwoFaLinks.joinToString("\n"))
             tapTag("2fa:read-link")
         },
+        // ssh-new step 6: the host's keys, on a phone with a chip — three keys at three levels.
+        Screen("26-settings-keys", kind = HostKind.Phone(PhoneKeys)) { openSettings(); scroll("keys:add") },
+        Screen("27-key-card", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:row-0") },
+        Screen("28-key-card-session", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:row-2") },
+        Screen("29-import-sources", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:add") },
+        Screen("30-import-inspect", kind = HostKind.Phone(PhoneKeys)) { importPasted("encrypted") },
+        Screen("31-import-set-passphrase", kind = HostKind.Phone(PhoneKeys)) {
+            importPasted("unencrypted")
+            tapTag("import:add")
+            typeInto("import:new-first", "short one")
+        },
+        Screen("32-import-refused", kind = HostKind.Phone(PhoneKeys)) { importPasted("-----BEGIN RSA PRIVATE KEY-----") },
+        Screen("33-import-create", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:add"); tapTag("import:create") },
+        // Storage & security in each status (06 §9): the chip (Ok), a key's passphrase (Info), no
+        // backup (Attention, in all of them), a software key (Unsafe), no vault (Missing), a lost key (Broken).
+        Screen("34-storage-phone") { openSettings(); tapTag("storage:open") },
+        Screen("35-storage-desktop-key", kind = HostKind.Desktop(withKey = true)) { openSettings(); tapTag("storage:open") },
+        Screen("36-storage-software-key", kind = HostKind.Phone(hardware = "software")) { openSettings(); tapTag("storage:open") },
+        Screen("37-home-desktop-no-key", kind = HostKind.Desktop()) {},
+        Screen("38-storage-desktop-no-key", kind = HostKind.Desktop()) { tapTag("home:storage-banner") },
+        Screen("39-storage-key-lost", kind = HostKind.Phone(lost = true)) { tapTag("home:storage-banner") },
+        Screen("40-2fa-not-protected", clock = TwoFaClock, kind = HostKind.Desktop()) {
+            openTwoFa()
+            addTwoFa(TwoFaLinks.first())
+        },
+        Screen("41-settings-keys-en", lang = "en", kind = HostKind.Phone(PhoneKeys)) {
+            tapIcon("Open menu")
+            tapIcon("Settings")
+            scroll("keys:add")
+        },
     )
+
+    private fun DriveScope.openSettings() {
+        tapIcon("Открыть меню")
+        tapIcon("Настройки")
+    }
+
+    /** Settings, Add a key, Paste: [text] decides what the fake keyring says it is. */
+    private fun DriveScope.importPasted(text: String) {
+        openSettings()
+        tapTag("keys:add")
+        tapTag("import:paste")
+        typeInto("import:paste-field", text)
+        tapTag("import:paste-next")
+    }
 
     /** Like the converter, the 2FA app is added from the catalog before it can be opened. */
     private fun DriveScope.openTwoFa() {
@@ -324,7 +391,7 @@ class Screenshots {
             File(viewport.directory).listFiles()?.forEach { if (it.name.endsWith(".png")) it.delete() }
             for (screen in screens) {
                 val device = FakeDeviceAuthenticator(screen.lock, screen.answer)
-                shot(viewport, screen.name, screen.lang, screen.offline, screen.clock, device, screen.drive)
+                shot(viewport, screen.name, screen.lang, screen.offline, screen.clock, device, screen.kind, screen.drive)
             }
         }
     }

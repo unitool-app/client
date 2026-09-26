@@ -29,6 +29,10 @@ import cx.m42.superizer.host.platform.currentPlatform
 import cx.m42.superizer.runtime.HostInfo
 import cx.m42.superizer.ui.shell.SuperizerShell
 import cx.m42.unitool.security.UnitoolSecurity
+import cx.m42.unitool.settings.HostTools
+import cx.m42.services.qr.QrScanner
+import cx.m42.services.share.FileSharer
+import cx.m42.superizer.runtime.FilePicker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -51,6 +55,7 @@ public fun buildUnitool(
     scope: CoroutineScope,
     debug: Boolean,
     security: UnitoolSecurity? = null,
+    tools: HostTools = HostTools(),
     extra: SuperizerBuilder.() -> Unit = {},
 ): Superizer = Superizer.build(scope) {
     host(
@@ -109,9 +114,16 @@ public fun buildUnitool(
     // never becomes a name a real app could collide with.
     serviceCode(SERVICE_CODE)
 
+    // The platform's optional services (D19), for the apps through the registry: the 2FA app draws
+    // its scan button from whether the camera is there, its export from whether there is a share
+    // sheet. The host's own screens get the same objects directly.
+    tools.qr?.let { service(QrScanner.Key, it) }
+    tools.sharer?.let { service(FileSharer.Key, it) }
+    tools.files?.let { service(FilePicker.Key, it) }
+
     // Keys, the vault behind runtime.secrets, and the diagnostics of both (ssh-new 07 §2.2): what
     // the platform brought, handed to the host. A test builds without it and gets a host with none.
-    security?.install(this, BuildInfo.VERSION)
+    security?.install(this, BuildInfo.VERSION, tools)
 
     extra()
 }.also { superizer -> security?.attach(superizer, scope) }

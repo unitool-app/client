@@ -2,6 +2,11 @@ package cx.m42.unitool.security
 
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.diagnostics.PlatformSelfTest
+import cx.m42.unitool.settings.DiagnosticsBanner
+import cx.m42.unitool.settings.HostTools
+import cx.m42.unitool.settings.KeysUi
+import cx.m42.unitool.settings.SshKeysSection
+import cx.m42.unitool.settings.StorageSecuritySection
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.diagnostics.DiagnosticsSource
 import cx.m42.superizer.host.SuperizerBuilder
@@ -9,9 +14,14 @@ import cx.m42.superizer.host.secrets.HostSecrets
 import cx.m42.superizer.host.storage.HostKeys
 import cx.m42.superizer.host.storage.SafePrefs
 import cx.m42.superizer.secrets.SecretVault
+import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.KeyCapability
+import cx.m42.superizer.ssh.KeyId
+import cx.m42.superizer.ssh.SshKeyAdmin
 import cx.m42.superizer.ssh.SshKeyring
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -34,8 +44,25 @@ public class UnitoolSecurity(
 ) {
     private var superizer: Superizer? = null
 
-    /** Registers everything with the host being built. [hostVersion] stamps the self-test. */
-    public fun install(builder: SuperizerBuilder, hostVersion: String) {
+    /** What the key screens are given: the admin door and the secrets' anchor, never the keyring itself. */
+    internal val keysUi: KeysUi = object : KeysUi {
+        override val admin: SshKeyAdmin get() = keyring.admin
+        override val secretsKey: StateFlow<KeyId?> get() = keyring.secretsKey
+        override val sealsToKey: Boolean get() = chipVault == null
+        override val inBrowser: Boolean get() = keyring.admin.device.platform == Platform.Web
+
+        override suspend fun sealSecretsWith(id: KeyId) {
+            val superizer = superizer ?: return
+            keyring.useForSecrets(id)
+            superizer.secrets.reseal(keyring.ageVault(id, ::hostSecretValues))
+        }
+    }
+
+    /**
+     * Registers everything with the host being built. [hostVersion] stamps the self-test; [tools] are
+     * what the host's own screens open files, scan and share with.
+     */
+    public fun install(builder: SuperizerBuilder, hostVersion: String, tools: HostTools = HostTools()) {
         builder.service(SshKeyring.Key) { caller -> keyring.forApp(caller) }
         builder.secretVault(chipVault ?: keyring.secretsKey.value?.let { keyring.ageVault(it, ::hostSecretValues) })
         // One release more (04 §9, Б4): an app that sealed with the vault itself moves its data into
@@ -45,6 +72,11 @@ public class UnitoolSecurity(
         chipVaultDiagnostics?.let { builder.diagnosticsSource(it) }
         builder.selfTest(keyring.selfTest(hostVersion, platformSelfTest) { superizer?.storage?.exportText().orEmpty() })
         builder.backupKeys { keyring.keyNames() }
+        // The host's own screens (07 §2.4): keys first, then how everything is kept; the banner on
+        // Home whenever that is worse than the listing promises (06 §7).
+        builder.hostSection(SshKeysSection(keysUi, tools))
+        builder.hostSection(StorageSecuritySection(keysUi, tools))
+        builder.homeBanner(DiagnosticsBanner(keysUi, tools))
     }
 
     /**
@@ -53,6 +85,11 @@ public class UnitoolSecurity(
      */
     public fun attach(superizer: Superizer, scope: CoroutineScope) {
         this.superizer = superizer
+        // A key added, deleted or made unusable changes what Storage & security and the banner say;
+        // the first value is the host's own start, which inspects by itself.
+        scope.launch {
+            keyring.admin.keys.drop(1).collect { superizer.storage.inspect() }
+        }
         if (chipVault != null) return
         scope.launch {
             keyring.admin.keys.first { keys -> keys.any { it.usable && KeyCapability.DecryptAge in it.can } }

@@ -1,8 +1,8 @@
 package cx.m42.unitool
 
 import cx.m42.services.qr.IosQrScanner
-import cx.m42.services.qr.QrScanner
-import cx.m42.services.share.FileSharer
+import cx.m42.services.files.IosFilePicker
+import cx.m42.unitool.settings.HostTools
 import cx.m42.services.share.IosFileSharer
 import cx.m42.services.vault.IosKeychainVault
 import cx.m42.services.ssh.SshKeyringHost
@@ -71,14 +71,15 @@ object UnitoolIos {
         val selfTest = IosSelfTest { securityStrings(language()).selfTest }
         val security = UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault), platformSelfTest = selfTest)
             .also { this.security = it }
-        val built = buildUnitool(scope, debug = Platform.isDebugBinary, security = security) {
+        // The camera for QR codes (D19), only on a device that has one — the simulator has none, and
+        // the 2FA app draws its scan button from whether it is there.
+        val tools = HostTools(
+            files = IosFilePicker(),
+            qr = if (IosQrScanner.available()) IosQrScanner { superizer?.settings?.langTag?.value ?: "en" } else null,
+            sharer = IosFileSharer(),
+        )
+        val built = buildUnitool(scope, debug = Platform.isDebugBinary, security = security, tools = tools) {
             notifier(LocalNotifier)
-            // The camera for QR codes (D19), only on a device that has one — the simulator has none,
-            // and the 2FA app draws its scan button from whether this is registered.
-            if (IosQrScanner.available()) {
-                service(QrScanner.Key, IosQrScanner { superizer?.settings?.langTag?.value ?: "en" })
-            }
-            service(FileSharer.Key, IosFileSharer())
         }
         superizer = built
         heldLinks.forEach { built.route.deliver(it) }

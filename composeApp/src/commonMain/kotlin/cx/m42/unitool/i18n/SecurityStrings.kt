@@ -1,9 +1,11 @@
 package cx.m42.unitool.i18n
 
 import cx.m42.services.ssh.keyring.UseReason
+import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
 import cx.m42.superizer.ssh.KeyOperation
 import cx.m42.superizer.ssh.KeyPurpose
+import cx.m42.superizer.ssh.UseRecord
 
 /**
  * The words of Unitool's own security screens and the keyring's sheet (07 §2.2): English first,
@@ -77,6 +79,24 @@ internal interface SecurityStrings {
     val delete: String
     val deleteAnchor: String
     val unusable: String
+    val lockKeys: String
+    val storedAt: String
+    val rekeyFailed: String
+    fun atLeast(n: Int): String
+    val working: String
+    val create: String
+    val back: String
+    val continueLabel: String
+    fun keyKind(kind: GeneratedKind): String
+    val keyName: String
+    val qrHint: String
+    val qrWarning: String
+    val sessionHint: String
+    fun purposeName(purpose: KeyPurpose): String
+    fun operationName(operation: KeyOperation): String
+    fun outcomeName(outcome: String): String
+    fun journalLine(at: String, who: String, record: UseRecord): String =
+        "$at · $who · " + operationName(record.operation) + (record.namespace?.let { " “$it”" } ?: "") + " · " + outcomeName(record.outcome)
 
     // Storage & security
     val storageSecurity: String
@@ -91,6 +111,11 @@ internal interface SecurityStrings {
     val facts: String
     val findings: String
     val notRunHere: String
+    val subjectSecrets: String
+    val subjectDevice: String
+    val subjectApps: String
+    fun lastRun(at: String): String
+    val copyReport: String
 
     // Backup
     val backup: String
