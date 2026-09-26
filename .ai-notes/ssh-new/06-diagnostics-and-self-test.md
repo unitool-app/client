@@ -212,6 +212,16 @@ I5 на JVM). Кнопка «Share report» → `FileSharer` как текст.
 | `app.secrets.sealed` | Ok | **{n} secrets, sealed by the host.** | — |
 | `app.secrets.plain` | Missing | **{n} secrets are stored as plain text** because the host has no secret storage here. | AddSshKey |
 
+**(impl, шаг 1).** В библиотеке каталог — `DiagnosticsCode` (enum: код, статус, действия) и
+`SelfTestCode`. Два отличия от таблицы выше, оба ради I21 и §3:
+
+- `vault.passphrase.browser` и `key.level3.browser` получили действие **ShareReport**: статус Unsafe
+  без единого действия нарушал бы I21, а честного «исправить» в браузере нет.
+- Новый код **`passphrase.slow`** (Attention): его называет §3 (`passphrase.roundtrip` дольше 3 с),
+  а таблица забыла. Текст: **Unlocking with a passphrase takes {seconds} s on this device.**
+  bcrypt with 24 rounds is slow here; the key is as safe as before, only slower to use. — без
+  действий.
+
 Тексты действий: AddSshKey «Add an SSH key», SetPassphrase «Set a passphrase», Rekey
 «Change passphrase», EnableScreenLock «Open security settings», RunSelfTest «Run self-test»,
 MakeBackup «Make a backup», ShareReport «Share report», ImportKeyAgain «Import the key again».
