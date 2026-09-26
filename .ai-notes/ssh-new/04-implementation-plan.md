@@ -1,5 +1,10 @@
 # 04 — План работ
 
+> **Обновлено 2026-09-26 по заметке 05:** шаг 0 с iOS-пробами, `PassphraseBackend` и `AgeVault`,
+> контракт 3 в шаге 4, шаг 5b iOS, «Задать пароль» в шаге 6, бэкап и переезд 2FA на
+> `runtime.secrets` в шаге 7. Выпуск — Superizer **0.4.0**, после 0.3.0 (замок + iOS).
+> Оценка ≈ 20,5 дней с диагностикой (06). Изменённые места помечены «05» и «06».
+
 > **Версия:** 1.0 · **Статус:** на ревью у владельца · **Дата:** 2026-09-24
 >
 > **История:** 1.0 — первая редакция.
@@ -8,23 +13,30 @@
 
 ## 1. Порядок и оценка
 
+> **(07)** Таблица шагов заменена: актуальная — 07 §4 (≈ 20 дней, один шаг в библиотеке,
+> остальное в Unitool). Ниже — прежняя раскладка, оставлена ради ссылок на номера шагов;
+> нумерация в 07 совпадает по смыслу (0 спайк, 1 библиотека, 2 форматы, 3 бэкенды, 4 хост и
+> 2FA, 5 Android, 5b iOS, 6 UI, 7 бэкап и релиз).
+
 Каждый шаг начинается с красного теста и заканчивается зелёным `./scripts/verify.sh` в обоих
 репозиториях.
 
 | Шаг | Что | Где | Оценка |
 |---|---|---|---|
-| 0 | Спайк: что Keystore умеет на `unitool35` и на телефоне (§2) | superizer, временный модуль или `ssh` | 0,5 дня |
+| 0 | Спайк: что Keystore умеет на `unitool35` и на телефоне; (05) P10–P14 на Mac и iPhone (§2) | superizer, временный модуль или `ssh` | 1 день |
 | 1 | Модуль `ssh`, переезд криптографии из 2FA, `SshPublicKey` с ECDSA | superizer, unitool/apps/twofa | 1 день |
 | 2 | Форматы и примитивы: `openssh-key-v1`, bcrypt_pbkdf, AES, Ed25519, SSHSIG, расшифровка age | superizer/ssh | 2 дня |
-| 3 | Агент, программный бэкенд, фейк, сканер, JVM-тесты утечек и интероп с `ssh-add` | superizer/ssh, testing | 1,5 дня |
-| 4 | Хост: сервисы, привязанные к вызывающему; секции Settings уровня хоста | superizer/host, ui | 0,5 дня |
+| 3 | Агент, фейк, сканер, JVM-тесты утечек и интероп с `ssh-add`; (05) `PassphraseBackend` (уровень 3), `rekey`, `AgeVault` | superizer/ssh, testing | 2,5 дня |
+| 4 | Хост: сервисы, привязанные к вызывающему; секции Settings уровня хоста; (05) контракт 3: `runtime.secrets`, `BackupPolicy`, «ключ для секретов»; (06) `StorageDiagnostics`: осмотр, пульс, самопроверка | superizer/host, ui, core | 2,5 дня |
 | 5 | Android: Keystore, конверт, `KeyPromptActivity`, записи, инструментальные тесты | superizer/ssh androidMain | 2,5 дня |
-| 6 | UI: секция «SSH-ключи», карточка, мастер импорта, скриншоты | superizer/ssh-ui | 1,5 дня |
-| 7 | Выпуск 0.3.0 и Unitool: регистрация, импорт экспорта в 2FA, bench, бэкап, PRIVACY, ручная приёмка | оба | 1,5 дня |
-| | **Итого** | | **≈ 11 дней** |
+| 5b | (05) iOS: `SecureEnclaveBackend`, записи с `NSFileProtectionComplete`, тесты на симуляторе; общие CoreFoundation-обёртки; (06) первый артефакт — самопроверка в TestFlight, отчёт с iPhone | superizer/ssh iosMain, unitool ios.yml | 1,5 дня |
+| 6 | UI: секция «SSH-ключи», карточка, мастер импорта, (05) шаг «Задать пароль» и счётчик, скриншоты; (06) экран Storage & security в Unitool, баннер Home, бейджи в 2FA и карточках, таблицы `DiagnosticsStrings` en/ru | superizer/ssh-ui, unitool composeApp | 3,5 дня |
+| 7 | Выпуск 0.4.0 и Unitool: регистрация на всех платформах, 2FA на `runtime.secrets` с миграцией, импорт экспорта, (05) `HostBackup` и восстановление, PRIVACY, ручная приёмка | оба | 4 дня |
+| | **Итого** | | **≈ 20,5 дней** |
 
-Шаги 1–3 не требуют ни устройства, ни ответов на вопросы, кроме 69 (где код). Шаг 5 ждёт
-результата шага 0 и ответов на 70–72. Шаг 6 ждёт ответов на 74–75.
+Шаги 1–4 не требуют устройства. Шаг 5 ждёт результата шага 0 (P1–P9). Шаг 5b ждёт Mac и
+P10–P13; без Mac он откладывается, а Android, desktop и web выпускаются без него (§6). Ответы
+на вопросы 69–87 приняты как в README «Рабочие допущения».
 
 ## 2. Шаг 0: спайк
 
@@ -43,6 +55,16 @@
 | P8 | `KeyInfo.securityLevel` и `isUserAuthenticationRequirementEnforcedBySecureHardware` для каждого типа | лог | | |
 | P9 | Сколько идёт bcrypt_pbkdf с 24 раундами в нашем Kotlin на телефоне? | замер после шага 2, туда же | | |
 
+(05 §5) На Mac, в `iosSimulatorArm64Test` и на iPhone:
+
+| # | Вопрос | Как | симулятор | iPhone |
+|---|---|---|---|---|
+| P10 | Есть ли Secure Enclave в симуляторе на этом Mac? | `SecKeyCreateRandomKey` с `kSecAttrTokenIDSecureEnclave` | | — |
+| P11 | Требует ли `SecKeyCreateDecryptedData` Face ID для ключа с `UserPresence`, какой `CFError` без него | без `LAContext`; на симуляторе `Features → Face ID` | | |
+| P12 | `WhenPasscodeSetThisDeviceOnly` без кода и после снятия кода | лог | | |
+| P13 | Подпись P-256 из enclave проходит `ssh-keygen -Y verify` после DER → mpint | интероп | | |
+| P14 | bcrypt_pbkdf 24 раунда в Kotlin/Native на iPhone и в wasm в браузере | замер, как P9 | | |
+
 Правило решения по Ed25519:
 
 - **P1 и P2 да** на API 33+ → Ed25519 там резидентный: два alias, `.sign` и `.agree`. На API
@@ -56,6 +78,10 @@
 Спайк в таком виде проверялся бы и на телефоне владельца: это один `connectedAndroidTest`.
 
 ## 3. Шаги
+
+> **(07)** Пути модулей ниже — прежние (`superizer:ssh`, `ssh-ui`). Читать как: `ssh` →
+> `unitool/services/ssh`, `ssh-ui` → `unitool/composeApp/settings`, публикация библиотеки —
+> только в шаге 1. Содержание шагов в силе.
 
 ### Шаг 1. Модуль `ssh` и переезд криптографии (1 день)
 
@@ -162,7 +188,7 @@ superizer-implemented).
 - Superizer: `CHANGELOG`, docs, тег `v0.3.0` → публикация в CI по обычной схеме.
 - Unitool, `gradle/libs.versions.toml`: `superizer = "0.3.0"`, `superizer-ssh`,
   `superizer-ssh-ui`. Отдельный коммит «bump superizer to 0.3.0».
-- `MainActivity`: на API ≥ 30 — `service(SshKeyring.Key) { caller -> keyring.forApp(caller) }`
+- `UnitoolHost`/`MainActivity` (05: на всех платформах): `service(SshKeyring.Key) { caller -> keyring.forApp(caller) }`
   и `settingsSection("ssh", …) { SshKeysSection(keyring.admin, sources) }`. Источник «QR» —
   `AndroidQrScanner`, если камера есть.
 - 2FA: «Импорт из файла» через `decrypt` (02 §6.1). Помнить ловушку `collectLatest`:
@@ -182,38 +208,51 @@ superizer-implemented).
 
 ## 4. Что меняется где
 
+> **(07)** Актуальная карта — 07 §2. Ниже — прежняя.
+
 ```
 /prj/superizer
   settings.gradle.kts                   + :ssh, :ssh-ui
-  ssh/                                  NEW (commonMain, androidMain, desktopTest, androidInstrumentedTest)
+  ssh/                                  NEW (commonMain, androidMain, iosMain, desktopMain, wasmJsMain, desktopTest, androidInstrumentedTest, iosSimulatorArm64Test)
   ssh-ui/                               NEW
-  host/…/SuperizerHost.kt               + service(key) { caller -> }, settingsSection(…)
+  host/…/SuperizerHost.kt               + service(key) { caller -> }, settingsSection(…), secrets store, HostBackup (05)
+  core/…/AppRuntime.kt, AppManifest.kt  + secrets, diagnostics, backup: BackupPolicy — контракт 3 (05, 06)
   host/…/HostRuntime.kt                 caller-bound lookup
   ui/…/SettingsScreen.kt                host sections first
   testing/                              + FakeSshKeyring, LeakScanner, Canary
   scripts/verify.sh                     + "ssh has no ktor", interop skips by name
   .github/workflows/*                   + apt-get install openssh-client openssh-server age
-  CHANGELOG.md, docs/                   0.3.0
+  CHANGELOG.md, docs/                   0.4.0 (05)
 /prj/unitool
-  gradle/libs.versions.toml             superizer 0.3.0, ssh, ssh-ui, (biometric comes transitively)
-  composeApp/…/MainActivity.kt          register keyring (API ≥ 30), section, QR source
+  gradle/libs.versions.toml             superizer 0.4.0, ssh, ssh-ui, (biometric comes transitively)
+  composeApp/…/MainActivity.kt          register keyring, section, QR source; vault → host (05)
+  composeApp/src/iosMain/…/UnitoolIos.kt  register SecureEnclaveBackend (05)
+  composeApp/src/desktopMain, wasmJsMain  register PassphraseBackend + AgeVault (05)
+  services/vault                        host-side only; CoreFoundation helpers from ssh (05)
   composeApp/src/androidMain/res/xml/*  exclude cx.m42.superizer.ssh.xml
   composeApp/src/desktopTest/…          BackupRulesTest
-  apps/twofa/                           − SshKey/Age/Curve25519/ChaCha/RsaOaep (moved), + import from file
+  apps/twofa/                           − SshKey/Age/Curve25519/ChaCha/RsaOaep (moved), + import from file, accounts → runtime.secrets with one-release migration (05)
   play/PRIVACY.md, play/listing/*       permissions from the APK, keys paragraph
 ```
 
 ## 5. Выпуск и совместимость
 
-- Новый модуль и новые методы `SuperizerBuilder` — это **минорный** релиз библиотеки 0.3.0.
-  Контракт приложения не меняется: `SshKeyring` приходит через `ServiceKey`, как и задумано
-  D19.
+- (07) Superizer 0.4.0 — **только** контракт 3, механика хоста и фейки (D183); после него
+  библиотека до конца работы не меняется, все релизы — Unitool.
+- (05) Выпуск — **0.4.0**, после 0.3.0 (замок idea/06 + iOS), который сейчас не закоммичен.
+  Контракт приложения растёт до 3: `runtime.secrets`, `runtime.diagnostics`,
+  `manifest.backup`. По D138 приложение, использующее их, пишет `minHostContract = 3`.
+  `SshKeyring` по-прежнему приходит через `ServiceKey` (D19).
+- (05) Миграция 2FA: один релиз `SecretVault.Key` остаётся зарегистрирован для приложений;
+  2FA при первом запуске читает `accounts.sealed` старым сейфом, пишет в `secrets.accounts`,
+  удаляет старое. Следующий релиз убирает `SecretVault` из контракта. Тестеры Play alpha уже
+  держат запечатанные аккаунты, поэтому без этого шага нельзя.
 - Если idea/06 (замок) принята, выпускать вместе. Обеим нужен `androidx.biometric`, а флаг
   «идёт свой промпт» у них общий. Контракт 2 из 06 D138 — её собственный, этой работе он не
   нужен.
 - Приложение, которое без ключей не может (гипотетический git-кирпич), пишет
-  `SshKeyring.Key` в `manifest.requires`. На хосте без кольца (desktop, web, API < 30) его
-  отклонят при регистрации, как любое приложение без нужного сервиса.
+  `SshKeyring.Key` в `manifest.requires`. (05) Кольцо теперь есть на всех платформах, так что
+  отклонения не будет; а приложение, которому нужен именно чип, смотрит `device.levels`.
 
 ## 6. Риски
 
@@ -225,6 +264,10 @@ superizer-implemented).
 | Производитель сломал KeyMint (бывает на дешёвых устройствах) | `KeystoreProbeTest` на таком устройстве покажет. Кольцо тогда предлагает только запечатанный вариант, если `securityLevel` «software» — с честной надписью |
 | Metaspace или OOM Kotlin-демона при двух новых модулях | память 2FA: `gradle.properties` уже 3g; при OOM — `./gradlew --stop`, **не** `pkill` |
 | Кто-то параллельно коммитит в `/prj/superizer` | `git log` перед каждым шагом |
+| (05) Mac недоступен | шаг 5b откладывается; 0.4.0 выходит для Android, desktop и web; iOS-кольцо и iOS-сейф остаются «написано, не выполнялось», как в ios/01 |
+| (05) Secure Enclave нет в симуляторе (P10) | iOS-тесты уровня 2 только на iPhone, вручную по 03 §7 |
+| (05) bcrypt в wasm медленный (P14) | индикатор при открытии секретов; раунды не снижаем |
+| (05) Удаление ключа, который запечатывает секреты | запрещено до перезапечатывания (D173); тест I18 |
 
 ## 7. Не входит в v1
 
@@ -242,5 +285,35 @@ superizer-implemented).
 - **D160.** Шаг 0 делается первым, до кода Android. Его ответы P1–P9 вписываются в таблицу §2
   и решают, где живёт Ed25519. Это единственная развилка, которую решает устройство, а не
   владелец.
-- **D161.** Выпуск — Superizer 0.3.0 (вместе с idea/06, если она принята). Контракт
-  приложения не меняется. Первый потребитель — импорт экспорта 2FA, второй — bench test-app.
+- **D161** (переписано 05). Выпуск — Superizer 0.4.0, после 0.3.0 (idea/06 + iOS). Контракт
+  приложения — 3. Первый потребитель — 2FA на `runtime.secrets` и импорт экспорта, второй —
+  `HostBackup`, третий — bench test-app.
+- **D176–D180** (06). Диагностика, самопроверка, каталог кодов, TestFlight-цикл вместо Mac.
+- **D181–D183** (07). Контракты в Superizer, реализации в Unitool; 0.4.0 — только контракт.
+- **D175** (05). Порядок: шаги 0–4 и 6–7 не ждут Mac. Шаг 5b идёт, когда Mac есть; до этого
+  iOS в 0.4.0 — только уровень 3 через `PassphraseBackend` (он commonMain и компилируется под
+  iOS), с честной надписью.
+
+## 9. Что решить до первой строки кода (2026-09-26)
+
+Не вопросы вкуса, а места, где без ответа шаг остановится.
+
+| # | Проблема | Что блокирует | Предложение |
+|---|---|---|---|
+| Б1 | Superizer 0.3.0 (замок idea/06, iOS) не закоммичен и не опубликован; Unitool с 2FA-замком и iOS тоже | шаг 1: `ssh` строится на контракте 2 и iOS-таргетах 0.3.0 | сначала закоммитить и опубликовать 0.3.0, потом ветка под 0.4.0 |
+| Б2 | Ed25519 в Keystore (P1–P2) неизвестен; от него зависит, где живёт самый частый ключ | шаг 5 | шаг 0 на `unitool35` и телефоне владельца первым; модель не меняется при любом ответе |
+| Б3 | Mac нет (ios/01 §5): iOS-сейф не выполнялся, P10–P13 некому прогнать | шаг 5b, iOS-тесты сейфа | **Решено, 06 §4, D180:** самопроверка в приложении + `ios.yml` в TestFlight; отчёт с iPhone заменяет Mac. Нужны секреты подписи (вопрос 88). До первого зелёного отчёта iOS — уровень 3 из commonMain (D175) |
+| Б4 | Миграция 2FA: тестеры Play alpha держат `accounts.sealed` под ключом `cx.m42.services.vault`; после переезда на `runtime.secrets` 2FA не имеет сейфа, чтобы это прочитать | шаг 7 | сейф хоста использует тот же alias и формат `v1:`/`e1:`; `SecretVault.Key` живёт для приложений ещё один релиз; 2FA переносит при первом запуске и удаляет старое; тест на JVM с `SoftwareVault` |
+| Б5 | Ключ, который запечатывает секреты хоста: какой из нескольких, что при удалении, что при `usable = false` | шаг 4 | настройка «ключ для секретов», по умолчанию первый Ed25519/RSA; удаление запрещено до перезапечатывания (D173); `usable = false` → секреты «Unreadable», как сегодня в 2FA, и подсказка импортировать ключ заново |
+| Б6 | На desktop и web нет сервиса выбора файла: импорт ключа и восстановление из бэкапа нечем открыть; `FileSharer` есть только для отдачи | шаги 6–7 | новый сервис `FilePicker` в 0.4.0 (Android SAF, iOS `UIDocumentPicker`, desktop `FileDialog`, web `<input type=file>`); без него desktop и web остаются со вставкой и QR |
+| Б7 | Конец сессии пароля на desktop и web: `ACTION_SCREEN_OFF` и `protectedDataWillBecomeUnavailable` там нет | шаг 3 | сессия = процесс хоста плюс `lockAll()` и таймер бездействия из настройки; на web — ещё `visibilitychange` в hidden дольше N минут |
+| Б8 | Сессия секретов хоста «одна на запуск» и правило кольца «каждое использование» — два разных таймера с одним ключом | шаг 3 | **Решено, D176:** `AgeVault` держит расшифрованные секреты, а не ключ; ключ после `open` стирается; подпись — снова пароль |
+| Б9 | Бэкап включает конфиги приложений из superizer/16, которого нет | шаг 7 | v1 бэкапа: `app.*`, `secret.*`, настройки хоста; конфиги 16 добавятся, когда появятся, схема с `schema: 1` это переживёт |
+| Б10 | Контракт 3 и правило D138: приложение с `backup` или `secrets` на хосте контракта 2 | шаг 4 | `minHostContract = 3` обязателен при любом из полей; реестр отклоняет несогласованный манифест, как для `protection` |
+| Б11 | CI не гоняет ни `AndroidKeystoreVaultTest`, ни будущие инструментальные тесты `ssh` | шаг 5 | job с эмулятором `api-33` в `verify.yml` для `:services:vault` и `:ssh` `connectedDebugAndroidTest`; самопроверка 06 §3 и есть этот тест |
+| Б12 | `SecretBytes` на wasm и Kotlin/Native: обнуление `ByteArray` не гарантирует отсутствие копий | шаг 3 | принять и записать в надписи (02 §9); тест I15 на JVM, на wasm — только отчёт |
+| Б13 | Экспорт 2FA в otpauth и полный бэкап — два формата, оба на ключи GitHub; человек может спутать | шаг 7 | разные расширения и заголовки: `*.2fa.age` и `unitool-backup-*.age`; импорт распознаёт по заголовку и говорит, что это |
+| Б14 | `IosKeychainVault` и `SecureEnclaveBackend` делят CoreFoundation-код | шаг 5b | **Снято 07:** оба в Unitool; обёртки в `services/ssh` iosMain, `services/vault` зависит от него |
+
+Порядок: Б1 → шаг 0 (Б2, и Б3 если Mac есть) → шаги 1–4 (Б5, Б7, Б8, Б10) → шаг 5 с Б11 →
+шаг 6 с Б6 → шаг 7 с Б4, Б9, Б13.

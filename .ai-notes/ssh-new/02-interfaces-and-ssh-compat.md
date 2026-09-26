@@ -1,5 +1,9 @@
 # 02 — Интерфейсы, совместимость с ssh, как ключом пользуется Superizer
 
+> **Обновлено 2026-09-26 по заметке 05:** `KeyStorage` с тремя уровнями, `rekey`, шаг «Задать
+> пароль», кольцо на всех платформах, новые §6.7 (сейф хоста на ssh-ключе) и §6.8 (бэкап),
+> контракт 3 (`runtime.secrets`, `BackupPolicy`). Изменённые места помечены «05».
+
 > **Версия:** 1.0 · **Статус:** на ревью у владельца · **Дата:** 2026-09-24
 >
 > **История:** 1.0 — первая редакция.
@@ -197,10 +201,17 @@ desktop её делает JCA через `expect/actual`, а на wasm `SigCheck
 ```kotlin
 public interface SshKeyAdmin {
     public val keys: StateFlow<List<SshKeyInfo>>
-    public val device: KeyringDevice      // strongBox, curve25519InKeystore, screenLockSet, sdk
+    public val device: KeyringDevice      // platform, strongBox, secureEnclave, curve25519InKeystore, screenLockSet, sdk, levels (05)
 
     /** What [file] is, before any passphrase: type, fingerprint, encrypted?, where it would live — or why not. */
-    public fun inspect(file: ByteArray): Inspection
+    public fun inspect(file: ByteArray): Inspection   // + encrypted: Boolean; the wizard refuses encrypted = false (D167)
+
+    /**
+     * (05) Re-encrypts the stored `openssh-key-v1` under [newPassphrase] — `ssh-keygen -p`. Level 3
+     * only; the "Set passphrase" step of the wizard and "Change passphrase" on the key card.
+     * [newPassphrase] is zeroed before this returns; shorter than MIN_PASSPHRASE is refused.
+     */
+    public suspend fun rekey(id: KeyId, newPassphrase: CharArray): SshOutcome<Unit>
 
     /** [file] and [passphrase] are zeroed before this returns, whatever it returns. */
     public suspend fun import(file: ByteArray, passphrase: CharArray?, options: ImportOptions): ImportOutcome
@@ -221,7 +232,7 @@ public interface SshKeyAdmin {
 public data class ImportOptions(
     val policy: UsePolicy = UsePolicy.EveryUse,
     val comment: String? = null,
-    /** Sealed keys only (01 §5.4): keep the file's own passphrase as a second lock on every use. */
+    /** Level 2 only (01 §5.4): keep the file's own passphrase as a second lock on every use. Level 3 has no other lock, so it is ignored there (05). */
     val keepPassphrase: Boolean = false,
 )
 
@@ -229,7 +240,7 @@ public data class SshKeyInfo(
     val id: KeyId,                        // the SHA-256 fingerprint: a second import of the same key is "already here"
     val publicKey: SshPublicKey,
     val comment: String,
-    val storage: KeyStorage,              // StrongBox, Tee, Sealed(under = Tee|StrongBox), Software (emulator)
+    val storage: KeyStorage,              // (05) StrongBox | Tee | SecureEnclave | SealedByChip(under) | SealedByPassphrase — no Plain: a key without a passphrase is never accepted
     val policy: UsePolicy,
     val origin: KeyOrigin,                // Imported, Generated(attested)
     val can: Set<KeyCapability>,          // Sign, DecryptAge
@@ -254,8 +265,12 @@ public sealed interface UsePolicy {
    `inspect`: тип, отпечаток и где будет жить, ещё до пароля. Затем пароль, если файл
    зашифрован, и политика. Затем «Добавить», и системный лист для конверта. Весь мастер под
    `FLAG_SECURE`. Поле пароля — `KeyboardType.Password`, `autoCorrectEnabled = false`.
+   (05 §2.4) Рядом с полем — счётчик символов. Файл без пароля или пароль короче 12 символов
+   → шаг «Задать пароль»: два поля, счётчик, кнопка активна от 12; результат — новый
+   `openssh-key-v1`, старый файл и пароль обнулены; подсказка «копия на компьютере осталась
+   со старым паролем». Тот же диалог — «Сменить пароль» в карточке ключа уровня 3.
 
-Источник «QR» дают снаружи. `ssh-ui` не знает о `services/qr-scanner` Unitool: хост
+Источник «QR» дают снаружи. Секция ключей (07: в `composeApp`) не знает о `services/qr-scanner` Unitool: хост
 передаёт список источников, `SshKeysSection(admin, sources = listOf(FileSource, PasteSource,
 TextSource("QR") { qr.scan() }))`. Для QR секция показывает команду для компьютера, как
 экспорт 2FA показывает свою:
@@ -280,9 +295,10 @@ qrencode -t ansiutf8 < ~/.ssh/id_ed25519; read _; clear
    → otpauth-строки → Import.read(…) → тот же экран «проверить и добавить»
 ```
 
-Кнопка видна, только если сервис есть. На desktop и web её нет, как нет кнопки сканера без
-камеры. Это закрывает пункт «No import of the export» из памяти 2FA, и это самый короткий путь
-проверить `decrypt` целиком на настоящем файле.
+Кнопка видна, только если сервис есть, а с 05 он есть везде. Это закрывает пункт «No import
+of the export» из памяти 2FA, и это самый короткий путь проверить `decrypt` целиком на
+настоящем файле. На iOS для этого нужен импортированный Ed25519 или RSA (уровень 2):
+созданный P-256 age не открывает.
 
 ### 6.2. Бандл конфигов (superizer/16) на свой ключ
 
@@ -328,6 +344,42 @@ Namespace `git` и `file`. Результат проверяет настоящ�
 - лист показывает `user@host` и отпечаток ключа хоста, разобранные из структуры RFC 4252.
 
 Не v1.
+
+### 6.7. Сейф хоста на ssh-ключе и `runtime.secrets` (05 §3, §3.2)
+
+Контракт 3. Приложение получает второе хранилище с тем же интерфейсом:
+
+```kotlin
+public val storage: StorageService   // открытые данные, как было
+public val secrets: StorageService   // значения хост запечатывает сам; prefs-ключ `secret.<appId>.<key>`
+```
+
+Хост запечатывает тем сейфом, что есть на платформе: `AndroidKeystoreVault` и
+`IosKeychainVault` (без аутентификации, как сегодня) или, где чипа нет, `AgeVault(keyring,
+keyId)`: `seal = Age.encrypt(value, [открытая половина ключа])` без промпта, `open` — пароль
+один раз за сессию хоста. **D176 (06 §8):** сейф кэширует *расшифрованные секреты*, а не ключ:
+после `open` ключ стирается из памяти, и любая операция кольца спрашивает пароль снова. Чем
+защищены секреты, приложение узнаёт из `runtime.diagnostics` (06 §1), и хост показывает
+«секреты не защищены: добавьте ssh-ключ», пока ключа нет. `SecretVault` из контракта приложений уходит:
+`services/vault` Unitool остаётся реализацией для хоста; `SecretVault.Key` регистрируется ещё
+один релиз, только чтобы 2FA перенёс `accounts.sealed` в `secrets` (04 §5).
+
+Какой ключ запечатывает секреты, выбирает хост: настройка «ключ для секретов», по умолчанию
+первый пригодный (Ed25519 или RSA: age не знает ECDSA). **Удалить этот ключ нельзя, пока
+секреты не перезапечатаны другим** (D148 плюс проверка): иначе секреты всех приложений
+становятся нечитаемыми.
+
+### 6.8. Полный бэкап и восстановление (05 §3.1, §3.3, §3.4)
+
+`HostBackup` в `superizer:host`. Бэкап = обход префиксов `app.<id>.` и `secret.<id>.` без
+чтения значений, секреты распечатаны сейфом хоста; плюс настройки хоста и список отпечатков
+ключей как подсказка. **Закрытых ключей в бэкапе нет** (D170). Бандл → `Age.encrypt` на
+`github.com/<login>.keys` → `FileSharer`. Под подтверждением (D148, D169), в журнале.
+
+Приложение участвует только манифестом: `backup: BackupPolicy = All | None | Except(keys)`,
+контракт 3. Восстановление — замена по приложению под подтверждением с перечнем; секреты
+запечатываются заново сейфом нового устройства; приложение, которого ещё нет, ждёт под своим
+префиксом. Слияние — не в v1 (вопрос 86).
 
 ## 7. Разрешения и журнал
 
@@ -412,10 +464,13 @@ string private      ← зашифрован: uint32 check, uint32 check, key fi
   выдадут.
 - Исключения модуля никогда не включают входные данные в `message`: ни байты, ни пароль, ни
   имя файла с путём.
+- (05) На wasm `SecretBytes.close()` обнуляет `ByteArray`, но копии в куче JS никто не
+  обещает. Это записано в KDoc и в надписи «в браузере».
 
 ## 10. Где будет криптография
 
-`ssh` commonMain, всё `internal`, кроме §4:
+(07) `unitool/services/ssh` commonMain, всё `internal`, кроме §4, которое становится `public`
+API этого модуля; в библиотеке — только интерфейсы и типы:
 
 | Файл | Откуда |
 |---|---|
@@ -432,8 +487,11 @@ string private      ← зашифрован: uint32 check, uint32 check, key fi
 | `age/Age.kt` — шифрование и **расшифровка** | 2FA плюс новое |
 | `sig/SshSig.kt` | новое |
 | `agent/AgentCodec.kt`, `agent/AgentServer.kt` | новое |
+| `backend/PassphraseBackend.kt` — уровень 3, все платформы (05) | новое: `OpenSshKeyFile` + `SecretBytes` + сессия |
+| `vault/AgeVault.kt` — сейф хоста на ssh-ключе (05) | новое, поверх `Age` и `SshKeyring.decrypt` |
+| `iosMain/SecureEnclaveBackend.kt` (05) | новое; CoreFoundation-обёртки из `IosKeychainVault` Unitool переезжают сюда |
 
-2FA после переезда зависит от `superizer:ssh` ради `SshPublicKey` и `Age`. `Crypto.kt` с HMAC
+2FA после переезда зависит от `services/ssh` ради `SshPublicKey` и `Age` (07). `Crypto.kt` с HMAC
 остаётся в 2FA для TOTP: делать SHA и HMAC публичным API библиотеки ради одного приложения —
 лишнее обязательство. Общий модуль `superizer:crypto` — если появится третий потребитель.
 
@@ -457,6 +515,14 @@ string private      ← зашифрован: uint32 check, uint32 check, key fi
 - **D155.** Секретные входы — `ByteArray` и `CharArray`, обнуляются в `finally`. Внутри —
   `SecretBytes` без сериализации и с `toString` = `redacted`. Исключения не несут входных
   данных.
-- **D156.** age, X25519, ChaCha20-Poly1305, RSA и разбор SSH-ключей переезжают из 2FA в `ssh`.
+- **D156** (07). age, X25519, ChaCha20-Poly1305, RSA и разбор SSH-ключей переезжают из 2FA в
+  `unitool/services/ssh`.
   SHA и HMAC копируются: в 2FA остаются для TOTP. Криптопримитивы `internal`. ECDSA проверяет
   JCA через `expect/actual`, на wasm это `Unsupported`.
+- **D171, D172** (05). `runtime.secrets` и `BackupPolicy` — контракт 3; сейф — дело хоста;
+  бэкап — обход префиксов без знания приложений. Подробно в 05 §3.2–§3.4 и §6.7–§6.8 здесь.
+- **D173** (05). Ключ, который запечатывает секреты хоста, нельзя удалить, пока секреты не
+  перезапечатаны другим ключом; смена пароля уровня 3 секретов не трогает (открытая половина
+  та же).
+- **D176, D177** (06). `AgeVault` кэширует секреты, не ключ. `StorageDiagnostics` — сервис
+  хоста контракта 3: коды и факты в библиотеке, тексты в Unitool.
