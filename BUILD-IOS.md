@@ -77,6 +77,8 @@ Two ways to get a build onto a phone, both in `.github/workflows/ios.yml` (ssh-n
 
   The App ID, the app record in App Store Connect and a TestFlight internal group are made in the
   console first. `CFBundleVersion` is the workflow run number, so every upload is a new build.
+  Started by hand (`lanes: testflight`) once `ios.yml` is on the default branch; before that, by
+  putting the label `testflight` on the pull request — one upload per label added.
   `iosApp/Configuration/ExportOptions.plist` is the export recipe; it holds no secret.
 
 ## Push (FCM)

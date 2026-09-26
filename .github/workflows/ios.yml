@@ -14,12 +14,15 @@
 # Started by hand, or by a pull request into main: macOS minutes cost ten Linux ones on a private
 # repository, so no `push`. The pull request is also the only way a new ios.yml can run at all —
 # GitHub dispatches a workflow only once its file is on the default branch. A pull request gets
-# the two unsigned lanes; a newer push to it stops the older build.
+# the two unsigned lanes; a newer push to it stops the older build. Putting the label `testflight`
+# on it uploads what the branch holds at that moment, once — every upload reaches the testers, so
+# each is asked for; take the label off and put it back for the next.
 name: ios
 
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
     inputs:
       lanes:
@@ -28,9 +31,10 @@ on:
         default: simulator+device
         options: [simulator, simulator+device, device, testflight, all]
 
+# A label gets a group of its own and is never cancelled: a push must not cut an upload short.
 concurrency:
-  group: ios-${{ github.ref }}
-  cancel-in-progress: true
+  group: ios-${{ github.ref }}-${{ github.event.label.name || 'build' }}
+  cancel-in-progress: ${{ github.event.action != 'labeled' }}
 
 env:
   # Compose Multiplatform 1.11.1 references UIViewLayoutRegion, an iOS 26 class, behind an
@@ -39,7 +43,7 @@ env:
 
 jobs:
   simulator:
-    if: contains(fromJSON('["simulator","simulator+device","all"]'), inputs.lanes || 'simulator+device')
+    if: github.event.action != 'labeled' && contains(fromJSON('["simulator","simulator+device","all"]'), inputs.lanes || 'simulator+device')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +69,7 @@ jobs:
           path: build/ios-dd/Build/Products/Debug-iphonesimulator/*.app
 
   device:
-    if: contains(fromJSON('["device","simulator+device","all"]'), inputs.lanes || 'simulator+device')
+    if: github.event.action != 'labeled' && contains(fromJSON('["device","simulator+device","all"]'), inputs.lanes || 'simulator+device')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -95,7 +99,9 @@ jobs:
           if-no-files-found: error
 
   testflight:
-    if: contains(fromJSON('["testflight","all"]'), inputs.lanes || 'simulator+device')
+    if: >-
+      contains(fromJSON('["testflight","all"]'), inputs.lanes || 'simulator+device') ||
+      (github.event.action == 'labeled' && github.event.label.name == 'testflight')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
