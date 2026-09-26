@@ -61,13 +61,13 @@ class SecureWindowTest {
 
         val flags = { activity!!.window.attributes.flags }
         assertTrue(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "the wizard's window is secure")
-        assertTrue(blank(screencap()), "a screenshot of the wizard shows nothing of it; in front: ${front()}")
+        assertTrue(settles { blank(screencap()) }, "a screenshot of the wizard shows nothing of it; ${seen()}")
 
         onNode(hasContentDescription("Back").or(hasContentDescription("Назад"))).performClick()
         waitForIdle()
         onNodeWithTag("settings:host:ssh-keys").assertExists()
         assertFalse(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "Settings is not")
-        assertFalse(blank(screencap()), "and Settings can be captured; in front: ${front()}")
+        assertTrue(settles { !blank(screencap()) }, "and Settings can be captured; ${seen()}")
     }
 
     /**
@@ -78,6 +78,28 @@ class SecureWindowTest {
     private fun screencap(): Bitmap? {
         val png = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("screencap -p")).use { it.readBytes() }
         return BitmapFactory.decodeByteArray(png, 0, png.size)
+    }
+
+    /**
+     * The attribute reads secure at once; the compositor learns it with the window's next layout,
+     * which on a slow emulator comes after the first capture. A leak never settles.
+     */
+    private fun settles(check: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (!check()) {
+            if (System.currentTimeMillis() > deadline) return false
+            Thread.sleep(250)
+        }
+        return true
+    }
+
+    /** What the last capture was of, for a failure to say. */
+    private fun seen(): String {
+        val shot = screencap() ?: return "no capture; in front: ${front()}"
+        val colours = (shot.height / 4 until shot.height * 3 / 4 step 16).flatMap { y ->
+            (shot.width / 8 until shot.width * 7 / 8 step 16).map { x -> shot.getPixel(x, y) }
+        }.toSet()
+        return "${shot.width}x${shot.height}, ${colours.size} colours in the middle; in front: ${front()}"
     }
 
     /** The middle of the screen, away from the system bars, is one flat colour: what a secure layer becomes in a capture. */
