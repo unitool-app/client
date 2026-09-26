@@ -2,7 +2,6 @@ package cx.m42.services.ssh.keyring
 
 import android.app.KeyguardManager
 import android.content.Context
-import android.os.Build
 import android.os.Debug
 import android.os.ParcelFileDescriptor
 import android.security.keystore.KeyInfo
@@ -98,10 +97,28 @@ class KeystoreBackendTest {
         return PrivateKey.ed25519(seed, "canary").also { seed.fill(0) }
     }
 
+    /** A generated RSA key through our own writer and reader, so no tool is needed on the device. */
+    private fun rsa(): PrivateKey {
+        val private = java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair().private as java.security.interfaces.RSAPrivateCrtKey
+        return PrivateKey.rsa(
+            private.modulus.toByteArray(), private.publicExponent.toByteArray(), private.privateExponent.toByteArray(),
+            private.crtCoefficient.toByteArray(), private.primeP.toByteArray(), private.primeQ.toByteArray(), "rsa",
+        )
+    }
+
     @Test
     fun aResidentKeyHasNoPrivateHalfOutsideTheKeystoreAndRefusesWithoutThePerson() = runBlocking<Unit> {
-        if (Build.VERSION.SDK_INT < 33) return@runBlocking // Ed25519 in the Keystore is API 33+ (P1)
         val backend = backend()
+        if (!backend.curve25519) {
+            // Android 13 without KeyMint 2 — the API 33 emulator. The probe said no, and the Keystore
+            // agrees: the import is refused, so an Ed25519 key is sealed by a chip key here instead.
+            canary().use { key ->
+                assertIs<ChipResult.Failed>(backend.store(alias, KeyStorage.Tee, key, ByteArray(0), UsePolicy.EveryUse, reason(key.publicKey)))
+                if (1 in backend.device.levels) assertIs<KeyStorage.SealedByChip>(backend.placement(key.publicKey, generated = false))
+            }
+            assertFalse(backend.exists(alias))
+            return@runBlocking
+        }
         canary().use { key ->
             val stored = backend.store(alias, KeyStorage.Tee, key, ByteArray(0), UsePolicy.EveryUse, reason(key.publicKey))
             assertEquals(ChipResult.Ok(null), stored)
@@ -139,14 +156,7 @@ class KeystoreBackendTest {
     fun rsaAndEcdsaImportUnderTheirOwnAliasesAndTheRawRsaIsForDecryptionOnly() = runBlocking<Unit> {
         val backend = backend()
         val dir = File(context.cacheDir, "keys").apply { mkdirs() }
-        // A generated RSA key through our own writer and reader, so no tool is needed on the device.
-        val pair = java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
-        val private = pair.private as java.security.interfaces.RSAPrivateCrtKey
-        val key = PrivateKey.rsa(
-            private.modulus.toByteArray(), private.publicExponent.toByteArray(), private.privateExponent.toByteArray(),
-            private.crtCoefficient.toByteArray(), private.primeP.toByteArray(), private.primeQ.toByteArray(), "rsa",
-        )
-        key.use { assertEquals(ChipResult.Ok(null), backend.store(alias, KeyStorage.Tee, it, ByteArray(0), UsePolicy.EveryUse, reason(it.publicKey))) }
+        rsa().use { assertEquals(ChipResult.Ok(null), backend.store(alias, KeyStorage.Tee, it, ByteArray(0), UsePolicy.EveryUse, reason(it.publicKey))) }
         assertTrue(keystore.containsAlias("$alias.sign"))
         assertTrue(keystore.containsAlias("$alias.decrypt"))
         val decrypt = keystore.getKey("$alias.decrypt", null) as java.security.PrivateKey
@@ -213,9 +223,10 @@ class KeystoreBackendTest {
 
     @Test
     fun removingTheScreenLockTakesTheKeyAndTheRecordStaysUnusable() = runBlocking<Unit> {
-        if (!setPin || Build.VERSION.SDK_INT < 33) return@runBlocking // a person's own lock is not ours to remove
+        if (!setPin) return@runBlocking // a person's own lock is not ours to remove
         val backend = backend()
-        canary().use { assertEquals(ChipResult.Ok(null), backend.store(alias, KeyStorage.Tee, it, ByteArray(0), UsePolicy.EveryUse, reason(it.publicKey))) }
+        // Any key the chip holds itself; Ed25519 only where the Keystore takes Curve25519.
+        (if (backend.curve25519) canary() else rsa()).use { assertEquals(ChipResult.Ok(null), backend.store(alias, KeyStorage.Tee, it, ByteArray(0), UsePolicy.EveryUse, reason(it.publicKey))) }
         assertTrue(backend.exists(alias))
         shell("locksettings clear --old 1111")
         setPin = false

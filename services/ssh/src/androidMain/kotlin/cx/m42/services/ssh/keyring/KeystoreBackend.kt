@@ -84,6 +84,9 @@ internal class KeystoreBackend(
     /** Where a Keystore key really lives here, learned once from a throwaway key (P8). */
     private val hardware: String by lazy { probeLevel() }
 
+    /** Whether this Keystore takes Ed25519 and its X25519 twin, learned once the same way. */
+    internal val curve25519: Boolean by lazy { probeCurve25519() }
+
     override val device: KeyringDevice
         get() {
             val lock = app.getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
@@ -93,7 +96,7 @@ internal class KeystoreBackend(
                 sdk = sdk,
                 strongBox = hasStrongBox,
                 tee = hardware == "tee" || hardware == "strongbox",
-                curve25519InKeystore = chip && sdk >= 33,
+                curve25519InKeystore = chip && curve25519,
                 screenLockSet = lock,
                 levels = if (chip) setOf(1, 2) else setOf(3),
             )
@@ -153,33 +156,42 @@ internal class KeystoreBackend(
         is UsePolicy.Session -> policy.seconds.coerceAtLeast(1)
     }
 
+    /** Ed25519 as `.sign` and its X25519 twin, the same scalar, as `.agree` (P1, P2). */
+    private fun importCurve25519(alias: String, key: PrivateKey, kind: SshPublicKey.Kind.Ed25519, sign: KeyProtection, agree: KeyProtection) {
+        key.ed25519Seed().use { seed ->
+            val signing = RawPrivateKey("XDH", ED25519_PKCS8 + seed.bytes)
+            keystore.setEntry(
+                "$alias.sign",
+                KeyStore.PrivateKeyEntry(signing, arrayOf(HandMadeCertificate(ED25519_SPKI + kind.point, ED25519_OID, "XDH"))),
+                sign,
+            )
+            val h = Sha512.digest(seed.bytes)
+            try {
+                val scalar = h.copyOf(32)
+                val agreeing = RawPrivateKey("XDH", X25519_PKCS8 + scalar)
+                scalar.fill(0)
+                val twin = cx.m42.services.ssh.crypto.Curve25519.edwardsToMontgomery(kind.point)
+                keystore.setEntry(
+                    "$alias.agree",
+                    KeyStore.PrivateKeyEntry(agreeing, arrayOf(HandMadeCertificate(X25519_SPKI + twin, ED25519_OID, "XDH"))),
+                    agree,
+                )
+            } finally {
+                h.fill(0)
+            }
+        }
+    }
+
     private fun importResident(alias: String, key: PrivateKey, strongBox: Boolean, policy: UsePolicy) {
         val public = key.publicKey
         when (val kind = public.kind) {
-            is SshPublicKey.Kind.Ed25519 -> {
-                key.ed25519Seed().use { seed ->
-                    val signing = RawPrivateKey("XDH", ED25519_PKCS8 + seed.bytes)
-                    keystore.setEntry(
-                        "$alias.sign",
-                        KeyStore.PrivateKeyEntry(signing, arrayOf(HandMadeCertificate(ED25519_SPKI + kind.point, ED25519_OID, "XDH"))),
-                        protection(KeyProperties.PURPOSE_SIGN, policy, false).setDigests(KeyProperties.DIGEST_NONE).build(),
-                    )
-                    val h = Sha512.digest(seed.bytes)
-                    try {
-                        val scalar = h.copyOf(32)
-                        val agreeing = RawPrivateKey("XDH", X25519_PKCS8 + scalar)
-                        scalar.fill(0)
-                        val twin = cx.m42.services.ssh.crypto.Curve25519.edwardsToMontgomery(kind.point)
-                        keystore.setEntry(
-                            "$alias.agree",
-                            KeyStore.PrivateKeyEntry(agreeing, arrayOf(HandMadeCertificate(X25519_SPKI + twin, ED25519_OID, "XDH"))),
-                            protection(KeyProperties.PURPOSE_AGREE_KEY, policy, false, window = AGREE_WINDOW).build(),
-                        )
-                    } finally {
-                        h.fill(0)
-                    }
-                }
-            }
+            is SshPublicKey.Kind.Ed25519 -> importCurve25519(
+                alias,
+                key,
+                kind,
+                protection(KeyProperties.PURPOSE_SIGN, policy, false).setDigests(KeyProperties.DIGEST_NONE).build(),
+                protection(KeyProperties.PURPOSE_AGREE_KEY, policy, false, window = AGREE_WINDOW).build(),
+            )
             is SshPublicKey.Kind.Rsa -> {
                 val fields = WireReader(key.fields.bytes)
                 val n = BigInteger(fields.mpint()!!)
@@ -458,6 +470,35 @@ internal class KeystoreBackend(
             runCatching { keystore.deleteEntry(alias) }
         }
     }.getOrDefault("software")
+
+    /**
+     * A throwaway pair imported exactly as [importCurve25519] imports a person's, without the person.
+     * Android 13 is where Curve25519 *can* be in the Keystore, not where it is: KeyMint older than 2
+     * — the API 33 emulator's among them, and a phone updated from Android 12 (01 §4.1) — answers
+     * "Unsupported key algorithm: XDH". Such a phone seals the key with a chip key instead.
+     */
+    private fun probeCurve25519(): Boolean {
+        if (sdk < 33) return false
+        val alias = "cx.m42.services.ssh.curve25519." + System.nanoTime()
+        val seed = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+        return try {
+            PrivateKey.ed25519(seed, "probe").use { key ->
+                importCurve25519(
+                    alias,
+                    key,
+                    key.publicKey.kind as SshPublicKey.Kind.Ed25519,
+                    KeyProtection.Builder(KeyProperties.PURPOSE_SIGN).setDigests(KeyProperties.DIGEST_NONE).build(),
+                    KeyProtection.Builder(KeyProperties.PURPOSE_AGREE_KEY).build(),
+                )
+            }
+            true
+        } catch (e: Exception) {
+            false
+        } finally {
+            seed.fill(0)
+            delete(alias)
+        }
+    }
 
     private fun curveName(curve: SshPublicKey.Curve) = when (curve) {
         SshPublicKey.Curve.P256 -> "secp256r1"
