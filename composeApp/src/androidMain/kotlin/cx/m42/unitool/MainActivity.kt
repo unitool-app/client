@@ -3,11 +3,11 @@ package cx.m42.unitool
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
+import androidx.fragment.app.FragmentActivity
 import cx.m42.services.qr.AndroidQrScanner
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.AndroidFileSharer
@@ -22,7 +22,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-class MainActivity : ComponentActivity() {
+/**
+ * A `FragmentActivity` rather than the plain `ComponentActivity` Compose needs: the lock over the
+ * 2FA app is the system's `BiometricPrompt`, which can only be shown from one (Superizer 0.3.0,
+ * note 06). It is still a ComponentActivity underneath, and no AppCompat theme is involved. A debug
+ * build that loses this crashes on the first frame, on purpose.
+ */
+class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Before super.onCreate, which is where the window is first laid out: asking for

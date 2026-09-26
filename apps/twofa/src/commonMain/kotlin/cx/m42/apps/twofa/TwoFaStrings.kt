@@ -44,6 +44,11 @@ internal interface TwoFaStrings {
     val deleteForever: String
     val back: String
 
+    /** What the device's sheet says each confirmation is for (06 §5.5). */
+    val confirmShowKey: String
+    val confirmExport: String
+    val confirmDelete: String
+
     val export: String
     val exportTitle: String
     val githubAccount: String
@@ -128,6 +133,9 @@ internal object TwoFaStringsRu : TwoFaStrings {
     override val deleteConfirm =
         "Аккаунт исчезнет с этого устройства. Если ключа больше нигде нет, войти на сайт без резервных кодов не получится."
     override val deleteForever = "Удалить навсегда"
+    override val confirmShowKey = "Показать ключ аккаунта"
+    override val confirmExport = "Экспорт всех ключей"
+    override val confirmDelete = "Удалить аккаунт"
     override val back = "Назад"
 
     override val export = "Экспорт ключей"
@@ -279,6 +287,9 @@ internal object TwoFaStringsEn : TwoFaStrings {
     override val deleteConfirm =
         "The account disappears from this device. If the key is nowhere else, you will need backup codes to sign in."
     override val deleteForever = "Delete for good"
+    override val confirmShowKey = "Show the account's key"
+    override val confirmExport = "Export every key"
+    override val confirmDelete = "Delete the account"
     override val back = "Back"
 
     override val export = "Export keys"

@@ -88,6 +88,29 @@ else
   bad "wasm bundle — see $out/web.log"
 fi
 
+# ---------------------------------------------------------------- 4b. ios
+step "4b. iOS"
+# The Kotlin half compiles anywhere: Kotlin 2.4 cross-compiles Apple klibs, so every module is
+# checked here for both targets. Linking the ComposeApp framework and building iosApp/ with Xcode
+# needs a Mac — on one, this goes on to do both; elsewhere it says it did not.
+if ./gradlew --quiet compileKotlinIosArm64 compileKotlinIosSimulatorArm64 > "$out/ios.log" 2>&1; then
+  ok "iOS klibs, every module (iosArm64, iosSimulatorArm64)"
+else
+  bad "iOS klibs — see $out/ios.log"
+fi
+if [ "$(uname)" = "Darwin" ] && command -v xcodebuild > /dev/null; then
+  if ./gradlew --quiet :composeApp:linkDebugFrameworkIosSimulatorArm64 >> "$out/ios.log" 2>&1 &&
+    xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug \
+      -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios-dd \
+      CODE_SIGNING_ALLOWED=NO build >> "$out/ios.log" 2>&1; then
+    ok "iosApp for the simulator (framework linked, Xcode build)"
+  else
+    bad "iosApp — see $out/ios.log"
+  fi
+else
+  skip "iosApp: linking the framework and the Xcode build need macOS with Xcode (this is $(uname))"
+fi
+
 # ---------------------------------------------------------------- 5. android
 step "5. Android"
 if [ -n "${ANDROID_HOME:-}" ] || grep -q sdk.dir local.properties 2>/dev/null; then

@@ -2,7 +2,8 @@
 """
 Generates every raster the vector adaptive icon cannot cover:
   - legacy mipmaps for API 24-25, which predate adaptive icons,
-  - the 512x512 Play listing icon and the 1024x500 feature graphic.
+  - the 512x512 Play listing icon and the 1024x500 feature graphic,
+  - the 1024x1024 iOS app icon, from which Xcode derives every other size.
 Geometry is taken from ic_launcher_foreground.xml so the drawn and the vector icon are the same
 mark: on the 108dp adaptive canvas the "=" is 44 wide and 28 tall over a 72dp visible area, i.e.
 61.1% wide, 12.5% per bar, 13.9% of gap. Change the vector and change the constants below
@@ -83,3 +84,10 @@ os.makedirs(store, exist_ok=True)
 store_icon().save(f"{store}/icon-512.png")
 feature_graphic().save(f"{store}/feature-graphic-1024x500.png")
 print("play listing: icon-512.png, feature-graphic-1024x500.png")
+
+# iOS wants what Play wants — a full-bleed square with no alpha, the system masks the corners — only
+# larger, and one size of it: Xcode 14+ derives the rest from a single universal 1024.
+ios = os.path.join(root, "iosApp/iosApp/Assets.xcassets/AppIcon.appiconset")
+os.makedirs(ios, exist_ok=True)
+store_icon(1024).save(f"{ios}/icon-1024.png")
+print("ios: icon-1024.png")

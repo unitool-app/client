@@ -65,7 +65,9 @@ On Android 13 and later the app asks whether you want notifications at all. Refu
 else works exactly the same.
 
 Permissions: internet, vibration (switchable off in Settings), notifications on Android 13 and
-later (yours to refuse), and the camera — only when you scan a QR code in the 2FA app yourself.
+later (yours to refuse), the camera — only when you scan a QR code in the 2FA app yourself — and
+biometrics, so the 2FA app can open with your fingerprint or face. Android does the check; the app
+learns only yes or no.
 
 NO ADS. NO IN-APP PURCHASES. NO SUBSCRIPTION. NO SIGN-IN.
 ```

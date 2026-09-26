@@ -1,0 +1,124 @@
+# Building Unitool for iPhone
+
+The Kotlin side compiles anywhere: Kotlin 2.4 cross-compiles Apple targets, and `scripts/verify.sh`
+compiles every module for `iosArm64` and `iosSimulatorArm64` on Linux. Linking the `ComposeApp`
+framework and building `iosApp/` needs a Mac with Xcode 16 or later.
+
+## What is where
+
+| | |
+|---|---|
+| `composeApp/src/iosMain` | `MainViewController()`, and `UnitoolIos`, the one object Swift talks to: links, the FCM token, messages, taps, and the Firebase topic bridge |
+| `services/*/src/iosMain` | the camera (`IosQrScanner`, AVFoundation), the share sheet (`IosFileSharer`), the vault (`IosKeychainVault`, a Secure Enclave key) |
+| `apps/twofa/src/iosMain` | `SecRandomCopyBytes`, and a clipboard that expires copied codes itself |
+| `iosApp/` | the Xcode project: SwiftUI wrapper, `AppDelegate` with Firebase, Info.plist, entitlements, privacy manifest |
+| Superizer `*/src/iosMain` | the host on iOS: defaults, Darwin networking, lifecycle, Face ID lock, FCM transport, privacy cover |
+
+## Build
+
+On the Mac, with Superizer checked out next to Unitool (`../superizer`, the same composite build
+as on Linux), or with `SUPERIZER_FROM_MAVEN=1` and a GitHub Packages token:
+
+```bash
+./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64     # the framework alone
+open iosApp/iosApp.xcodeproj                                    # or build it from the command line:
+
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug \
+  -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -derivedDataPath build/ios-dd CODE_SIGNING_ALLOWED=NO build
+```
+
+The project's first build phase runs `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode`
+itself, so Xcode alone is enough once the checkout is there. `scripts/verify.sh` does the simulator
+build on a Mac and names the skip everywhere else.
+
+agentiz builds its iOS app on a remote CI Mac and signs it locally (`agentiz/mobile-client/BUILD-IOS.md`).
+Two traps from there apply here as well:
+
+- `OTHER_LDFLAGS="-Wl,-U,_OBJC_CLASS_\$_UIViewLayoutRegion"` for SDKs older than iOS 26. Compose
+  Multiplatform 1.11.1 looks that class up behind an availability check.
+- `CADisableMinimumFrameDurationOnPhone` must stay in Info.plist. Compose aborts at startup without
+  it.
+
+One trap is Unitool's own. The simulator framework exists for Apple silicon only
+(`iosSimulatorArm64`, no `iosX64`). `Config.xcconfig` therefore excludes `x86_64` from simulator
+builds, and an Intel Mac, agentiz's CI Mac among them, can build for the simulator but cannot run
+the result there. On that Mac, build for the device instead: `-configuration Release -sdk iphoneos
+-destination generic/platform=iOS` with signing off, then sign where the certificate is.
+
+## Signing
+
+`iosApp/Configuration/Config.xcconfig` sets `TEAM_ID` (the team agentiz is signed with),
+`BUNDLE_ID=cx.m42.unitool` and `APP_NAME=Unitool`. Code signing is Automatic. For push, the App ID
+needs the **Push Notifications** capability. Release uses `iosApp.entitlements`
+(`aps-environment=production`) and Debug uses `iosAppDebug.entitlements` (`development`). A profile
+without the capability fails the build rather than producing an app that never registers.
+
+Two ways to get a build onto a phone, both in `.github/workflows/ios.yml` (ssh-new/06 §4.1):
+
+- **Unsigned device build, signed here.** The `device` lane builds Release for `iphoneos` with
+  signing off and uploads `Unitool.app`. On a Mac with the development certificate and a
+  *development* profile for the explicit App ID `cx.m42.unitool` (Push Notifications on, this
+  iPhone's UDID in it):
+
+      IOS_SIGN_IDENTITY=<cert SHA-1> IOS_PROFILE=~/Library/MobileDevice/Provisioning\ Profiles/<uuid>.mobileprovision \
+        scripts/ios-sign-and-install.sh Unitool.app
+
+  Nothing from the repository's secrets is involved. This is the loop for the on-device self-test.
+- **TestFlight.** The `testflight` lane archives, signs with a distribution certificate and uploads
+  to App Store Connect. It runs only when these repository secrets exist, and says so otherwise:
+
+  | Secret | What |
+  |---|---|
+  | `IOS_DIST_CERT_P12_BASE64` | Apple Distribution certificate with its private key, `.p12`, base64 |
+  | `IOS_DIST_CERT_PASSWORD` | the `.p12` password |
+  | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8_BASE64` | App Store Connect API key (App Manager), its issuer, the `.p8` base64 |
+  | `IOS_PROFILE_BASE64` | optional: an App Store profile; without it automatic signing fetches one with the API key |
+
+  The App ID, the app record in App Store Connect and a TestFlight internal group are made in the
+  console first. `CFBundleVersion` is the workflow run number, so every upload is a new build.
+  `iosApp/Configuration/ExportOptions.plist` is the export recipe; it holds no secret.
+
+## Push (FCM)
+
+Push goes through Firebase Cloud Messaging, as on Android, so the server sends one kind of message
+to both. What iOS needs on top:
+
+1. Register the iOS app `cx.m42.unitool` in the same Firebase project as the Android one and
+   download `GoogleService-Info.plist` into `iosApp/iosApp/`. It is gitignored. CI would write it
+   from `GOOGLE_SERVICE_INFO_PLIST_BASE64`.
+2. Upload an APNs key (`.p8`) in the Firebase console → Project settings → Cloud Messaging. The key
+   goes to Firebase, not to any server of ours.
+3. Xcode resolves the Firebase Swift package (`firebase-ios-sdk`, FirebaseCore and
+   FirebaseMessaging) on the first build.
+
+Without the plist the "Copy Firebase Config" phase prints a warning and the app runs with push
+inert: `AppDelegate` configures Firebase only when the file is in the bundle.
+
+How a message travels:
+- A data message reaches `didReceiveRemoteNotification` → `UnitoolIos.deliverMessage` → the router.
+- A non-silent one is drawn as a local notification carrying the link.
+- A tap arrives at `didReceive response` → `UnitoolIos.deliverTap`. A tap that cold-starts the app
+  is held until the host exists.
+- A background data message must be sent with `content-available: 1`.
+- Anything that should show while the app is closed needs a `notification` block in the FCM
+  message: iOS draws nothing for a bare data message.
+
+## What iOS does differently
+
+- **The 2FA lock** is Face ID or Touch ID with the passcode behind it (`LocalAuthentication`).
+  - "The screen turned off" is "the phone locked", which iOS reports a few seconds after the side
+    button.
+  - Settings → Protection → "Set up" opens Unitool's own page in Settings. iOS has no public way
+    into Face ID & Passcode.
+- **Screenshots cannot be blocked on iOS.** The app switcher shows a blank screen instead of the
+  2FA app, and screen recording, mirroring and AirPlay show it blank too. A screenshot, the system
+  only reports after the fact.
+- **The clipboard** expires a copied code after a minute by itself (`UIPasteboardOptionExpirationDate`)
+  and keeps it off Universal Clipboard (`localOnly`).
+- **The vault** sealing is ECIES under a Secure Enclave P-256 key; the simulator has no enclave and
+  uses a software key in the Keychain with the same access class (`WhenUnlockedThisDeviceOnly`).
+  Neither travels in a backup, so — as on Android — the 2FA export is the way to a new phone.
+- **Export compliance** (`ITSAppUsesNonExemptEncryption`) is deliberately not set in Info.plist: the
+  2FA export encrypts with its own age implementation, and whether that is exempt is a declaration
+  for the owner to make in App Store Connect, not a default to ship.

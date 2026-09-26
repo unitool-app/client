@@ -1,0 +1,49 @@
+# The steps every iOS job starts with: the library next door, a JDK, Gradle, and the optional
+# Firebase config. One place, so the three lanes in ios.yml cannot drift apart.
+name: ios-prepare
+description: Check out Superizer beside the repo, set up Java and Gradle, drop in GoogleService-Info.plist if the secret is set
+
+inputs:
+  superizer_repo:
+    description: Repository of the library (mode B in settings.gradle.kts)
+    required: true
+  superizer_ref:
+    description: Ref of the library; empty means its default branch
+    required: false
+    default: ''
+  google_service_info_plist_base64:
+    description: Base64 of GoogleService-Info.plist; empty leaves push inert
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.superizer_repo }}
+        ref: ${{ inputs.superizer_ref }}
+        path: superizer-checkout
+
+    - name: Put the library where settings.gradle.kts looks for it
+      shell: bash
+      run: mv superizer-checkout ../superizer
+
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - uses: gradle/actions/setup-gradle@v4
+
+    # Optional, as on Android: without it the app builds with push inert, and the build phase says so.
+    - name: Firebase config
+      shell: bash
+      env:
+        PLIST: ${{ inputs.google_service_info_plist_base64 }}
+      run: |
+        if [ -n "$PLIST" ]; then
+          echo "$PLIST" | base64 --decode > iosApp/iosApp/GoogleService-Info.plist
+        else
+          echo "::warning::GOOGLE_SERVICE_INFO_PLIST_BASE64 is not set — push is inert in this build"
+        fi

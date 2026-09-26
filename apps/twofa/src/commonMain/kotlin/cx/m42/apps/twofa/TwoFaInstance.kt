@@ -6,9 +6,12 @@ import cx.m42.services.share.FileSharer
 import cx.m42.services.vault.SecretVault
 import cx.m42.superizer.app.AppChrome
 import cx.m42.superizer.app.AppInstance
+import cx.m42.superizer.lock.UserPresence
 import cx.m42.superizer.runtime.InstanceRuntime
 import kotlin.random.Random
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +51,14 @@ internal const val KEY_EXPORT_LOGIN = "export.github"
 
 /** What the export is shared as: armored age is text, but no app should try to open it as text. */
 internal const val EXPORT_MIME = "application/octet-stream"
+
+/**
+ * How long a copied code stays on the clipboard. Long enough to switch apps and paste; a code is
+ * dead within a minute or so anyway, so what this removes is mostly a keyboard's copy of it.
+ */
+internal const val CLIPBOARD_SECONDS = 60
+
+private const val CLIPBOARD_REFOCUS_MILLIS = 1_000L
 
 /**
  * One open 2FA app.
@@ -126,6 +137,23 @@ internal class TwoFaInstance(
 
     /** Which account's code was copied last, so the row can say so. */
     val copiedId = MutableStateFlow<String?>(null)
+
+    /**
+     * The host's "is this still the owner?" (06 §5.5), asked before the three actions that give
+     * the accounts away or take one from its owner: Export, Show key and Delete. Export is the one
+     * that matters most — a minute alone with the unlocked phone is enough to type one's own GitHub
+     * login and send oneself every secret at once.
+     *
+     * None on desktop and the web, which have nothing to ask with; the actions then work as before.
+     */
+    private val presence: UserPresence? = runtime.service(UserPresence.Key)
+
+    /** The account whose key is on screen, if any. Never in a snapshot: it is the secret itself. */
+    val shownSecret = MutableStateFlow<String?>(null)
+
+    /** The last code copied and the clipboard it went to, until it has been cleared from it. */
+    private var onClipboard: Pair<String, CodeClipboard>? = null
+    private var clipboardTimer: Job? = null
 
     private val _chrome = MutableStateFlow(AppChrome())
     override val chrome: StateFlow<AppChrome> get() = _chrome.asStateFlow()
@@ -206,9 +234,66 @@ internal class TwoFaInstance(
     fun openDetails(account: TotpAccount) = go(Page.Details(account.id))
 
     fun startExport() {
-        exportKeys.value = KeysState.Idle
-        exportDone.value = null
-        go(Page.Export)
+        runtime.scope.launch {
+            if (!confirmed(strings.confirmExport)) return@launch
+            exportKeys.value = KeysState.Idle
+            exportDone.value = null
+            go(Page.Export)
+        }
+    }
+
+    /** Shows [account]'s key once the person has confirmed; hiding it asks nothing. */
+    fun toggleSecret(account: TotpAccount) {
+        if (shownSecret.value == account.id) {
+            shownSecret.value = null
+            return
+        }
+        runtime.scope.launch {
+            if (confirmed(strings.confirmShowKey)) shownSecret.value = account.id
+        }
+    }
+
+    /**
+     * True when the host confirmed the person, or has nothing to confirm with. A refused or
+     * cancelled sheet is simply nothing happening: the page stays as it was.
+     */
+    private suspend fun confirmed(reason: String): Boolean = presence?.confirm(reason) ?: true
+
+    /**
+     * [account]'s code onto [clipboard], marked sensitive, and off it again a minute later if it is
+     * still there (06 §7). The clipboard is the screen's; this only decides when.
+     */
+    fun copyTo(clipboard: CodeClipboard, account: TotpAccount) {
+        val code = copy(account)
+        // Headless desktop and a browser without clipboard permission both throw here; the code is
+        // on the screen either way.
+        if (runCatching { clipboard.put(code) }.isFailure) return
+        onClipboard = code to clipboard
+        clipboardTimer?.cancel()
+        clipboardTimer = runtime.scope.launch {
+            delay(CLIPBOARD_SECONDS * 1000L)
+            clearClipboard()
+        }
+    }
+
+    /**
+     * Android lets only the app in front read the clipboard, and a code is copied to be pasted
+     * somewhere else — so the minute usually runs out with this app behind another. Then it is
+     * settled on the way back instead.
+     */
+    override fun onForeground() {
+        if (onClipboard == null || clipboardTimer?.isActive == true) return
+        runtime.scope.launch {
+            // Coming to the front and having the window's focus are a moment apart on Android.
+            delay(CLIPBOARD_REFOCUS_MILLIS)
+            clearClipboard()
+        }
+    }
+
+    private fun clearClipboard() {
+        val (code, clipboard) = onClipboard ?: return
+        val settled = runCatching { clipboard.clearIfStill(code) }.getOrDefault(true)
+        if (settled != null) onClipboard = null
     }
 
     /** Back inside the app. False at the root, which is where the host takes over and closes it. */
@@ -221,6 +306,7 @@ internal class TwoFaInstance(
     private fun go(page: Page) {
         _page.value = page
         copiedId.value = null
+        shownSecret.value = null
         if (page != Page.Import) {
             importBatch.value = null
             importSelected.value = emptySet()
@@ -373,10 +459,14 @@ internal class TwoFaInstance(
         return true
     }
 
+    /** Deleting someone's account cuts them off from wherever it signs in, so it asks first. */
     fun delete(id: String) {
-        if (!persist(_accounts.value.filterNot { it.id == id })) return
-        runtime.analytics.event("2fa_delete")
-        go(Page.List)
+        runtime.scope.launch {
+            if (!confirmed(strings.confirmDelete)) return@launch
+            if (!persist(_accounts.value.filterNot { it.id == id })) return@launch
+            runtime.analytics.event("2fa_delete")
+            go(Page.List)
+        }
     }
 
     // ---------------------------------------------------------------- export

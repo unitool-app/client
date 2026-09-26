@@ -22,6 +22,16 @@ composeApp/google-services.json
 # today: these arrive from a browser download with names like `google-services (4).json`, and the
 # copy nobody meant to keep is the one that gets committed.
 google-services*.json
+# The same thing for iOS (iosApp/iosApp/GoogleService-Info.plist), under any download name. CI
+# writes it from GOOGLE_SERVICE_INFO_PLIST_BASE64; without it the app builds with push inert.
+GoogleService-Info*.plist
+
+# Xcode's per-user state and derived data, and the Kotlin/Native caches.
+iosApp/build/
+xcuserdata/
+.kotlin/
+*.p8
+*.mobileprovision
 
 # Anything that could sign or publish a release. The directory rather than a pattern per file,
 # so a secret added later is ignored before anyone has to remember to add it — and the keystore

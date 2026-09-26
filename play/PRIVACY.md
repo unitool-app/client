@@ -1,6 +1,6 @@
 # Privacy Policy — Unitool
 
-**Last updated: 24 September 2026**
+**Last updated: 25 September 2026**
 
 ## The short version
 
@@ -26,6 +26,7 @@ On your device only, in the app's private storage, which on Android only this ap
 | The last exchange-rate table it downloaded | so the converter still works with no signal |
 | The two-factor accounts you add: service, account name, secret key — encrypted, see below | so the 2FA app can show their codes |
 | The GitHub username your last 2FA export was encrypted for | so the next export offers it |
+| How long the 2FA lock waits before asking again, and any lock switches you changed | so Settings → Protection remembers them |
 
 The two-factor accounts are never written in readable form. Before they reach storage they are
 encrypted (AES-256-GCM) with a key that Android's Keystore generates for this app and keeps: the key
@@ -40,6 +41,27 @@ exists while the app is open and is gone when it closes. A two-factor account is
 tap Save, and its codes are computed on the phone from the stored key — no code is ever sent
 anywhere, and a key leaves the phone only inside an export you make and send yourself, encrypted
 (see below).
+
+## The 2FA lock
+
+The 2FA app opens only after your phone confirms it is you — with your fingerprint, your face, or
+your screen lock's PIN, pattern or password. That check is Android's own: the system shows the
+sheet, compares the fingerprint or face, counts the attempts, and tells the app only "yes" or "no".
+The app never receives, stores or sends anything about your fingerprint or face, and it has no PIN
+of its own.
+
+The "yes" is kept in memory only. It is forgotten when the screen turns off, when you have been in
+another app for longer than the time set in Settings → Protection (a minute unless you change it),
+and whenever the app is closed. Showing an account's key, exporting the accounts and deleting one
+ask again. While the 2FA app is on screen, Android is told not to allow screenshots or screen
+recording of it and not to show it in the recent-apps preview.
+
+A code you copy is marked as sensitive, which on Android 13 and later keeps it out of the clipboard
+preview, and is cleared from the clipboard a minute later if nothing else has been copied since —
+when Android lets the app see that, which it does only while the app is in front.
+
+If your phone has no screen lock, there is nothing to confirm with: the 2FA app opens anyway and
+says, above its screen, that it is not protected.
 
 ## What leaves the device
 
@@ -98,9 +120,10 @@ and the GitHub key lookup you start yourself.
 
 ## Permissions
 
-Seven, which is all of them. This list was read off the built app, not off the source, because
-three of them are added by the Firebase messaging library rather than written by us — and a
-permission list that omits those would be wrong in exactly the way nobody checks.
+Ten, which is all of them. This list was read off the built app, not off the source, because six
+of them are added by libraries rather than written by us — three by Firebase messaging, two by
+AndroidX Biometric, one by AndroidX Core — and a permission list that omits those would be wrong in
+exactly the way nobody checks.
 
 Asked for, and refusable:
 
@@ -125,6 +148,14 @@ Granted at install time, never prompted for:
   it arrives as the screen goes off.
 - `com.google.android.c2dm.permission.RECEIVE` — added by Firebase. It is what allows this app,
   and only this app, to be handed its own messages.
+- `android.permission.USE_BIOMETRIC` and `android.permission.USE_FINGERPRINT` — added by AndroidX
+  Biometric, so that the 2FA lock can show Android's own fingerprint and face sheet (see "The 2FA
+  lock" above). They let the app *ask* the system to check you; the check, and everything about
+  your fingerprint or face, stays with the system. `USE_FINGERPRINT` is the older name of the same
+  thing, for Android 8 and earlier.
+- `cx.m42.unitool.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — added by AndroidX Core. It is this
+  app's own permission, granted to nothing but this app, and it keeps its internal signals from
+  being sent to it by anyone else.
 
 ## Notifications
 

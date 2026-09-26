@@ -7,7 +7,9 @@ import cx.m42.superizer.app.AppId
 import cx.m42.superizer.app.AppInstance
 import cx.m42.superizer.app.AppManifest
 import cx.m42.superizer.app.AppMetadata
+import cx.m42.superizer.app.AppProtection
 import cx.m42.superizer.app.AppSetupContext
+import cx.m42.superizer.app.LockPolicy
 import cx.m42.superizer.app.SuperizerApp
 import cx.m42.superizer.app.localized
 import cx.m42.superizer.runtime.InstanceRuntime
@@ -37,6 +39,9 @@ public class TwoFaApp : SuperizerApp<TwoFaConfig>() {
     override val manifest: AppManifest = AppManifest(
         id = ID,
         version = "0.1.0",
+        // Contract 2 is the one with `protection`: a host of contract 1 would show the codes with
+        // no lock at all, and has to turn the app away instead (06, D138).
+        minHostContract = 2,
         metadata = AppMetadata(
             title = localized("ru" to "Коды 2FA", "en" to "2FA codes"),
             description = localized(
@@ -53,6 +58,10 @@ public class TwoFaApp : SuperizerApp<TwoFaConfig>() {
             category = "Безопасность",
         ),
         deepLinks = setOf("add"),
+        // Behind the device's own lock, always (06, D139): the codes are the second factor, and a
+        // second factor anyone holding the unlocked phone can read is not one. Kept out of
+        // screenshots, recordings and the recents thumbnail as well.
+        protection = AppProtection(lock = LockPolicy.Required, secureWindow = true),
     )
 
     override val configSpec: AppConfigSpec<TwoFaConfig> =

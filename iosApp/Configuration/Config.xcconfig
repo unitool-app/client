@@ -1,0 +1,9 @@
+// The Apple Developer team that signs the app — the same team agentiz is signed with.
+TEAM_ID=5K5GDFV386
+// The same identifier as the Android application id. The two stores never compare them; keeping
+// them equal is only so that "the Unitool app" is one string wherever it is looked up.
+BUNDLE_ID=cx.m42.unitool
+APP_NAME=Unitool
+// Kotlin builds the simulator framework for Apple silicon only (iosSimulatorArm64, no iosX64), so a
+// build for "any simulator" must not ask for an Intel slice the framework does not have.
+EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64

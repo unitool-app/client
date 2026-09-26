@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  What `xcodebuild -exportArchive` does with the archive in the testflight lane of ios.yml.
+  `destination: upload` sends it to App Store Connect; `signingStyle: automatic` lets Xcode pick the
+  distribution certificate from the runner's keychain and the profile for the explicit App ID, with
+  the App Store Connect key passed on the command line. Nothing here is a secret.
+-->
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<key>teamID</key>
+	<string>5K5GDFV386</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

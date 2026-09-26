@@ -112,6 +112,22 @@ kotlin {
         binaries.executable()
     }
 
+    /**
+     * The iPhone app: a static framework that `iosApp/` links, the way agentiz does it. Static, so
+     * the one binary Xcode signs is the whole app — nothing to embed, nothing to sign twice.
+     *
+     * Only the klibs build on Linux; linking this framework takes a Mac with Xcode (BUILD-IOS.md).
+     */
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { target ->
+        target.binaries.framework {
+            baseName = "ComposeApp"
+            isStatic = true
+        }
+    }
+
     sourceSets {
         val desktopMain by getting
         val desktopTest by getting

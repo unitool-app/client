@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -38,6 +39,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,6 +58,24 @@ import kotlinx.coroutines.delay
 
 /** The last seconds of a code, when it is safer to wait for the next one than to type this one. */
 private const val EXPIRING_SECONDS = 5
+
+/**
+ * For a field a key is typed or pasted into (06 §7): no suggestions over it and nothing learnt from
+ * it. A password field is what keyboards treat as "keep nothing"; autocorrect off is what the rest
+ * of them read.
+ */
+private val SecretKeyboard = KeyboardOptions(
+    capitalization = KeyboardCapitalization.None,
+    autoCorrectEnabled = false,
+    keyboardType = KeyboardType.Password,
+)
+
+/** The link holds the same key, but is many lines long, so it is a URI field with nothing learnt. */
+private val LinkKeyboard = KeyboardOptions(
+    capitalization = KeyboardCapitalization.None,
+    autoCorrectEnabled = false,
+    keyboardType = KeyboardType.Uri,
+)
 
 /**
  * The list of codes, the add form, one account's page, the export and the import — five pages of one app,
@@ -106,8 +127,7 @@ private fun ListPage(instance: TwoFaInstance, strings: TwoFaStrings) {
     val now by instance.now.collectAsState()
     val copiedId by instance.copiedId.collectAsState()
     val problem by instance.storageProblem.collectAsState()
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberCodeClipboard()
 
     Column(modifier = Modifier.fillMaxSize().testTag("2fa:list")) {
         Column(
@@ -167,12 +187,7 @@ private fun ListPage(instance: TwoFaInstance, strings: TwoFaStrings) {
                             index = index,
                             copied = copiedId == account.id,
                             strings = strings,
-                            onCopy = {
-                                val code = instance.copy(account)
-                                // Headless desktop and a browser without clipboard permission both
-                                // throw here; the code is on the screen either way.
-                                runCatching { clipboard.setText(AnnotatedString(code)) }
-                            },
+                            onCopy = { instance.copyTo(clipboard, account) },
                         )
                     }
                 }
@@ -383,6 +398,8 @@ private fun AddPage(instance: TwoFaInstance, strings: TwoFaStrings) {
                     label = strings.link,
                     singleLine = false,
                     minHeight = 96.dp,
+                    // The link carries the key in its query, so it is a secret field too.
+                    keyboardOptions = LinkKeyboard,
                     modifier = Modifier.testTag("2fa:link"),
                 )
                 Hint(strings.linkHint)
@@ -424,6 +441,7 @@ private fun AddPage(instance: TwoFaInstance, strings: TwoFaStrings) {
                     placeholder = "JBSW Y3DP EHPK 3PXP",
                     label = strings.secret,
                     textStyle = tokens.body.copy(fontFeatureSettings = "tnum", letterSpacing = 1.sp),
+                    keyboardOptions = SecretKeyboard,
                     modifier = Modifier.testTag("2fa:secret"),
                 )
                 Hint(strings.secretHint)
@@ -879,11 +897,10 @@ private fun DetailsPage(instance: TwoFaInstance, strings: TwoFaStrings, id: Stri
     val accounts by instance.accounts.collectAsState()
     val now by instance.now.collectAsState()
     val account = accounts.firstOrNull { it.id == id } ?: return
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
+    val clipboard = rememberCodeClipboard()
     val copiedId by instance.copiedId.collectAsState()
-
-    var showSecret by remember(id) { mutableStateOf(false) }
+    val shownSecret by instance.shownSecret.collectAsState()
+    val showSecret = shownSecret == account.id
     var confirmDelete by remember(id) { mutableStateOf(false) }
     var issuer by remember(id) { mutableStateOf(account.issuer) }
     var name by remember(id) { mutableStateOf(account.name) }
@@ -903,10 +920,7 @@ private fun DetailsPage(instance: TwoFaInstance, strings: TwoFaStrings, id: Stri
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(tokens.radius))
                 .background(tokens.background)
-                .clickable(role = Role.Button) {
-                    val code = instance.copy(account)
-                    runCatching { clipboard.setText(AnnotatedString(code)) }
-                }
+                .clickable(role = Role.Button) { instance.copyTo(clipboard, account) }
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -947,7 +961,8 @@ private fun DetailsPage(instance: TwoFaInstance, strings: TwoFaStrings, id: Stri
                 Spacer(Modifier.height(8.dp))
                 AppButton(
                     text = if (showSecret) strings.hideSecret else strings.showSecret,
-                    onClick = { showSecret = !showSecret },
+                    // Showing asks the device first (06 §5.5); hiding does not.
+                    onClick = { instance.toggleSecret(account) },
                     size = ButtonSize.Sm,
                     variant = ButtonVariant.Secondary,
                     modifier = Modifier.testTag("2fa:toggle-secret"),

@@ -19,7 +19,10 @@ import androidx.compose.ui.unit.Density
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.superizer.host.storage.PrefsStorage
+import cx.m42.superizer.lock.AuthAvailability
+import cx.m42.superizer.lock.AuthOutcome
 import cx.m42.superizer.runtime.Clock
+import cx.m42.superizer.testing.FakeDeviceAuthenticator
 import java.awt.image.BufferedImage
 import java.io.File
 import java.nio.file.Files
@@ -83,6 +86,7 @@ class Screenshots {
         lang: String,
         offline: Boolean,
         clock: Clock?,
+        device: FakeDeviceAuthenticator,
         drive: DriveScope.() -> Unit,
     ) {
         // A fresh store for every frame: a screenshot must show what a new install looks like,
@@ -96,6 +100,9 @@ class Screenshots {
                 service(QrScanner.Key, PhoneCamera)
                 // And a share sheet, which is what the 2FA export's main button needs to be drawn.
                 service(FileSharer.Key, PhoneShareSheet)
+                // And a screen lock: the 2FA app is behind it (06), and the finger that answers the
+                // sheet is this fake. A frame of the curtain itself sets it to say no.
+                deviceAuthenticator(device)
             }
             superizer.settings.chooseLanguage(lang)
             setContent {
@@ -162,6 +169,9 @@ class Screenshots {
         val offline: Boolean = false,
         /** Pinned for screens whose content is a function of time — a 2FA code is. */
         val clock: Clock? = null,
+        /** The phone's screen lock, and what the person answers when it asks. */
+        val lock: AuthAvailability = AuthAvailability.Available,
+        val answer: AuthOutcome = AuthOutcome.Success,
         val drive: DriveScope.() -> Unit,
     )
 
@@ -260,6 +270,18 @@ class Screenshots {
             // Further down: the command that shows every account as one QR code for the new phone.
             tapTag("2fa:transfer-0")
         },
+        // 06: the curtain, as it stays when the sheet is cancelled.
+        Screen("23-2fa-locked", clock = TwoFaClock, answer = AuthOutcome.Cancelled) { openTwoFa() },
+        // A phone with no screen lock: the app opens, under the host's banner (D140).
+        Screen("24-2fa-no-screen-lock", clock = TwoFaClock, lock = AuthAvailability.NoScreenLock) {
+            openTwoFa()
+            addTwoFa(TwoFaLinks.first())
+        },
+        Screen("25-settings-protection") {
+            tapIcon("Открыть меню")
+            tapIcon("Настройки")
+            tapTag("settings:lock-now")
+        },
         Screen("22-2fa-import", clock = TwoFaClock) {
             openTwoFa()
             // One account already here, so the list shows both kinds of row.
@@ -301,7 +323,8 @@ class Screenshots {
             // missing one: it is the picture somebody uploads to a store listing by mistake.
             File(viewport.directory).listFiles()?.forEach { if (it.name.endsWith(".png")) it.delete() }
             for (screen in screens) {
-                shot(viewport, screen.name, screen.lang, screen.offline, screen.clock, screen.drive)
+                val device = FakeDeviceAuthenticator(screen.lock, screen.answer)
+                shot(viewport, screen.name, screen.lang, screen.offline, screen.clock, device, screen.drive)
             }
         }
     }

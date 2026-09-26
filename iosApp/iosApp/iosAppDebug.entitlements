@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  What puts Push Notifications into the signed binary (Debug, for builds run from Xcode). Without it
+	  registerForRemoteNotifications() fails with "no valid aps-environment entitlement string", no
+	  APNs token reaches Firebase and no FCM token is ever minted — which looks exactly like a delivery
+	  problem and is not one. The provisioning profile has to allow the capability too.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

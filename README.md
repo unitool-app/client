@@ -1,7 +1,7 @@
 # Unitool
 
 A Kotlin Multiplatform / Compose Multiplatform **Super App** — `cx.m42.unitool`. One `commonMain`
-codebase renders the same UI on **Android**, **desktop (JVM)** and **web (Wasm)**.
+codebase renders the same UI on **Android**, **iOS**, **desktop (JVM)** and **web (Wasm)**.
 
 Unitool is a *host*: it ships a home screen of apps, a drawer, settings, activation by promo code or
 QR payload, deep links and a service menu — and the apps themselves are independent modules that
@@ -15,14 +15,15 @@ Four apps ship today:
 |---|---|
 | **Калькулятор** | four functions, percent, and a scientific mode a config turns on |
 | **Конвертер валют** | ECB rates over the network, with a cache that works offline |
-| **Коды 2FA** | TOTP codes (RFC 6238) from a scanned QR code, an `otpauth://` link or a typed key, offline, with the keys encrypted at rest under an Android Keystore key; exports every account as an [age](https://age-encryption.org) file encrypted to a GitHub user's SSH keys, which a new phone takes back in one scan (`age -d … | qrencode -t ansiutf8`) or one paste |
+| **Коды 2FA** | TOTP codes (RFC 6238) from a scanned QR code, an `otpauth://` link or a typed key, offline, with the keys encrypted at rest under an Android Keystore or iOS Secure Enclave key and the app behind the device's biometrics; exports every account as an [age](https://age-encryption.org) file encrypted to a GitHub user's SSH keys, which a new phone takes back in one scan (`age -d … | qrencode -t ansiutf8`) or one paste |
 | **Test App** | hidden; one card per runtime service, for whoever is building on this |
 
-Android builds receive push notifications through Firebase. The routing — which app a message is
+Android and iOS builds receive push notifications through Firebase Cloud Messaging. The routing — which app a message is
 for, which screen a tap opens, and the rule that a push never unlocks a hidden app — is Superizer's
 and is the same on every target; Unitool supplies the Firebase config and the code that draws the
-notification. A build without `composeApp/google-services.json` compiles and runs exactly as
-before, and simply never receives one.
+notification. A build without `composeApp/google-services.json` (Android) or
+`iosApp/iosApp/GoogleService-Info.plist` (iOS) compiles and runs exactly as before, and simply never
+receives one.
 
 Home is what you chose, not everything installed: a fresh install starts with the calculator, the
 "+" tile opens All Apps where a tap puts an app on Home, and a long press on any tile takes it off
@@ -38,6 +39,7 @@ again. A hidden app lands on Home the moment its promo code or QR unlocks it.
 | Gradle | none — use the bundled `./gradlew` |
 | Node.js | none for the build; the web smoke test in `scripts/` wants Node 20+ |
 | Android | Android SDK, only for the Android target |
+| iOS | a Mac with Xcode, only to link and run the iOS app — the Kotlin side compiles on Linux too; see [BUILD-IOS.md](BUILD-IOS.md) |
 | Superizer | optional: a checkout at `../superizer` is used automatically; otherwise the published package is |
 
 ---

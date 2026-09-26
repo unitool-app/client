@@ -1,0 +1,193 @@
+# The iPhone app on a macOS runner — the half of iOS that cannot happen on Linux (BUILD-IOS.md).
+# The Kotlin half is already compiled for both iOS targets by verify.yml.
+#
+# Three jobs, three ways to get a build somewhere it can run (ssh-new/06 §4.1):
+#
+#   simulator   Debug for the Apple-silicon simulator, unsigned. What CI has always done.
+#   device      Release for a real iPhone, UNSIGNED. The owner signs it on their own Mac with
+#               scripts/ios-sign-and-install.sh and installs it over USB — the agentiz pattern.
+#               Needs nothing from the repository's secrets.
+#   testflight  Release, archived, signed and uploaded to App Store Connect. Runs only when the
+#               signing secrets are present; otherwise it says so and stops, green, so the two
+#               jobs above never wait on it.
+#
+# Started by hand: macOS minutes cost ten Linux ones on a private repository. Add `push` once the
+# simulator job has had its first green run.
+name: ios
+
+on:
+  workflow_dispatch:
+    inputs:
+      lanes:
+        description: 'Which jobs to run'
+        type: choice
+        default: simulator+device
+        options: [simulator, simulator+device, device, testflight, all]
+
+env:
+  # Compose Multiplatform 1.11.1 references UIViewLayoutRegion, an iOS 26 class, behind an
+  # availability check; an older SDK's linker has to be told to leave it undefined.
+  OTHER_LDFLAGS: '$(inherited) -Wl,-U,_OBJC_CLASS_$_UIViewLayoutRegion'
+
+jobs:
+  simulator:
+    if: contains(fromJSON('["simulator","simulator+device","all"]'), inputs.lanes)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ios-prepare
+        with:
+          superizer_repo: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
+          superizer_ref: ${{ vars.SUPERIZER_REF || '' }}
+          google_service_info_plist_base64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+
+      - name: Build for the simulator
+        run: |
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/ios-dd \
+            CODE_SIGNING_ALLOWED=NO \
+            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
+            build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-simulator-app
+          path: build/ios-dd/Build/Products/Debug-iphonesimulator/*.app
+
+  device:
+    if: contains(fromJSON('["device","simulator+device","all"]'), inputs.lanes)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ios-prepare
+        with:
+          superizer_repo: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
+          superizer_ref: ${{ vars.SUPERIZER_REF || '' }}
+          google_service_info_plist_base64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+
+      # Unsigned on purpose: the certificate lives on the owner's Mac and never in this repository.
+      # The build number is the run number, so two installs never carry the same CFBundleVersion.
+      - name: Build for a device, unsigned
+        run: |
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/ios-dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
+            build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-device-unsigned-app
+          path: build/ios-dd/Build/Products/Release-iphoneos/*.app
+          if-no-files-found: error
+
+  testflight:
+    if: contains(fromJSON('["testflight","all"]'), inputs.lanes)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Secrets cannot be read in a job-level `if`, so the check is a step with an output. Missing
+      # secrets end the job green with a notice: this lane is opt-in, not a gate.
+      - name: Are the signing secrets here?
+        id: gate
+        env:
+          P12: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          P8: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          missing=""
+          [ -n "$P12" ]          || missing="$missing IOS_DIST_CERT_P12_BASE64"
+          [ -n "$P12_PASSWORD" ] || missing="$missing IOS_DIST_CERT_PASSWORD"
+          [ -n "$KEY_ID" ]       || missing="$missing ASC_KEY_ID"
+          [ -n "$ISSUER_ID" ]    || missing="$missing ASC_ISSUER_ID"
+          [ -n "$P8" ]           || missing="$missing ASC_KEY_P8_BASE64"
+          if [ -n "$missing" ]; then
+            echo "::notice::TestFlight lane skipped — secrets not set:$missing (BUILD-IOS.md, Signing)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: ./.github/actions/ios-prepare
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          superizer_repo: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
+          superizer_ref: ${{ vars.SUPERIZER_REF || '' }}
+          google_service_info_plist_base64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+
+      # A keychain of its own, deleted with the runner. The distribution certificate goes in; the
+      # App Store Connect key goes where xcodebuild looks for it. A provisioning profile is optional:
+      # with the API key, automatic signing fetches or creates one for the explicit App ID.
+      - name: Install the certificate and the App Store Connect key
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          P12: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          P8: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          PROFILE: ${{ secrets.IOS_PROFILE_BASE64 }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          rm "$RUNNER_TEMP/dist.p12"
+
+          mkdir -p "$HOME/private_keys"
+          echo "$P8" | base64 --decode > "$HOME/private_keys/AuthKey_$KEY_ID.p8"
+
+          if [ -n "$PROFILE" ]; then
+            mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+            echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+            UUID=$(security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" | plutil -extract UUID raw -)
+            mv "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          fi
+
+      - name: Archive
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath build/Unitool.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
+            archive
+
+      # `destination: upload` in ExportOptions.plist sends the build straight to App Store Connect;
+      # it appears under TestFlight once Apple has processed it. The first upload will ask about
+      # export compliance in the console (BUILD-IOS.md, Push / export compliance).
+      - name: Upload to TestFlight
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive -archivePath build/Unitool.xcarchive \
+            -exportOptionsPlist iosApp/Configuration/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
+
+      - name: Forget the key
+        if: always()
+        run: rm -rf "$HOME/private_keys" "$RUNNER_TEMP/signing.keychain-db" || true
