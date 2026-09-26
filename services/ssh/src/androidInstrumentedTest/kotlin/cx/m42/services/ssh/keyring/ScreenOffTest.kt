@@ -42,6 +42,15 @@ class ScreenOffTest {
     private fun shell(command: String): String =
         ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes().decodeToString() }
 
+    /** `Awake`, `Asleep` or `Dozing`, as the power manager has it. */
+    private fun wakefulness(): String = shell("dumpsys power").lineSequence().firstOrNull { "mWakefulness=" in it }?.substringAfter("=")?.trim().orEmpty()
+
+    private fun waitFor(millis: Long, done: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + millis
+        while (!done() && System.currentTimeMillis() < deadline) Thread.sleep(100)
+        return done()
+    }
+
     private class Asking(private val pass: String) : KeyPrompter {
         var passphrases = 0
         override suspend fun choose(app: AppId, purpose: KeyPurpose, candidates: List<SshKeyInfo>): KeyId? = candidates.firstOrNull()?.id
@@ -57,6 +66,11 @@ class ScreenOffTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val host = SshKeyringHost.android(context, { null }, { PromptText("t", null, null) }, InMemoryRecordStore(), prompter, Clock { System.currentTimeMillis() }, scope)
         try {
+            // Going off is only an event for a screen that is on. An emulator nobody has touched for
+            // a few minutes is asleep already, KEYCODE_SLEEP does nothing, and no broadcast comes.
+            shell("svc power stayon true")
+            shell("input keyevent KEYCODE_WAKEUP")
+            assertTrue(waitFor(10_000) { wakefulness() == "Awake" }, "the screen did not come on: ${wakefulness()}")
             val seed = Canary.ED25519_SEED.reveal()
             val file = PrivateKey.ed25519(seed, "screen").use { k -> SecretBytes.utf8(pass.toCharArray()).use { OpenSshKeyFile.write(k, it, rounds = 4) } }
             seed.fill(0)
@@ -67,10 +81,11 @@ class ScreenOffTest {
             assertEquals(1, prompter.passphrases, "inside the session, asked once")
 
             shell("input keyevent KEYCODE_SLEEP")
-            val deadline = System.currentTimeMillis() + 5_000
-            while (host.keyring.openSessionsForTest().any { !it.closed } && System.currentTimeMillis() < deadline) Thread.sleep(100)
+            // The broadcast follows the display's own power-down, which on a CI emulator takes seconds.
+            val closed = waitFor(20_000) { host.keyring.openSessionsForTest().all { it.closed } }
+            val state = wakefulness()
             shell("input keyevent KEYCODE_WAKEUP")
-            assertTrue(host.keyring.openSessionsForTest().all { it.closed }, "the screen went off and the session stayed")
+            assertTrue(closed, "the screen went off ($state) and the session stayed")
 
             assertIs<SshOutcome.Ok<*>>(app.sign(key.id, "git", "3".toByteArray()))
             assertEquals(2, prompter.passphrases, "after the screen went off, asked again")
