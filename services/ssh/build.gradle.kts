@@ -42,6 +42,9 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
         }
+        wasmJsMain.dependencies {
+            implementation(libs.kotlinx.browser)
+        }
         val desktopTest by getting
         desktopTest.dependencies {
             implementation(libs.superizer.testing)

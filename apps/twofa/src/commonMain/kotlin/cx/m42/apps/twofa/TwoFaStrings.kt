@@ -87,6 +87,7 @@ internal interface TwoFaStrings {
     fun importFailed(failed: ImportBatch.Failed): String
 
     fun storageProblem(problem: StorageProblem): String
+    val unlock: String
 }
 
 internal object TwoFaStringsRu : TwoFaStrings {
@@ -238,10 +239,15 @@ internal object TwoFaStringsRu : TwoFaStrings {
             "Сохранённые аккаунты не удаётся расшифровать на этом устройстве. Они не удалены и не будут " +
                 "перезаписаны. Так бывает, если данные приложения перенесли на другой телефон: ключ, " +
                 "которым они зашифрованы, не покидает защищённое хранилище старого."
+        StorageProblem.Locked ->
+            "Аккаунты заперты: хост не смог их открыть без пароля. Они на месте — откройте их, чтобы " +
+                "увидеть коды."
         StorageProblem.NotSaved ->
             "Не удалось зашифровать изменения, поэтому они не сохранены и пропадут, когда приложение " +
                 "закроется. Незашифрованными ключи не записываются никогда."
     }
+
+    override val unlock = "Открыть"
 }
 
 internal object TwoFaStringsEn : TwoFaStrings {
@@ -382,10 +388,15 @@ internal object TwoFaStringsEn : TwoFaStrings {
             "The saved accounts can't be decrypted on this device. They have not been deleted and won't " +
                 "be overwritten. This happens when the app's data is moved to another phone: the key they " +
                 "were encrypted with never leaves the old phone's secure storage."
+        StorageProblem.Locked ->
+            "The accounts are locked: the host could not open them without the passphrase. They are " +
+                "still there — unlock them to see the codes."
         StorageProblem.NotSaved ->
             "The change couldn't be encrypted, so it wasn't saved and will be gone when the app closes. " +
                 "Keys are never written unencrypted."
     }
+
+    override val unlock = "Unlock"
 }
 
 internal val TwoFaStringTables: Map<String, TwoFaStrings> = mapOf(

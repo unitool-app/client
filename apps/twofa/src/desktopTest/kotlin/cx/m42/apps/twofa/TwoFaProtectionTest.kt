@@ -28,7 +28,7 @@ class TwoFaProtectionTest {
         val manifest = TwoFaApp().manifest
         assertEquals(LockPolicy.Required, manifest.protection.lock)
         assertTrue(manifest.protection.secureWindow)
-        assertEquals(2, manifest.minHostContract)
+        assertEquals(3, manifest.minHostContract, "contract 3: runtime.secrets; it includes 2, the lock")
     }
 
     @Test

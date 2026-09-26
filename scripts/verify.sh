@@ -158,8 +158,15 @@ if [ -n "${ANDROID_HOME:-}" ] || grep -q sdk.dir local.properties 2>/dev/null; t
     else
       bad "Keystore vault — see $out/android.log"
     fi
+    # The keyring against the same Keystore (ssh-new 03 §6): step 0's probe, and the backend's
+    # invariants — no private half outside the chip, nothing without the person, nothing on disk.
+    if ./gradlew --quiet :services:ssh:connectedDebugAndroidTest >> "$out/android.log" 2>&1; then
+      ok "SSH keyring on the device (probe, Keystore backend)"
+    else
+      bad "SSH keyring on the device — see $out/android.log"
+    fi
   else
-    skip "instrumented tests (smoke, Keystore vault): no device attached"
+    skip "instrumented tests (smoke, Keystore vault, SSH keyring): no device attached"
   fi
 else
   skip "Android: no SDK configured"

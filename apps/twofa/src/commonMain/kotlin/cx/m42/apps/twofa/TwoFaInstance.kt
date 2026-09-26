@@ -5,7 +5,7 @@ import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.Age
 import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.vault.SecretVault
+import cx.m42.superizer.secrets.SecretVault
 import cx.m42.superizer.app.AppChrome
 import cx.m42.superizer.app.AppInstance
 import cx.m42.superizer.lock.UserPresence
@@ -44,8 +44,18 @@ internal enum class StorageProblem {
     /** There is a stored list and it cannot be opened here; it is left exactly as it is. */
     Unreadable,
 
+    /**
+     * The host holds the list and cannot open it right now — its passphrase was not given (desktop,
+     * the web: ssh-new 05 §3.4). Nothing is lost; unlocking reads it again.
+     */
+    Locked,
+
     /** The last change could not be sealed, so it was not written; it lives until the app closes. */
     NotSaved,
+    ;
+
+    /** A stored list is there and not on screen: writing now would replace it. */
+    val blocksWriting: Boolean get() = this == Unreadable || this == Locked
 }
 
 /** The GitHub login the last export went to — a public name, remembered so a second export is one tap. */
@@ -80,10 +90,10 @@ internal class TwoFaInstance(
     val accounts: StateFlow<List<TotpAccount>> get() = _accounts.asStateFlow()
 
     /**
-     * Sealed by the host's vault (D19) where it has one — Android's Keystore — and plain JSON on
-     * desktop and the web, which have none (see [AccountStore]).
+     * In `runtime.secrets`: sealed by the host with whatever the platform has (contract 3). What an
+     * older version sealed itself is moved in on the first read, with the vault it used (Б4).
      */
-    private val store = AccountStore(runtime.storage, runtime.service(SecretVault.Key), runtime.logger)
+    private val store = AccountStore(runtime.storage, runtime.secrets, runtime.service(SecretVault.Key), runtime.logger)
 
     /** False until the stored list has been read; the screen draws nothing rather than "no accounts yet". */
     private val _loaded = MutableStateFlow(false)
@@ -171,9 +181,14 @@ internal class TwoFaInstance(
     }
 
     private suspend fun load() {
-        val stored = store.load()
+        val loaded = store.load()
+        val stored = (loaded as? AccountStore.Loaded.Ok)?.accounts
         _accounts.value = stored.orEmpty()
-        if (stored == null) storageProblem.value = StorageProblem.Unreadable
+        storageProblem.value = when (loaded) {
+            is AccountStore.Loaded.Ok -> null
+            AccountStore.Loaded.Locked -> StorageProblem.Locked
+            AccountStore.Loaded.Unreadable -> StorageProblem.Unreadable
+        }
         _loaded.value = true
         settlePage()
 
@@ -194,11 +209,16 @@ internal class TwoFaInstance(
     private fun settlePage() {
         if (!_loaded.value) return
         val current = _page.value
-        val unreadable = storageProblem.value == StorageProblem.Unreadable
+        val unreadable = storageProblem.value?.blocksWriting == true
         if (unreadable && current != Page.List || current is Page.Details && _accounts.value.none { it.id == current.id }) {
             _page.value = Page.List
         }
         updateChrome()
+    }
+
+    /** "Unlock": read the list again — the host asks for the passphrase this time round. */
+    fun unlock() {
+        runtime.scope.launch { load() }
     }
 
     fun tick() {
@@ -563,7 +583,7 @@ internal class TwoFaInstance(
      * their keys.
      */
     private fun persist(accounts: List<TotpAccount>): Boolean {
-        if (!_loaded.value || storageProblem.value == StorageProblem.Unreadable) return false
+        if (!_loaded.value || storageProblem.value?.blocksWriting == true) return false
         _accounts.value = accounts
         runtime.scope.launch {
             // A write, once started, finishes: closing the app a moment after Save cancels this

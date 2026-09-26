@@ -1,6 +1,13 @@
 package cx.m42.unitool
 
 import androidx.compose.runtime.remember
+import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.keyring.FileRecordStore
+import cx.m42.superizer.host.SystemClock
+import cx.m42.superizer.runtime.Platform
+import cx.m42.unitool.security.KeyPrompts
+import cx.m42.unitool.security.UnitoolSecurity
+import java.io.File
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -17,7 +24,8 @@ import kotlinx.coroutines.SupervisorJob
  */
 fun main(args: Array<String>) = application {
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
-    val superizer = remember { buildUnitool(scope, debug = true) }
+    val security = remember { desktopSecurity(scope) }
+    val superizer = remember { buildUnitool(scope, debug = true, security = security) }
 
     remember {
         args.firstOrNull { it.startsWith("--link=") || it.startsWith("--activate=") }
@@ -32,6 +40,16 @@ fun main(args: Array<String>) = application {
         state = rememberWindowState(width = 420.dp, height = 820.dp),
         title = "Unitool",
     ) {
-        UnitoolApp(superizer)
+        UnitoolApp(superizer, security)
     }
+}
+
+/**
+ * No chip on a desktop: every key at level 3, under its passphrase, and the host's secrets sealed to
+ * the first such key (05 §2.1, §3). The records sit next to the host's own settings.
+ */
+private fun desktopSecurity(scope: CoroutineScope): UnitoolSecurity {
+    val prompts = KeyPrompts()
+    val records = FileRecordStore(File(System.getProperty("user.home"), ".superizer/cx.m42.services.ssh.json"))
+    return UnitoolSecurity(SshKeyringHost.passphraseOnly(records, prompts, SystemClock, Platform.Desktop, scope), prompts)
 }

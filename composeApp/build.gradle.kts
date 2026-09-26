@@ -156,6 +156,7 @@ kotlin {
             implementation(project(":services:qr-scanner"))
             implementation(project(":services:share"))
             implementation(project(":services:vault"))
+            implementation(project(":services:ssh"))
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

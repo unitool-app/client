@@ -63,6 +63,13 @@
 перечисляют только `include`, а в `include` стоит чужой файл, как записано в памяти 2FA. Поэтому
 явный `exclude` — страховка на случай, если правила когда-нибудь поменяют на «всё, кроме».
 
+**(impl)** Явный `exclude` в релизную сборку не проходит: `lintVitalRelease` считает фатальной
+ошибкой `exclude` пути, которого нет ни в одном `include` (`FullBackupContent`: «is not in an
+included path»). Поэтому страховка перенесена в тест: `BackupRulesTest` требует, чтобы каждый
+раздел обоих правил был «только `include`» — хотя бы один `include`, ни одного `include` на
+корень домена — и чтобы файла записей не было ни в одном `include`. Смена правил на «всё, кроме»
+роняет тест, а не молча уносит записи. Имя файла по факту — `cx.m42.services.ssh.xml`.
+
 ## 3. Канарейки и сканер
 
 ### 3.1. Канарейки
@@ -154,7 +161,7 @@
 | `NamespaceTest` | I9 | `x@m42.cx` от приложения → `NotAllowed`; недопустимые символы → `NotAllowed`; подписанные данные начинаются с `"SSHSIG"`; в реестре сервисов хоста Unitool нет `SshAgent` и `SshKeyAdmin` |
 | `DeleteTest` | I11 | после `delete` нет записи, разрешений, журнала ключа, а сканер пуст |
 | `ImportFormatTest` | — | каждый отказ §8 заметки 02 даёт свою причину и свою команду; дубликат → «уже есть» |
-| `BackupRulesTest` (в Unitool) | I10 | разбирает оба XML правил: `cx.m42.superizer.ssh.xml` есть в `exclude` и нет в `include` |
+| `BackupRulesTest` (в Unitool) | I10 | разбирает оба XML правил: каждый раздел — только `include`, `cx.m42.services.ssh.xml` нет ни в одном `include` (impl, §2: `exclude` запрещает lint) |
 
 ## 5b. iOS-тесты (`unitool/services/ssh/src/iosSimulatorArm64Test`) (05, 07)
 

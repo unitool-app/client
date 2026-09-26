@@ -39,9 +39,9 @@ public class TwoFaApp : SuperizerApp<TwoFaConfig>() {
     override val manifest: AppManifest = AppManifest(
         id = ID,
         version = "0.1.0",
-        // Contract 2 is the one with `protection`: a host of contract 1 would show the codes with
-        // no lock at all, and has to turn the app away instead (06, D138).
-        minHostContract = 2,
+        // Contract 3: the accounts live in `runtime.secrets`, which the host seals (ssh-new 05 §3.2).
+        // Contract 2 brought `protection`; a host of contract 1 would show the codes with no lock.
+        minHostContract = 3,
         metadata = AppMetadata(
             title = localized("ru" to "Коды 2FA", "en" to "2FA codes"),
             description = localized(

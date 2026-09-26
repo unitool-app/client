@@ -1,6 +1,10 @@
 package cx.m42.services.vault
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyInfo
+import cx.m42.superizer.secrets.SecretVault
+import javax.crypto.SecretKeyFactory
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -27,7 +31,7 @@ import kotlinx.coroutines.withContext
  *
  * [alias] is the key's name in the Keystore — a parameter so a test can use its own and delete it.
  */
-public class AndroidKeystoreVault(private val alias: String = DEFAULT_ALIAS) : SecretVault {
+public class AndroidKeystoreVault(private val alias: String = DEFAULT_ALIAS) : SecretVault, HardwareVault {
 
     override suspend fun seal(plaintext: String): String = withContext(Dispatchers.IO) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -48,6 +52,31 @@ public class AndroidKeystoreVault(private val alias: String = DEFAULT_ALIAS) : S
             cipher.updateAAD(AAD)
             cipher.doFinal(body, NONCE_SIZE, body.size - NONCE_SIZE).decodeToString(throwOnInvalidSequence = true)
         }.getOrNull()
+    }
+
+    /**
+     * Where the key lives, read off the Keystore (05 §3.4): `strongbox`, `tee` or `software` — the
+     * last is what an emulator or a broken KeyMint gives, and the diagnostics say so (06 §6.1).
+     * Null before the first seal has made the key.
+     */
+    override fun hardware(): String? = runCatching {
+        val key = existingKey() ?: return@runCatching null
+        val info = SecretKeyFactory.getInstance(key.algorithm, PROVIDER).getKeySpec(key, KeyInfo::class.java) as KeyInfo
+        if (Build.VERSION.SDK_INT >= 31) {
+            when (info.securityLevel) {
+                KeyProperties.SECURITY_LEVEL_STRONGBOX -> "strongbox"
+                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT, KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE -> "tee"
+                else -> "software"
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            if (info.isInsideSecureHardware) "tee" else "software"
+        }
+    }.getOrNull()
+
+    /** Removes the key, and with it everything it sealed. For the self-test's throwaway vaults, and tests. */
+    public fun deleteKey() {
+        runCatching { KeyStore.getInstance(PROVIDER).apply { load(null) }.deleteEntry(alias) }
     }
 
     /**

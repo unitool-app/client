@@ -154,7 +154,7 @@ private fun ListPage(instance: TwoFaInstance, strings: TwoFaStrings) {
             }
             if (accounts.isEmpty()) {
                 // "No accounts yet" would be untrue over a list that is there but cannot be read.
-                if (problem != StorageProblem.Unreadable) EmptyState(strings)
+                if (problem?.blocksWriting != true) EmptyState(strings)
             } else {
                 AppTextField(
                     value = query,
@@ -210,8 +210,15 @@ private fun ListPage(instance: TwoFaInstance, strings: TwoFaStrings) {
             }
         }
 
+        if (problem == StorageProblem.Locked) {
+            AppButton(
+                text = strings.unlock,
+                onClick = instance::unlock,
+                modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("2fa:unlock"),
+            )
+        }
         // Nowhere to save a new account while the stored list cannot be read (TwoFaInstance.persist).
-        if (problem != StorageProblem.Unreadable) {
+        if (problem?.blocksWriting != true) {
             AppButton(
                 text = strings.add,
                 onClick = instance::startAdd,

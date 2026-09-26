@@ -108,7 +108,7 @@ class TwoFaInstanceTest {
         assertShown("2fa:list")
         val twofa = instance as TwoFaInstance
         assertEquals(listOf("GitHub"), twofa.accounts.value.map { it.issuer })
-        assertTrue(runtime.storage.entries[KEY_ACCOUNTS]!!.contains(secret))
+        assertTrue(runtime.secrets.entries[KEY_SECRET_ACCOUNTS]!!.contains(secret))
         inRow("2fa:code-0").assertTextEquals(twofa.expected(0))
     }
 
@@ -188,7 +188,7 @@ class TwoFaInstanceTest {
         node("2fa:delete-confirm").performScrollTo().performClick()
         assertShown("2fa:list")
         assertEquals(listOf("b"), twofa.accounts.value.map { it.id })
-        assertTrue(!runtime.storage.entries[KEY_ACCOUNTS]!!.contains("\"a\""))
+        assertTrue(!runtime.secrets.entries[KEY_SECRET_ACCOUNTS]!!.contains("\"a\""))
     }
 
     @Test

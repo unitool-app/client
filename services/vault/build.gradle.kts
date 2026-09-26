@@ -4,10 +4,10 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 /**
  * Encryption at rest with a key no app can read — an optional service in the sense of D19.
  *
- * `commonMain` is all an app sees: [cx.m42.services.vault.SecretVault] and its key. `androidMain`
- * is the one implementation there is, AES-GCM under a key that lives in Android's Keystore.
- * Desktop and the web register nothing: neither has a keystore a browser tab or a plain JVM can
- * use, and a key kept next to the data it locks would only look like one.
+ * The host's vault on a phone (ssh-new 05 §3.2, D182): implementations of Superizer's
+ * `SecretVault` — AES-GCM under a key in Android's Keystore, ECIES under a key in the Secure
+ * Enclave. The interface moved into the library with contract 3; these stay Unitool's (D181).
+ * Desktop and the web have no chip, and their vault is the person's SSH key (`AgeVault`).
  *
  * The Android side is tested on a device (`connectedAndroidTest`), because the Keystore is the
  * thing under test and nothing off a device has one.
@@ -37,6 +37,10 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(libs.superizer.core)
+        }
+        iosMain.dependencies {
+            // The CoreFoundation glue, shared with the keyring's Secure Enclave backend (07 §3, question 84).
+            implementation(project(":services:ssh"))
         }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)

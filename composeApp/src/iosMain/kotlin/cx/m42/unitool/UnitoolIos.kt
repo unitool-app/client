@@ -5,7 +5,12 @@ import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.share.IosFileSharer
 import cx.m42.services.vault.IosKeychainVault
-import cx.m42.services.vault.SecretVault
+import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.keyring.FileRecordStore
+import cx.m42.services.vault.VaultDiagnostics
+import cx.m42.superizer.host.SystemClock
+import cx.m42.unitool.security.KeyPrompts
+import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.host.push.IosMessaging
 import cx.m42.superizer.host.push.Notifier
@@ -43,6 +48,10 @@ interface FirebaseMessagingBridge {
 object UnitoolIos {
 
     private var superizer: Superizer? = null
+
+    /** The keyring and the vault, for the root composable's sheet. */
+    var security: UnitoolSecurity? = null
+        private set
     private val heldLinks = mutableListOf<String>()
     private val heldTaps = mutableListOf<Map<String, String>>()
 
@@ -50,7 +59,13 @@ object UnitoolIos {
     fun host(): Superizer {
         superizer?.let { return it }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        val built = buildUnitool(scope, debug = Platform.isDebugBinary) {
+        // The Secure Enclave seals the host's secrets as it sealed the 2FA accounts before (Б4). The
+        // keyring is level 3 here until the enclave backend runs on a phone (step 5b, D180).
+        val prompts = KeyPrompts()
+        val vault = IosKeychainVault()
+        val keyring = SshKeyringHost.passphraseOnly(FileRecordStore(), prompts, SystemClock, cx.m42.superizer.runtime.Platform.Ios, scope)
+        val security = UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault)).also { this.security = it }
+        val built = buildUnitool(scope, debug = Platform.isDebugBinary, security = security) {
             notifier(LocalNotifier)
             // The camera for QR codes (D19), only on a device that has one — the simulator has none,
             // and the 2FA app draws its scan button from whether this is registered.
@@ -58,8 +73,6 @@ object UnitoolIos {
                 service(QrScanner.Key, IosQrScanner { superizer?.settings?.langTag?.value ?: "en" })
             }
             service(FileSharer.Key, IosFileSharer())
-            // The 2FA accounts, sealed under a Secure Enclave key before they reach the defaults.
-            service(SecretVault.Key, IosKeychainVault())
         }
         superizer = built
         heldLinks.forEach { built.route.deliver(it) }

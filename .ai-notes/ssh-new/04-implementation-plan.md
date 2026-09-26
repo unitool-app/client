@@ -207,7 +207,8 @@ superizer-implemented).
   `FakeSshKeyring`: отмена листа ничего не меняет, снапшот не содержит `secret=`.
 - Bench test-app: «Подписать» и «Проверить» — видимая проверка `sign`/`verify`.
 - `backup_rules.xml`, `data_extraction_rules.xml`: `exclude` для `cx.m42.superizer.ssh.xml`,
-  `BackupRulesTest`.
+  `BackupRulesTest`. **(impl)** `exclude` запрещает release-lint (03 §2): правила остаются
+  «только `include`», файл `cx.m42.services.ssh.xml` не включён, тест держит оба условия.
 - `play/PRIVACY.md` и оба описания: разрешения читаем **из собранного APK** через `aapt2 dump
   xmltree`, а не из манифеста (память push-fcm). `androidx.biometric` добавит
   `USE_BIOMETRIC` и, скорее всего, `USE_FINGERPRINT`. Абзац о ключах: где хранятся, что
@@ -240,7 +241,7 @@ superizer-implemented).
   composeApp/src/iosMain/…/UnitoolIos.kt  register SecureEnclaveBackend (05)
   composeApp/src/desktopMain, wasmJsMain  register PassphraseBackend + AgeVault (05)
   services/vault                        host-side only; CoreFoundation helpers from ssh (05)
-  composeApp/src/androidMain/res/xml/*  exclude cx.m42.superizer.ssh.xml
+  composeApp/src/androidMain/res/xml/*  include-only, cx.m42.services.ssh.xml not included (impl, 03 §2)
   composeApp/src/desktopTest/…          BackupRulesTest
   apps/twofa/                           − SshKey/Age/Curve25519/ChaCha/RsaOaep (moved), + import from file, accounts → runtime.secrets with one-release migration (05)
   play/PRIVACY.md, play/listing/*       permissions from the APK, keys paragraph
@@ -315,6 +316,7 @@ superizer-implemented).
 | Б2 | Ed25519 в Keystore (P1–P2) неизвестен; от него зависит, где живёт самый частый ключ | шаг 5 | шаг 0 на `unitool35` и телефоне владельца первым; модель не меняется при любом ответе |
 | Б3 | Mac нет (ios/01 §5): iOS-сейф не выполнялся, P10–P13 некому прогнать | шаг 5b, iOS-тесты сейфа | **Решено, 06 §4, D180:** самопроверка в приложении + `ios.yml` в TestFlight; отчёт с iPhone заменяет Mac. Нужны секреты подписи (вопрос 88). До первого зелёного отчёта iOS — уровень 3 из commonMain (D175) |
 | Б4 | Миграция 2FA: тестеры Play alpha держат `accounts.sealed` под ключом `cx.m42.services.vault`; после переезда на `runtime.secrets` 2FA не имеет сейфа, чтобы это прочитать | шаг 7 | сейф хоста использует тот же alias и формат `v1:`/`e1:`; `SecretVault.Key` живёт для приложений ещё один релиз; 2FA переносит при первом запуске и удаляет старое; тест на JVM с `SoftwareVault` |
+| Б4 (impl, шаг 4) | **Сделано:** сейф хоста на Android — тот же `AndroidKeystoreVault` с alias `cx.m42.services.vault`, на iOS — тот же `IosKeychainVault`; `SecretVault.Key` зарегистрирован ещё на релиз; 2FA при первом чтении открывает `accounts.sealed` старым сейфом, пишет в `runtime.secrets`, удаляет старое только после записи нового; открытый `accounts` переносится так же. Проверено: `TwoFaVaultTest` (JVM, `SoftwareVault`) и `SecurityWiringTest` (весь хост Unitool: `app.2fa.accounts.sealed` → `secret.2fa.accounts`, запечатан сейфом хоста) | — | — |
 | Б5 | Ключ, который запечатывает секреты хоста: какой из нескольких, что при удалении, что при `usable = false` | шаг 4 | настройка «ключ для секретов», по умолчанию первый Ed25519/RSA; удаление запрещено до перезапечатывания (D173); `usable = false` → секреты «Unreadable», как сегодня в 2FA, и подсказка импортировать ключ заново |
 | Б6 | На desktop и web нет сервиса выбора файла: импорт ключа и восстановление из бэкапа нечем открыть; `FileSharer` есть только для отдачи | шаги 6–7 | новый сервис `FilePicker` в 0.4.0 (Android SAF, iOS `UIDocumentPicker`, desktop `FileDialog`, web `<input type=file>`); без него desktop и web остаются со вставкой и QR |
 | Б7 | Конец сессии пароля на desktop и web: `ACTION_SCREEN_OFF` и `protectedDataWillBecomeUnavailable` там нет | шаг 3 | сессия = процесс хоста плюс `lockAll()` и таймер бездействия из настройки; на web — ещё `visibilitychange` в hidden дольше N минут |

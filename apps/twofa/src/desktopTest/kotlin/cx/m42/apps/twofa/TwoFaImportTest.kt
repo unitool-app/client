@@ -5,7 +5,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.performTextReplacement
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
-import cx.m42.services.vault.SecretVault
+import cx.m42.superizer.secrets.SecretVault
 import cx.m42.superizer.app.AppConfig
 import cx.m42.superizer.testing.runAppTest
 import kotlin.test.Test
@@ -140,7 +140,7 @@ class TwoFaImportTest {
             assertShown("2fa:list")
             assertEquals(three, twofa.withoutIds())
             assertEquals(3, twofa.accounts.value.map { it.id }.toSet().size, "every account has an id of its own")
-            assertEquals(three, Json.decodeFromString<List<TotpAccount>>(runtime.storage.entries[KEY_ACCOUNTS]!!).map { it.copy(id = "") })
+            assertEquals(three, Json.decodeFromString<List<TotpAccount>>(runtime.secrets.entries[KEY_SECRET_ACCOUNTS]!!).map { it.copy(id = "") })
             assertEquals("2fa_import" to mapOf("accounts" to "3"), runtime.analytics.events.last())
         }
     }
@@ -258,20 +258,15 @@ class TwoFaImportTest {
     }
 
     @Test
-    fun importedAccountsAreSealedLikeAnyOther() {
-        val vault = SoftwareVault()
-        runAppTest(
-            TwoFaApp(),
-            prepare = { it.provide(SecretVault.Key, vault) },
-        ) {
+    fun importedAccountsGoToTheHostsSecretsLikeAnyOther() {
+        runAppTest(TwoFaApp()) {
             click("2fa:add")
             type("2fa:link", printed(three))
             click("2fa:read-link")
             click("2fa:import-add")
             val all = runtime.storage.entries.entries.joinToString("\n") { "${it.key}=${it.value}" }
-            for (account in three) assertFalse(account.secret in all, "${account.secret} stored readable:\n$all")
-            assertNull(runtime.storage.entries[KEY_ACCOUNTS])
-            val opened = Json.decodeFromString<List<TotpAccount>>(vault.openBlocking(runtime.storage.entries[KEY_SEALED_ACCOUNTS]!!)!!)
+            for (account in three) assertFalse(account.secret in all, "${account.secret} in the app's plain storage:\n$all")
+            val opened = Json.decodeFromString<List<TotpAccount>>(runtime.secrets.entries.getValue(KEY_SECRET_ACCOUNTS))
             assertEquals(three, opened.map { it.copy(id = "") })
         }
     }

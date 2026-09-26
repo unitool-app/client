@@ -1,6 +1,15 @@
 package cx.m42.unitool
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import cx.m42.superizer.ui.i18n.LocalDiagnosticsStrings
+import cx.m42.unitool.i18n.diagnosticsWords
+import cx.m42.unitool.security.KeyPromptSheet
 import cx.m42.apps.calculator.CalculatorApp
 import cx.m42.apps.calculator.CalculatorConfig
 import cx.m42.apps.converter.ConverterApp
@@ -19,6 +28,7 @@ import cx.m42.superizer.host.build
 import cx.m42.superizer.host.platform.currentPlatform
 import cx.m42.superizer.runtime.HostInfo
 import cx.m42.superizer.ui.shell.SuperizerShell
+import cx.m42.unitool.security.UnitoolSecurity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -40,6 +50,7 @@ import kotlinx.serialization.json.buildJsonObject
 public fun buildUnitool(
     scope: CoroutineScope,
     debug: Boolean,
+    security: UnitoolSecurity? = null,
     extra: SuperizerBuilder.() -> Unit = {},
 ): Superizer = Superizer.build(scope) {
     host(
@@ -98,13 +109,26 @@ public fun buildUnitool(
     // never becomes a name a real app could collide with.
     serviceCode(SERVICE_CODE)
 
-    extra()
-}
+    // Keys, the vault behind runtime.secrets, and the diagnostics of both (ssh-new 07 §2.2): what
+    // the platform brought, handed to the host. A test builds without it and gets a host with none.
+    security?.install(this, BuildInfo.VERSION)
 
-/** The root composable every entry point calls. */
+    extra()
+}.also { superizer -> security?.attach(superizer, scope) }
+
+/**
+ * The root composable every entry point calls: the shell, the host's words for how things are kept
+ * (06 §6), and — over everything — the keyring's sheet (02 §7) when there is a keyring.
+ */
 @Composable
-public fun UnitoolApp(superizer: Superizer) {
-    SuperizerShell(superizer)
+public fun UnitoolApp(superizer: Superizer, security: UnitoolSecurity? = null) {
+    val langTag by superizer.settings.langTag.collectAsState()
+    CompositionLocalProvider(LocalDiagnosticsStrings provides diagnosticsWords(langTag)) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            SuperizerShell(superizer)
+            security?.let { KeyPromptSheet(it.prompts, langTag) }
+        }
+    }
 }
 
 /** Registers an app the host was built without — the seam `ExtensibilityTest` uses (§24). */

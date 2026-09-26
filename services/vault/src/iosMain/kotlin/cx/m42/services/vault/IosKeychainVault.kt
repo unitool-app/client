@@ -1,5 +1,9 @@
 package cx.m42.services.vault
 
+import cx.m42.services.ssh.ios.cfDictionary
+import cx.m42.services.ssh.ios.toByteArray
+import cx.m42.services.ssh.ios.toCFData
+import cx.m42.superizer.secrets.SecretVault
 import kotlin.io.encoding.Base64
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.IntVar
@@ -8,8 +12,6 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.UByteVar
-import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
@@ -18,25 +20,21 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import platform.CoreFoundation.CFDataCreate
-import platform.CoreFoundation.CFDataGetBytePtr
-import platform.CoreFoundation.CFDataGetLength
 import platform.CoreFoundation.CFDataRef
 import platform.CoreFoundation.CFDictionaryAddValue
-import platform.CoreFoundation.CFDictionaryCreateMutable
 import platform.CoreFoundation.CFErrorRefVar
 import platform.CoreFoundation.CFMutableDictionaryRef
 import platform.CoreFoundation.CFNumberCreate
+import platform.CoreFoundation.CFDictionaryGetValue
 import platform.CoreFoundation.CFRelease
 import platform.CoreFoundation.CFTypeRef
 import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreFoundation.kCFNumberSInt32Type
-import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
-import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.Security.SecAccessControlCreateWithFlags
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
+import platform.Security.SecKeyCopyAttributes
 import platform.Security.SecKeyCopyPublicKey
 import platform.Security.SecKeyCreateDecryptedData
 import platform.Security.SecKeyCreateEncryptedData
@@ -76,7 +74,7 @@ import platform.Security.kSecReturnRef
  * [tag] is the key's name in the Keychain — a parameter so a test can use its own and delete it.
  */
 @OptIn(ExperimentalForeignApi::class)
-public class IosKeychainVault(private val tag: String = DEFAULT_TAG) : SecretVault {
+public class IosKeychainVault(private val tag: String = DEFAULT_TAG) : SecretVault, HardwareVault {
 
     override suspend fun seal(plaintext: String): String = withContext(Dispatchers.IO) {
         val key = key()
@@ -123,6 +121,29 @@ public class IosKeychainVault(private val tag: String = DEFAULT_TAG) : SecretVau
                 }
             } finally {
                 CFRelease(input)
+            }
+        } finally {
+            CFRelease(key)
+        }
+    }
+
+    /**
+     * Where the key lives (05 §3.4): `secure-enclave` when the Keychain made it there, `software` for
+     * the fallback (the simulator, a device without an enclave). Null before the first seal.
+     */
+    override fun hardware(): String? {
+        val key = existingKey() ?: return null
+        return try {
+            val attributes = SecKeyCopyAttributes(key) ?: return "unknown"
+            try {
+                val token = CFDictionaryGetValue(attributes, kSecAttrTokenID)
+                // Compared as strings: `kSecAttrTokenIDSecureEnclave` is "com.apple.setoken", and a CFString
+                // handed back need not be the same object as the constant.
+                val name = token?.let { platform.Foundation.CFBridgingRelease(platform.CoreFoundation.CFRetain(it)) as? String }
+                val enclave = platform.Foundation.CFBridgingRelease(platform.CoreFoundation.CFRetain(kSecAttrTokenIDSecureEnclave)) as? String
+                if (name != null && name == enclave) "secure-enclave" else "software"
+            } finally {
+                CFRelease(attributes)
             }
         } finally {
             CFRelease(key)
@@ -192,13 +213,7 @@ public class IosKeychainVault(private val tag: String = DEFAULT_TAG) : SecretVau
 
     private fun tagData(): CFDataRef = tag.encodeToByteArray().toCFData()
 
-    /** A CF dictionary with CF's own retain callbacks, so the values may be released after this. */
-    private fun dictionary(vararg entries: Pair<CFTypeRef?, CFTypeRef?>): CFMutableDictionaryRef {
-        val dictionary = CFDictionaryCreateMutable(null, entries.size.convert(), kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr)
-            ?: error("CFDictionaryCreateMutable failed")
-        entries.forEach { (key, value) -> CFDictionaryAddValue(dictionary, key, value) }
-        return dictionary
-    }
+    private fun dictionary(vararg entries: Pair<CFTypeRef?, CFTypeRef?>): CFMutableDictionaryRef = cfDictionary(*entries)
 
     public companion object {
         public const val DEFAULT_TAG: String = "cx.m42.services.vault"
@@ -207,17 +222,4 @@ public class IosKeychainVault(private val tag: String = DEFAULT_TAG) : SecretVau
         private val ALGORITHM = kSecKeyAlgorithmECIESEncryptionCofactorVariableIVX963SHA256AESGCM
         private val lock = Mutex()
     }
-}
-
-@OptIn(ExperimentalForeignApi::class)
-private fun ByteArray.toCFData(): CFDataRef =
-    usePinned { pinned ->
-        CFDataCreate(null, if (isEmpty()) null else pinned.addressOf(0).reinterpret<UByteVar>(), size.convert())
-    } ?: error("CFDataCreate failed")
-
-@OptIn(ExperimentalForeignApi::class)
-private fun CFDataRef.toByteArray(): ByteArray {
-    val length = CFDataGetLength(this).toInt()
-    if (length == 0) return ByteArray(0)
-    return CFDataGetBytePtr(this)!!.readBytes(length)
 }

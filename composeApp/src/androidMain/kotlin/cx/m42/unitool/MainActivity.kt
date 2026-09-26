@@ -13,7 +13,13 @@ import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.AndroidFileSharer
 import cx.m42.services.share.FileSharer
 import cx.m42.services.vault.AndroidKeystoreVault
-import cx.m42.services.vault.SecretVault
+import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.keyring.PrefsRecordStore
+import cx.m42.services.vault.VaultDiagnostics
+import cx.m42.superizer.host.SystemClock
+import cx.m42.superizer.runtime.Platform
+import cx.m42.unitool.security.KeyPrompts
+import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.host.platform.AndroidHost
 import cx.m42.superizer.host.push.PushTransport
@@ -51,7 +57,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             val superizer = remember { host() }
             remember { deliver(intent) }
-            UnitoolApp(superizer)
+            UnitoolApp(superizer, Holder.security)
         }
     }
 
@@ -106,7 +112,8 @@ class MainActivity : FragmentActivity() {
         // The application context, not this activity: a notification can be drawn long after the
         // activity that happened to build the host is gone.
         val notifier = AndroidNotifier(applicationContext)
-        return buildUnitool(scope, debug = BuildConfig.DEBUG) {
+        val security = androidSecurity(scope).also { Holder.security = it }
+        return buildUnitool(scope, debug = BuildConfig.DEBUG, security = security) {
             notifier(notifier)
             // The camera for QR codes (D19), only on a device that has one: the 2FA app draws its
             // scan button from whether this is registered. The scanner's words follow the host's
@@ -118,10 +125,19 @@ class MainActivity : FragmentActivity() {
             }
             // The share sheet (D19): the 2FA export hands its encrypted file to it.
             service(FileSharer.Key, AndroidFileSharer(applicationContext))
-            // Encryption at rest (D19): the 2FA accounts are sealed under a Keystore key before
-            // they reach the prefs file, and without one registered they would be stored plain.
-            service(SecretVault.Key, AndroidKeystoreVault())
         }.also { Holder.superizer = it }
+    }
+
+    /**
+     * The host's vault is the Keystore key the 2FA app sealed with before contract 3 — same alias,
+     * same format — so a tester's accounts open after the update (04 §9, Б4). The keyring's records
+     * have a prefs file of their own, out of every backup (I10).
+     */
+    private fun androidSecurity(scope: CoroutineScope): UnitoolSecurity {
+        val prompts = KeyPrompts()
+        val vault = AndroidKeystoreVault()
+        val keyring = SshKeyringHost.passphraseOnly(PrefsRecordStore(applicationContext), prompts, SystemClock, Platform.Android, scope)
+        return UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault))
     }
 
     /**
@@ -133,6 +149,7 @@ class MainActivity : FragmentActivity() {
      */
     private object Holder {
         var superizer: Superizer? = null
+        var security: UnitoolSecurity? = null
     }
 
     private companion object {

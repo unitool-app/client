@@ -12,6 +12,7 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="cx.m42.unitool.settings.xml" />
+        <!-- Include-only: the SSH keyring's records never travel (ssh-new 03 §2, I10). -->
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="cx.m42.unitool.settings.xml" />

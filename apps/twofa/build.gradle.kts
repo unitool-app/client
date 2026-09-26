@@ -44,8 +44,6 @@ kotlin {
             implementation(project(":services:qr-scanner"))
             // The export's share sheet, likewise: the contract here, the sheet in the host.
             implementation(project(":services:share"))
-            // Encryption at rest for the accounts: the contract here, the Keystore in the host.
-            implementation(project(":services:vault"))
             // SSH public keys and age, for the export: pure functions of public keys (ssh-new 02 §4).
             implementation(project(":services:ssh"))
         }

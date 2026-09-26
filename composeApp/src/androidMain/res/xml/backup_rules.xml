@@ -6,4 +6,9 @@
 -->
 <full-backup-content>
     <include domain="sharedpref" path="cx.m42.unitool.settings.xml" />
+    <!--
+      Not included, so never in a backup: the SSH keyring's records, cx.m42.services.ssh.xml
+      (ssh-new 03 §2, I10). An <exclude> would be plainer, but lint fails a release build on one
+      outside an <include>; BackupRulesTest keeps these rules include-only instead.
+    -->
 </full-backup-content>

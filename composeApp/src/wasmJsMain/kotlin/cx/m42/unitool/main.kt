@@ -1,6 +1,12 @@
 package cx.m42.unitool
 
 import androidx.compose.runtime.remember
+import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.keyring.LocalStorageRecordStore
+import cx.m42.superizer.host.SystemClock
+import cx.m42.superizer.runtime.Platform
+import cx.m42.unitool.security.KeyPrompts
+import cx.m42.unitool.security.UnitoolSecurity
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import kotlinx.browser.window
@@ -12,7 +18,12 @@ import kotlinx.coroutines.SupervisorJob
 fun main() {
     ComposeViewport(viewportContainerId = "composeTarget") {
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
-        val superizer = remember { buildUnitool(scope, debug = true) }
+        val security = remember {
+            // In the browser: level 3, and the words say "in the browser" (05 §2.3).
+            val prompts = KeyPrompts()
+            UnitoolSecurity(SshKeyringHost.passphraseOnly(LocalStorageRecordStore(), prompts, SystemClock, Platform.Web, scope), prompts)
+        }
+        val superizer = remember { buildUnitool(scope, debug = true, security = security) }
 
         remember {
             // `?activate=` and `?link=` are the browser's version of a QR code and a notification
@@ -24,7 +35,7 @@ fun main() {
             if (queryParam(search, "test") != null) installTestBridge(superizer)
         }
 
-        UnitoolApp(superizer)
+        UnitoolApp(superizer, security)
     }
 }
 
