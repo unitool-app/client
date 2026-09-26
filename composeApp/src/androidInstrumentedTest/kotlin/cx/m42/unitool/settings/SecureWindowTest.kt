@@ -15,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import cx.m42.unitool.MainActivity
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -27,6 +28,24 @@ import org.junit.runner.RunWith
 class SecureWindowTest {
 
     private val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+
+    private fun shell(command: String): String =
+        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes().decodeToString() }
+
+    /** The window the system has in front: what a capture that is not blank is a capture of. */
+    private fun front(): String = shell("dumpsys window").lineSequence().firstOrNull { "mCurrentFocus" in it }?.trim().orEmpty()
+
+    /**
+     * The ssh tests before this one set a PIN, clear it and put the screen to sleep; a fresh emulator
+     * then wakes to its swipe keyguard, and the capture is of that rather than of us. An ANR dialog
+     * from System UI on a slow emulator does the same.
+     */
+    @Before
+    fun clearTheScreen() {
+        shell("input keyevent KEYCODE_WAKEUP")
+        shell("wm dismiss-keyguard")
+        shell("am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS")
+    }
 
     @Test
     fun theImportWizardCannotBeCapturedAndSettingsCan() = runAndroidComposeUiTest<MainActivity> {
@@ -42,13 +61,13 @@ class SecureWindowTest {
 
         val flags = { activity!!.window.attributes.flags }
         assertTrue(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "the wizard's window is secure")
-        assertTrue(blank(screencap()), "a screenshot of the wizard shows nothing of it")
+        assertTrue(blank(screencap()), "a screenshot of the wizard shows nothing of it; in front: ${front()}")
 
         onNode(hasContentDescription("Back").or(hasContentDescription("Назад"))).performClick()
         waitForIdle()
         onNodeWithTag("settings:host:ssh-keys").assertExists()
         assertFalse(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "Settings is not")
-        assertFalse(blank(screencap()), "and Settings can be captured")
+        assertFalse(blank(screencap()), "and Settings can be captured; in front: ${front()}")
     }
 
     /**
