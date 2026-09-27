@@ -89,7 +89,10 @@ and a third lane, a Debug build for the simulator, only on a push to `ios-simula
   The App ID, the app record in App Store Connect and a TestFlight internal group are made in the
   console first. `CFBundleVersion` is the workflow run number, so every upload is a new build.
   Started by hand once `ios.yml` is on the default branch; before that, by
-  putting the label `testflight` on the pull request — one upload per label added.
+  putting the label `testflight` on the pull request — one upload per label added. The job after
+  it, on Linux, waits for Apple to process the build and adds it to the TestFlight group (the
+  repository variable `TESTFLIGHT_GROUP`, `dev` when unset; `scripts/testflight-distribute.py`).
+  Export compliance is still answered in App Store Connect; the job warns while it is not.
   `iosApp/Configuration/ExportOptions.plist` is the export recipe; it holds no secret.
 
 ## Push (FCM)
