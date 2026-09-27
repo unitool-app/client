@@ -3,33 +3,37 @@
 #
 # Three jobs, three ways to get a build somewhere it can run (ssh-new/06 §4.1):
 #
-#   simulator   Debug for the Apple-silicon simulator, unsigned. What CI has always done.
+#   simulator   Debug for the Apple-silicon simulator, unsigned. Off unless asked for: it runs only
+#               on a push to the branch `ios-simulator`, and on nothing else — the owner has no use
+#               for it now, and every run is macOS minutes.
 #   device      Release for a real iPhone, UNSIGNED. The owner signs it on their own Mac with
 #               scripts/ios-sign-and-install.sh and installs it over USB — the agentiz pattern.
 #               Needs nothing from the repository's secrets.
 #   testflight  Release, archived, signed and uploaded to App Store Connect. Runs only when the
-#               signing secrets are present; otherwise it says so and stops, green, so the two
-#               jobs above never wait on it.
+#               signing secrets are present; otherwise it says so and stops, green, so the job
+#               above never waits on it.
 #
 # Started by hand, or by a pull request into main: macOS minutes cost ten Linux ones on a private
-# repository, so no `push`. The pull request is also the only way a new ios.yml can run at all —
-# GitHub dispatches a workflow only once its file is on the default branch. A pull request gets
-# the two unsigned lanes; a newer push to it stops the older build. Putting the label `testflight`
-# on it uploads what the branch holds at that moment, once — every upload reaches the testers, so
-# each is asked for; take the label off and put it back for the next.
+# repository, so no `push` but the one branch above. The pull request is also the only way a new
+# ios.yml can run at all — GitHub dispatches a workflow only once its file is on the default
+# branch. A pull request gets the unsigned device build; a newer push to it stops the older one.
+# Putting the label `testflight` on it uploads what the branch holds at that moment, once — every
+# upload reaches the testers, so each is asked for; take the label off and put it back for the next.
 name: ios
 
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, labeled]
+  push:
+    branches: [ios-simulator]
   workflow_dispatch:
     inputs:
       lanes:
         description: 'Which jobs to run'
         type: choice
-        default: simulator+device
-        options: [simulator, simulator+device, device, testflight, all]
+        default: device
+        options: [device, testflight, all]
 
 # A label gets a group of its own and is never cancelled: a push must not cut an upload short.
 concurrency:
@@ -43,10 +47,10 @@ env:
 
 # macos-26, not macos-15: App Store Connect takes only builds from the iOS 26 SDK (Xcode 26) now, and
 # refused the first upload from macos-15's default Xcode 16.4 — after twenty minutes of building. All
-# three lanes run on it, so a green simulator build means the same Xcode as the one that ships.
+# three lanes run on it, so a green unsigned build means the same Xcode as the one that ships.
 jobs:
   simulator:
-    if: github.event.action != 'labeled' && contains(fromJSON('["simulator","simulator+device","all"]'), inputs.lanes || 'simulator+device')
+    if: github.event_name == 'push'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +76,9 @@ jobs:
           path: build/ios-dd/Build/Products/Debug-iphonesimulator/*.app
 
   device:
-    if: github.event.action != 'labeled' && contains(fromJSON('["device","simulator+device","all"]'), inputs.lanes || 'simulator+device')
+    if: >-
+      github.event_name != 'push' && github.event.action != 'labeled' &&
+      contains(fromJSON('["device","all"]'), inputs.lanes || 'device')
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -103,7 +109,7 @@ jobs:
 
   testflight:
     if: >-
-      contains(fromJSON('["testflight","all"]'), inputs.lanes || 'simulator+device') ||
+      contains(fromJSON('["testflight","all"]'), inputs.lanes || 'device') ||
       (github.event.action == 'labeled' && github.event.label.name == 'testflight')
     runs-on: macos-26
     steps:

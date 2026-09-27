@@ -55,7 +55,9 @@ needs the **Push Notifications** capability. Release uses `iosApp.entitlements`
 (`aps-environment=production`) and Debug uses `iosAppDebug.entitlements` (`development`). A profile
 without the capability fails the build rather than producing an app that never registers.
 
-Two ways to get a build onto a phone, both in `.github/workflows/ios.yml` (ssh-new/06 §4.1):
+Two ways to get a build onto a phone, both in `.github/workflows/ios.yml` (ssh-new/06 §4.1). Its
+third lane, a Debug build for the simulator, is off: it runs only on a push to the branch
+`ios-simulator`.
 
 - **Unsigned device build, signed here.** The `device` lane builds Release for `iphoneos` with
   signing off and uploads `Unitool.app`. On a Mac with the development certificate and a
