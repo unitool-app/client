@@ -55,9 +55,9 @@ needs the **Push Notifications** capability. Release uses `iosApp.entitlements`
 (`aps-environment=production`) and Debug uses `iosAppDebug.entitlements` (`development`). A profile
 without the capability fails the build rather than producing an app that never registers.
 
-Two ways to get a build onto a phone, both in `.github/workflows/ios.yml` (ssh-new/06 §4.1). Its
-third lane, a Debug build for the simulator, is off: it runs only on a push to the branch
-`ios-simulator`.
+Two ways to get a build onto a phone, both in `.github/workflows/ios.yml` (ssh-new/06 §4.1). Only
+TestFlight is in use. The unsigned device build runs only on a push to the branch `ios-device`,
+and a third lane, a Debug build for the simulator, only on a push to `ios-simulator`.
 
 - **Unsigned device build, signed here.** The `device` lane builds Release for `iphoneos` with
   signing off and uploads `Unitool.app`. On a Mac with the development certificate and a
@@ -88,7 +88,7 @@ third lane, a Debug build for the simulator, is off: it runs only on a push to t
 
   The App ID, the app record in App Store Connect and a TestFlight internal group are made in the
   console first. `CFBundleVersion` is the workflow run number, so every upload is a new build.
-  Started by hand (`lanes: testflight`) once `ios.yml` is on the default branch; before that, by
+  Started by hand once `ios.yml` is on the default branch; before that, by
   putting the label `testflight` on the pull request — one upload per label added.
   `iosApp/Configuration/ExportOptions.plist` is the export recipe; it holds no secret.
 
