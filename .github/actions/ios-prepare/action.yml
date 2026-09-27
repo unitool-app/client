@@ -29,6 +29,11 @@ runs:
       shell: bash
       run: mv superizer-checkout ../superizer
 
+    # Which Xcode the runner image chose, at the top of the log rather than inferred from it.
+    - name: Xcode
+      shell: bash
+      run: xcodebuild -version && xcrun --sdk iphoneos --show-sdk-version
+
     - uses: actions/setup-java@v4
       with:
         distribution: temurin

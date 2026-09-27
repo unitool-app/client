@@ -2,7 +2,8 @@
 
 The Kotlin side compiles anywhere: Kotlin 2.4 cross-compiles Apple targets, and `scripts/verify.sh`
 compiles every module for `iosArm64` and `iosSimulatorArm64` on Linux. Linking the `ComposeApp`
-framework and building `iosApp/` needs a Mac with Xcode 16 or later.
+framework and building `iosApp/` needs a Mac with Xcode 16 or later; App Store Connect takes only
+builds from Xcode 26 (iOS 26 SDK), which is what CI uses.
 
 ## What is where
 

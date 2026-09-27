@@ -41,10 +41,13 @@ env:
   # availability check; an older SDK's linker has to be told to leave it undefined.
   OTHER_LDFLAGS: '$(inherited) -Wl,-U,_OBJC_CLASS_$_UIViewLayoutRegion'
 
+# macos-26, not macos-15: App Store Connect takes only builds from the iOS 26 SDK (Xcode 26) now, and
+# refused the first upload from macos-15's default Xcode 16.4 — after twenty minutes of building. All
+# three lanes run on it, so a green simulator build means the same Xcode as the one that ships.
 jobs:
   simulator:
     if: github.event.action != 'labeled' && contains(fromJSON('["simulator","simulator+device","all"]'), inputs.lanes || 'simulator+device')
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/ios-prepare
@@ -70,7 +73,7 @@ jobs:
 
   device:
     if: github.event.action != 'labeled' && contains(fromJSON('["device","simulator+device","all"]'), inputs.lanes || 'simulator+device')
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/ios-prepare
@@ -102,7 +105,7 @@ jobs:
     if: >-
       contains(fromJSON('["testflight","all"]'), inputs.lanes || 'simulator+device') ||
       (github.event.action == 'labeled' && github.event.label.name == 'testflight')
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
