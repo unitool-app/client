@@ -90,10 +90,11 @@
   `ssh-keyring` запушена, PR #1 в `main`; Android из `ssh-keyring` выложен в Play alpha
   (versionCode 1011) со старым PRIVACY — так решил владелец; iOS simulator и неподписанная сборка
   для iPhone собраны в CI. Локальный `main` (0.3.0) не запушен.
-- TestFlight: секреты подписи в `unitool-app/client` (сертификат и ключ API — из `.env` agentiz на
-  Mac) и App Store-профиль для `cx.m42.unitool` (`IOS_PROFILE_BASE64`; подпись ручная, как в
-  agentiz), App ID `cx.m42.unitool` с Push. Карточка в App Store Connect есть («37tool», группа dev) — Bundle ID
-  проверить. Выгрузку запускает метка `testflight` на PR #1, одна метка — одна выгрузка.
+- TestFlight: сборка 1.0 (11) выгружена 2026-09-27 из `ssh-keyring` (метка `testflight` на PR #1,
+  Xcode 26.6, ручная подпись App Store-профилем «Unitool», с `GoogleService-Info.plist`). Секреты
+  подписи перенесены из agentiz. Владельцу: ответить про шифрование (export compliance), добавить
+  сборку в группу dev, загрузить APNs-ключ WU5497H8A2 в Firebase `unitool-b1529` — без него iOS
+  пуши не доставляются. Неподписанная сборка и симулятор в CI выключены по решению владельца.
 - Телефон с USB-отладкой — для столбца телефона в 04 §2 и самопроверки на железе.
 - iPhone и подпись (вопрос 88) — для отчёта самопроверки iOS (D180).
 - Ответить на вопрос 90: вписать ли текст PRIVACY и листинга из [08](08-privacy-and-listing-proposal.md).
