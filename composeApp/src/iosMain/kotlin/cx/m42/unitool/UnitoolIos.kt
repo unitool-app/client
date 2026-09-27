@@ -67,8 +67,9 @@ object UnitoolIos {
         // SshKeyringHost.ios(texts, …) with the same words as MainActivity's promptText.
         val prompts = KeyPrompts()
         val vault = IosKeychainVault()
-        val keyring = SshKeyringHost.passphraseOnly(FileRecordStore(), prompts, SystemClock, cx.m42.superizer.runtime.Platform.Ios, scope)
-        val selfTest = IosSelfTest { securityStrings(language()).selfTest }
+        val records = FileRecordStore()
+        val keyring = SshKeyringHost.passphraseOnly(records, prompts, SystemClock, cx.m42.superizer.runtime.Platform.Ios, scope)
+        val selfTest = IosSelfTest(records) { securityStrings(language()).selfTest }
         val security = UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault), platformSelfTest = selfTest)
             .also { this.security = it }
         // The camera for QR codes (D19), only on a device that has one — the simulator has none, and

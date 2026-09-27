@@ -20,7 +20,8 @@ import platform.Foundation.writeToURL
 /**
  * The keyring's records in Application Support (05 §4.4, D159): `NSFileProtectionComplete`, so the
  * file is unreadable while the phone is locked, and excluded from iCloud and iTunes backups, so no
- * copy of the device carries it (I10, T1 on iOS). Written, not yet run (D180).
+ * copy of the device carries it (I10, T1 on iOS). [protectionProblem] reads both back for the
+ * self-test's `storage.location`.
  */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 public class FileRecordStore : RecordStore {
@@ -51,6 +52,26 @@ public class FileRecordStore : RecordStore {
     }
 
     override val location: String get() = url?.path ?: "Application Support/$FILE"
+
+    /** Whether there is a file to protect at all: none until the first key is kept. */
+    public fun exists(): Boolean = url?.path?.let { NSFileManager.defaultManager.fileExistsAtPath(it) } == true
+
+    /**
+     * Null when the file is what [save] asked for — `NSFileProtectionComplete` and out of backups —
+     * as the file system answers now, not as [save] meant it: [save] does not see the errors of
+     * either call. No file is no problem; there is nothing to carry.
+     */
+    public fun protectionProblem(): String? {
+        val path = url?.path ?: return "no Application Support directory"
+        if (!exists()) return null
+        val protection = NSFileManager.defaultManager.attributesOfItemAtPath(path, error = null)?.get(NSFileProtectionKey)
+        if (protection != NSFileProtectionComplete) return "file protection is ${protection ?: "unknown"}, not $NSFileProtectionComplete"
+        // A URL of its own: an NSURL caches resource values, and the one save() used would answer from memory.
+        val excluded = NSURL.fileURLWithPath(path).resourceValuesForKeys(listOf(NSURLIsExcludedFromBackupKey), error = null)
+            ?.get(NSURLIsExcludedFromBackupKey) as? NSNumber
+        if (excluded?.boolValue != true) return "not excluded from backup"
+        return null
+    }
 
     private companion object {
         const val FILE = "cx.m42.services.ssh.json"

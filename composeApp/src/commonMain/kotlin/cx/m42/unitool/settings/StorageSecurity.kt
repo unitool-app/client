@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
+import cx.m42.services.ssh.diagnostics.SkipReason
 import cx.m42.superizer.HomeBanner
 import cx.m42.superizer.HostScreen
 import cx.m42.superizer.HostSection
@@ -234,7 +235,13 @@ internal class StorageSecurityScreen(private val keys: KeysUi?, private val tool
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(words.title(step.code), style = AppTheme.body, color = if (step.ran) AppTheme.foreground else AppTheme.muted)
                                 val under = when {
-                                    !step.ran -> strings.notRunHere
+                                    // Why it did not run, where a person can do something about it (SkipReason).
+                                    !step.ran -> when (step.evidence) {
+                                        SkipReason.NEEDS_CONFIRMATION -> strings.notRunNeedsConfirmation
+                                        SkipReason.NO_SCREEN_LOCK -> strings.notRunNoScreenLock
+                                        SkipReason.AFTER_FAILURE -> strings.notRunAfterFailure
+                                        else -> strings.notRunHere
+                                    }
                                     !step.passed -> step.evidence
                                     else -> null
                                 }

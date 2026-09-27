@@ -112,6 +112,10 @@ internal interface SecurityStrings {
     val facts: String
     val findings: String
     val notRunHere: String
+    /** A step the run at start skips because it needs the person (SkipReason.NEEDS_CONFIRMATION). */
+    val notRunNeedsConfirmation: String
+    val notRunNoScreenLock: String
+    val notRunAfterFailure: String
     val subjectSecrets: String
     val subjectDevice: String
     val subjectApps: String

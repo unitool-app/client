@@ -34,6 +34,22 @@ public interface PlatformSelfTest {
 }
 
 /**
+ * Why a step did not run, as that step's evidence. The report carries these as they are; the host's
+ * screen gives the ones a person can do something about words of its own, and reads anything else
+ * as "not on this platform".
+ */
+public object SkipReason {
+    /** The run at start asks nobody (06 §2); the button in Settings does. */
+    public const val NEEDS_CONFIRMATION: String = "run from Settings to confirm"
+
+    /** A key bound to the person cannot exist here until the device has a screen lock. */
+    public const val NO_SCREEN_LOCK: String = "no screen lock"
+
+    /** An earlier step of the same check failed, and this one had nothing to work on. */
+    public const val AFTER_FAILURE: String = "the step before it failed"
+}
+
+/**
  * The self-test (06 §3, D178): the real cryptography, on this device, with throwaway keys only —
  * one implementation for Settings → Run self-test, for step 0's instrumented run, and for the iPhone
  * report. Every step records how long it took and, when it fails, the platform's own words.

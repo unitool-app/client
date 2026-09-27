@@ -11,6 +11,7 @@ import android.os.CancellationSignal
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import cx.m42.services.ssh.diagnostics.PlatformSelfTest
+import cx.m42.services.ssh.diagnostics.SkipReason
 import cx.m42.services.ssh.probe.KeystoreProbe
 import cx.m42.services.vault.AndroidKeystoreVault
 import cx.m42.superizer.diagnostics.DeviceFacts
@@ -86,8 +87,8 @@ internal class AndroidSelfTest(
                     steps += SelfTestStep(it.id, passed = true, millis = 0, evidence = "API ${Build.VERSION.SDK_INT}: keys are level 3 here", ran = false)
                 }
             } else if (!lock) {
-                steps += SelfTestStep(SelfTestCode.WrapAuthRequired.id, passed = true, millis = 0, evidence = "no screen lock", ran = false)
-                steps += SelfTestStep(SelfTestCode.WrapConfirmed.id, passed = true, millis = 0, evidence = "no screen lock", ran = false)
+                steps += SelfTestStep(SelfTestCode.WrapAuthRequired.id, passed = true, millis = 0, evidence = SkipReason.NO_SCREEN_LOCK, ran = false)
+                steps += SelfTestStep(SelfTestCode.WrapConfirmed.id, passed = true, millis = 0, evidence = SkipReason.NO_SCREEN_LOCK, ran = false)
                 steps += timed(SelfTestCode.WrapPasscodeClass) {
                     // Without a lock the Keystore must refuse a key that needs one (P7, 01 §5.6).
                     val made = runCatching { wrapKey(alias) }
@@ -110,7 +111,7 @@ internal class AndroidSelfTest(
                         null
                     }
                 } else {
-                    SelfTestStep(SelfTestCode.WrapConfirmed.id, passed = true, millis = 0, evidence = "run from Settings to confirm", ran = false)
+                    SelfTestStep(SelfTestCode.WrapConfirmed.id, passed = true, millis = 0, evidence = SkipReason.NEEDS_CONFIRMATION, ran = false)
                 }
             }
             steps += SelfTestStep(SelfTestCode.EnclaveSign.id, passed = true, millis = 0, evidence = "iOS only", ran = false)

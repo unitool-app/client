@@ -1,6 +1,7 @@
 package cx.m42.unitool.security
 
 import cx.m42.services.ssh.diagnostics.PlatformSelfTest
+import cx.m42.services.ssh.keyring.FileRecordStore
 import cx.m42.services.ssh.keyring.SecureEnclaveSelfTest
 import cx.m42.services.vault.IosKeychainVault
 import cx.m42.superizer.diagnostics.DeviceFacts
@@ -21,10 +22,13 @@ import platform.UIKit.UIDevice
  * to "does `IosKeychainVault` run at all" (ios/01 §4) — and the enclave's own steps: a wrapping key
  * that exists only with a passcode, refuses with nobody there and opens with the person, and a P-256
  * whose signature verifies as SSH's. Its report, shared from the phone, is how iOS gets checked
- * without a Mac (D180). Written, not yet run.
+ * without a Mac (D180). First run on an iPhone 2026-09-27 (TestFlight 1.0 (11)), green.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal class IosSelfTest(private val confirmReason: () -> String) : PlatformSelfTest {
+internal class IosSelfTest(
+    private val records: FileRecordStore,
+    private val confirmReason: () -> String,
+) : PlatformSelfTest {
 
     override val device: DeviceFacts
         get() = DeviceFacts(
@@ -65,8 +69,11 @@ internal class IosSelfTest(private val confirmReason: () -> String) : PlatformSe
         steps + SelfTestStep(SelfTestCode.EnclaveSign.id, sign.passed, now() - signStarted, sign.evidence)
     }
 
-    override suspend fun storageStep(): SelfTestStep =
-        SelfTestStep(SelfTestCode.StorageLocation.id, passed = true, millis = 0, evidence = "Application Support, NSFileProtectionComplete, excluded from backup")
+    /** I10 on iOS: the keyring's file, its protection class and its backup flag read back (06 §3). */
+    override suspend fun storageStep(): SelfTestStep = timed(SelfTestCode.StorageLocation) { records.protectionProblem() }
+        .let { step ->
+            step.copy(evidence = step.evidence ?: if (records.exists()) "Application Support: NSFileProtectionComplete, excluded from backup" else "no records yet")
+        }
 
     private suspend fun timed(code: SelfTestCode, block: suspend () -> String?): SelfTestStep {
         val started = now()

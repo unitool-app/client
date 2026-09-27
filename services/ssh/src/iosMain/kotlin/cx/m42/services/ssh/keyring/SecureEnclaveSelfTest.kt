@@ -1,6 +1,7 @@
 package cx.m42.services.ssh.keyring
 
 import cx.m42.services.ssh.crypto.secureRandomBytes
+import cx.m42.services.ssh.diagnostics.SkipReason
 import cx.m42.services.ssh.ios.toByteArray
 import cx.m42.services.ssh.ios.toCFData
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -20,7 +21,7 @@ import platform.Security.SecKeyCreateEncryptedData
  * The Secure Enclave's steps of the self-test (06 §3), with throwaway keys only: `enclave.sign`,
  * and the wrapping key's three — made only with a passcode (P12), refused with nobody there (I7,
  * P11: `interactionNotAllowed`), opened once the person confirms. Here rather than in the host,
- * because only this module speaks Security.framework. Written, not yet run (D180).
+ * because only this module speaks Security.framework. First run on an iPhone 2026-09-27, green (D180).
  */
 @OptIn(ExperimentalForeignApi::class)
 public object SecureEnclaveSelfTest {
@@ -39,15 +40,15 @@ public object SecureEnclaveSelfTest {
         try {
             if (!passcodeSet) {
                 val refused = Check(key == null, if (key == null) "no passcode: refused, as it should be" else "a key bound to the person was made with no passcode")
-                return listOf(refused, Check(true, "no passcode", ran = false), Check(true, "no passcode", ran = false))
+                return listOf(refused, Check(true, SkipReason.NO_SCREEN_LOCK, ran = false), Check(true, SkipReason.NO_SCREEN_LOCK, ran = false))
             }
-            key ?: return listOf(Check(false, "the enclave made no key bound to the person"), Check(true, "no key", ran = false), Check(true, "no key", ran = false))
+            key ?: return listOf(Check(false, "the enclave made no key bound to the person"), Check(true, SkipReason.AFTER_FAILURE, ran = false), Check(true, SkipReason.AFTER_FAILURE, ran = false))
             val plain = "self-test".encodeToByteArray()
-            val sealed = seal(key, plain) ?: return listOf(Check(true, null), Check(false, "the public half did not seal"), Check(true, "not sealed", ran = false))
+            val sealed = seal(key, plain) ?: return listOf(Check(true, null), Check(false, "the public half did not seal"), Check(true, SkipReason.AFTER_FAILURE, ran = false))
             val nobody = open(tag, sealed, LAContext().apply { interactionNotAllowed = true })
             val authRequired = Check(nobody.first == null, nobody.second ?: "opened with nobody there (I7)")
             val confirmed = if (confirmReason == null) {
-                Check(true, "run from Settings to confirm", ran = false)
+                Check(true, SkipReason.NEEDS_CONFIRMATION, ran = false)
             } else {
                 val opened = open(tag, sealed, LAContext().apply { localizedReason = confirmReason })
                 Check(opened.first?.contentEquals(plain) == true, opened.second)

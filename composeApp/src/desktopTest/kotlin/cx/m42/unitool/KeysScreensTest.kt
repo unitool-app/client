@@ -4,6 +4,9 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -12,9 +15,15 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import cx.m42.apps.twofa.TwoFaApp
 import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.diagnostics.SkipReason
 import cx.m42.services.ssh.keyring.InMemoryRecordStore
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.diagnostics.DiagnosticsCode
+import cx.m42.superizer.diagnostics.SelfTestCode
+import cx.m42.superizer.diagnostics.SelfTestResult
+import cx.m42.superizer.diagnostics.SelfTestStep
+import cx.m42.superizer.host.storage.HostKeys
+import cx.m42.superizer.host.storage.SafePrefs
 import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportOptions
@@ -39,6 +48,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import org.junit.Assume
 
 /**
@@ -294,6 +304,35 @@ class KeysScreensTest : UnitoolTest() {
         // The catalogue's action for "no vault" is to add a key, and the button goes there.
         tap("storage:action-${DiagnosticsCode.VaultMissing.id}-AddSshKey")
         onNodeWithTag("host:key-import").assertIsDisplayed()
+    }
+
+    @Test
+    fun aSkippedStepSaysWhyWhenAPersonCanDoSomethingAboutIt() = runComposeUiTest {
+        // As an iPhone showed it on 2026-09-27: the run at start skips the step that needs Face ID,
+        // and the screen called that "not on this platform".
+        val skipped = SelfTestResult(
+            steps = listOf(
+                SelfTestStep(SelfTestCode.WrapConfirmed.id, passed = true, millis = 0, evidence = SkipReason.NEEDS_CONFIRMATION, ran = false),
+                SelfTestStep(SelfTestCode.WrapAuthRequired.id, passed = true, millis = 0, evidence = SkipReason.NO_SCREEN_LOCK, ran = false),
+                SelfTestStep(SelfTestCode.EnclaveSign.id, passed = true, millis = 0, evidence = "iOS only", ran = false),
+            ),
+            at = 1_700_000_022_000,
+            // This version's, or the host would run its own at start over it.
+            hostVersion = BuildInfo.VERSION,
+        )
+        SafePrefs.put(HostKeys.SELF_TEST, Json.encodeToString(SelfTestResult.serializer(), skipped))
+        val security = security()
+        val superizer = host(security)
+        setContent { UnitoolApp(superizer, security) }
+        waitForIdle()
+        openSettings()
+        tap("storage:open")
+
+        fun under(code: SelfTestCode, text: String) =
+            onNode(hasText(text, substring = true) and hasAnyAncestor(hasTestTag("storage:step-${code.id}"))).performScrollTo().assertIsDisplayed()
+        under(SelfTestCode.WrapConfirmed, "only from the Run self-test button")
+        under(SelfTestCode.WrapAuthRequired, "no screen lock")
+        under(SelfTestCode.EnclaveSign, "not on this platform")
     }
 
     @Test
