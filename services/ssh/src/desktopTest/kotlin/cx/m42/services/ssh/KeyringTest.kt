@@ -2,7 +2,11 @@ package cx.m42.services.ssh
 
 import cx.m42.services.ssh.crypto.secureRandomBytes
 import cx.m42.services.ssh.key.OpenSshKeyFile
+import cx.m42.services.ssh.diagnostics.KeyFindings
 import cx.m42.superizer.app.AppId
+import cx.m42.superizer.diagnostics.DiagnosticsCode
+import cx.m42.superizer.ssh.Chip
+import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportOptions
 import cx.m42.superizer.ssh.ImportOutcome
 import cx.m42.superizer.ssh.ImportRefusal
@@ -294,6 +298,116 @@ class KeyringTest {
         chip.answer = false
         assertEquals(SshOutcome.Cancelled, f.app("git").sign(key.id, "git", "y".toByteArray()))
     }
+
+    // ------------------------------------------------------------ the level the person chose (09, D237–D244)
+
+    @Test
+    fun levelThreeOnADeviceWithAChipStaysOutOfTheChip() = runTest {
+        val chip = SoftwareChip(level = 1)
+        val f = KeyringFixture(backgroundScope, chip)
+        val key = f.importCanary(ImportOptions(level = 3)).key
+        assertEquals(KeyStorage.SealedByPassphrase, key.storage)
+        assertTrue(!chip.exists(aliasOf(key.id)), "nothing of it in the chip")
+        val stored = assertIs<OpenSshKeyFile.Parsed.Ok>(OpenSshKeyFile.parse(RecordsText(f.records.text!!).file(key.id))).file
+        assertTrue(stored.isEncrypted, "the file the person gave, under its passphrase")
+        f.prompter.passphrases.add(pass)
+        assertIs<SshOutcome.Ok<*>>(f.app("git").sign(key.id, "git", "x".toByteArray()))
+        assertEquals(0, chip.asks, "the passphrase, not the device")
+        assertEquals(emptyList(), LeakScanner.scan(f.everything(), canaries))
+    }
+
+    @Test
+    fun aLevelTheDeviceOrTheKeyCannotHaveIsRefusedAndNothingIsStored() = runTest {
+        val bare = KeyringFixture(backgroundScope)
+        for (level in listOf(1, 2, 0, 4)) {
+            assertEquals(ImportOutcome.Failed("level.unavailable"), bare.admin.import(canaryFile(pass), pass.toCharArray(), ImportOptions(level = level)), "level $level without a chip")
+        }
+        assertEquals(ImportOutcome.Failed("level.unavailable"), bare.admin.generate(GeneratedKind.Ed25519, ImportOptions(level = 2), GOOD.toCharArray()))
+        assertEquals(null, bare.records.text)
+
+        val sealing = KeyringFixture(backgroundScope, SoftwareChip(level = 2))
+        assertEquals(ImportOutcome.Failed("level.unavailable"), sealing.admin.import(canaryFile(pass), pass.toCharArray(), ImportOptions(level = 1)), "a chip that only seals")
+        // P-256 is born in the chip or not at all: there is no file to seal or to keep under a passphrase.
+        val resident = KeyringFixture(backgroundScope, SoftwareChip(level = 1))
+        for (level in listOf(2, 3)) {
+            assertEquals(ImportOutcome.Failed("level.unavailable"), resident.admin.generate(GeneratedKind.EcdsaP256, ImportOptions(level = level), GOOD.toCharArray()))
+        }
+        assertEquals(null, sealing.records.text)
+        assertEquals(null, resident.records.text)
+    }
+
+    @Test
+    fun levelTwoUnderAChipThatCouldHoldTheKeyKeepsThePassphraseAsASecondLock() = runTest {
+        // Android's default (D244): the key could live inside the chip, and is sealed instead, so its passphrase still counts.
+        val chip = SoftwareChip(level = 1)
+        val f = KeyringFixture(backgroundScope, chip)
+        val key = f.importCanary(ImportOptions(level = 2, keepPassphrase = true)).key
+        assertEquals(KeyStorage.SealedByChip(Chip.Tee), key.storage)
+        val asksAfterImport = chip.asks
+        f.prompter.passphrases.add(pass)
+        assertIs<SshOutcome.Ok<*>>(f.app("git").sign(key.id, "git", "x".toByteArray()))
+        assertEquals(asksAfterImport + 1, chip.asks, "the device, once")
+        assertEquals(1, f.prompter.count("passphrase"), "and the passphrase")
+        f.prompter.passphrases.addAll(listOf("wrong one 1", "wrong one 2", "wrong one 3"))
+        assertEquals(SshOutcome.Failed("wrong-passphrase"), f.app("git").sign(key.id, "git", "y".toByteArray()), "the device alone does not open it")
+        assertEquals(emptyList(), LeakScanner.scan(f.everything(), canaries))
+
+        // Without the passphrase, the best the chip offers — inside it.
+        val g = KeyringFixture(backgroundScope, SoftwareChip(level = 1))
+        assertEquals(KeyStorage.Tee, g.importCanary(ImportOptions(level = null)).key.storage)
+    }
+
+    @Test
+    fun aKeyCreatedUnderTheChipCanKeepAPassphrase() = runTest {
+        val chip = SoftwareChip(level = 1)
+        val f = KeyringFixture(backgroundScope, chip)
+        val options = ImportOptions(level = 2, keepPassphrase = true)
+        assertEquals(ImportOutcome.NeedsNewPassphrase(0), f.admin.generate(GeneratedKind.Ed25519, options, null))
+        assertEquals(ImportOutcome.NeedsNewPassphrase(5), f.admin.generate(GeneratedKind.Ed25519, options, "short".toCharArray()))
+        val key = assertIs<ImportOutcome.Imported>(f.admin.generate(GeneratedKind.Ed25519, options, GOOD.toCharArray())).key
+        assertEquals(2, key.storage.level)
+        f.prompter.passphrases.add(GOOD)
+        assertIs<SshOutcome.Ok<*>>(f.app("git").sign(key.id, "git", "x".toByteArray()))
+        assertEquals(1, f.prompter.count("passphrase"))
+
+        val chosenThree = assertIs<ImportOutcome.Imported>(f.admin.generate(GeneratedKind.Ed25519, ImportOptions(level = 3), GOOD.toCharArray())).key
+        assertEquals(KeyStorage.SealedByPassphrase, chosenThree.storage)
+        assertTrue(!chip.exists(aliasOf(chosenThree.id)))
+    }
+
+    @Test
+    fun onlyAFingerprintIsAskedForWhenThePersonChoseIt() = runTest {
+        val chip = SoftwareChip(level = 1, strongBiometric = true)
+        val f = KeyringFixture(backgroundScope, chip)
+        val key = f.importCanary(ImportOptions(biometricOnly = true)).key
+        assertEquals(true, key.biometricOnly)
+        assertEquals(true, f.admin.keys.value.single().biometricOnly, "and it stays so in the records")
+        assertIs<SshOutcome.Ok<*>>(f.app("git").sign(key.id, "git", "x".toByteArray()))
+        assertEquals(listOf(true, true), chip.biometricOnlyAsked, "the import and the use, both bound to the finger")
+        assertTrue(DiagnosticsCode.KeyBiometricOnly.id in KeyFindings.of(key, null, inBrowser = false).map { it.code })
+
+        // The same under the chip's seal, with the passphrase as well.
+        val sealed = KeyringFixture(backgroundScope, SoftwareChip(level = 1, strongBiometric = true))
+        val both = sealed.importCanary(ImportOptions(level = 2, keepPassphrase = true, biometricOnly = true)).key
+        assertEquals(2, both.storage.level)
+        assertEquals(true, both.biometricOnly)
+    }
+
+    @Test
+    fun onlyAFingerprintIsRefusedWhereThereIsNoneOrNoChip() = runTest {
+        val noFinger = KeyringFixture(backgroundScope, SoftwareChip(level = 1, strongBiometric = false))
+        assertEquals(ImportOutcome.Failed("biometric.unavailable"), noFinger.admin.import(canaryFile(pass), pass.toCharArray(), ImportOptions(biometricOnly = true)))
+        assertEquals(ImportOutcome.Failed("biometric.unavailable"), noFinger.admin.generate(GeneratedKind.Ed25519, ImportOptions(biometricOnly = true), GOOD.toCharArray()))
+        val levelThree = KeyringFixture(backgroundScope, SoftwareChip(level = 1, strongBiometric = true))
+        assertEquals(ImportOutcome.Failed("biometric.unavailable"), levelThree.admin.import(canaryFile(pass), pass.toCharArray(), ImportOptions(level = 3, biometricOnly = true)))
+        val desktop = KeyringFixture(backgroundScope)
+        assertEquals(ImportOutcome.Failed("biometric.unavailable"), desktop.admin.import(canaryFile(pass), pass.toCharArray(), ImportOptions(biometricOnly = true)))
+        assertEquals(null, noFinger.records.text)
+        assertEquals(null, levelThree.records.text)
+        assertEquals(null, desktop.records.text)
+    }
+
+    private fun aliasOf(id: KeyId) = "cx.m42.services.ssh." + id.fingerprint.removePrefix("SHA256:").filter { it.isLetterOrDigit() }.take(16)
 
     @Test
     fun anAppChoosesAKeyAndHoldsAGrantForIt() = runTest {

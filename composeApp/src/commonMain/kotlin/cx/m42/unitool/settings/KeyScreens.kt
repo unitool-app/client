@@ -73,7 +73,7 @@ internal class SshKeysSection(private val keys: KeysUi, private val tools: HostT
         }
         list.forEachIndexed { i, key ->
             RowDivider()
-            KeyRow(key, KeyFindings.of(key, anchor, keys.inBrowser).first(), "keys:row-$i") {
+            KeyRow(key, KeyFindings.of(key, anchor, keys.inBrowser, keys.chipHere).first(), "keys:row-$i") {
                 open(KeyCardScreen(keys, tools, key.id))
             }
         }
@@ -138,7 +138,7 @@ internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTo
 
         Page("key:card") {
             Section(title = strings.storedAt) {
-                KeyFindings.of(key, anchor, keys.inBrowser).forEachIndexed { i, finding ->
+                KeyFindings.of(key, anchor, keys.inBrowser, keys.chipHere).forEachIndexed { i, finding ->
                     if (i > 0) RowDivider()
                     FindingRow(finding)
                 }

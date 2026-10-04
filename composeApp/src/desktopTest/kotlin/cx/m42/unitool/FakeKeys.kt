@@ -30,8 +30,12 @@ import kotlinx.coroutines.flow.StateFlow
  * the screenshots draw, since a desktop has no chip to put a key in. Nothing here is a real key: the
  * public halves are the test ones from [ratesNetwork], the fingerprints are made up.
  */
-internal class FakeKeys(keys: List<SshKeyInfo> = PhoneKeys) : KeysUi {
-    override val admin: FakeKeyAdmin = FakeKeyAdmin(keys)
+internal class FakeKeys(
+    keys: List<SshKeyInfo> = PhoneKeys,
+    device: KeyringDevice = AndroidPhone,
+    wouldBe: KeyStorage = KeyStorage.Tee,
+) : KeysUi {
+    override val admin: FakeKeyAdmin = FakeKeyAdmin(keys, device, wouldBe)
     override val secretsKey: StateFlow<KeyId?> = MutableStateFlow(null)
     override val sealsToKey: Boolean = false
     override val inBrowser: Boolean = false
@@ -39,12 +43,16 @@ internal class FakeKeys(keys: List<SshKeyInfo> = PhoneKeys) : KeysUi {
     override suspend fun sealSecretsWith(id: KeyId) = Unit
 }
 
-internal class FakeKeyAdmin(keys: List<SshKeyInfo>) : SshKeyAdmin {
+internal class FakeKeyAdmin(
+    keys: List<SshKeyInfo>,
+    override val device: KeyringDevice = AndroidPhone,
+    private val wouldBe: KeyStorage = KeyStorage.Tee,
+) : SshKeyAdmin {
     private val list = MutableStateFlow(keys)
     override val keys: StateFlow<List<SshKeyInfo>> = list
-    override val device: KeyringDevice = KeyringDevice(
-        Platform.Android, sdk = 35, strongBox = true, tee = true, curve25519InKeystore = true, screenLockSet = true, levels = setOf(1, 2, 3),
-    )
+
+    /** What the wizard asked for, in order: imports and creations alike. */
+    val asked = mutableListOf<Pair<GeneratedKind?, ImportOptions>>()
 
     /** By what the text says: a PEM key is the old format, a marked one has no passphrase, the rest is an encrypted Ed25519. */
     override fun inspect(file: ByteArray): Inspection {
@@ -59,7 +67,7 @@ internal class FakeKeyAdmin(keys: List<SshKeyInfo>) : SshKeyAdmin {
                 comment = "ivan@laptop",
                 encrypted = "unencrypted" !in text,
                 rounds = 24,
-                wouldBe = KeyStorage.Tee,
+                wouldBe = wouldBe,
             )
         }
     }
@@ -68,10 +76,15 @@ internal class FakeKeyAdmin(keys: List<SshKeyInfo>) : SshKeyAdmin {
         file.fill(0)
         passphrase?.fill('\u0000')
         newPassphrase?.fill('\u0000')
+        asked += null to options
         return ImportOutcome.Cancelled
     }
 
-    override suspend fun generate(kind: GeneratedKind, options: ImportOptions, passphrase: CharArray?): ImportOutcome = ImportOutcome.Cancelled
+    override suspend fun generate(kind: GeneratedKind, options: ImportOptions, passphrase: CharArray?): ImportOutcome {
+        passphrase?.fill('\u0000')
+        asked += kind to options
+        return ImportOutcome.Cancelled
+    }
 
     override suspend fun rekey(id: KeyId, newPassphrase: CharArray): SshOutcome<Unit> = SshOutcome.Cancelled
 
@@ -98,6 +111,17 @@ internal class FakeKeyAdmin(keys: List<SshKeyInfo>) : SshKeyAdmin {
 
     override fun lockAll() = Unit
 }
+
+/** A phone with StrongBox and Curve25519 in its Keystore: every level there is — and a PIN, but no fingerprint. */
+internal val AndroidPhone = KeyringDevice(
+    Platform.Android, sdk = 35, strongBox = true, tee = true, curve25519InKeystore = true, screenLockSet = true, levels = setOf(1, 2, 3),
+)
+
+/** The same phone with a fingerprint enrolled (D245). */
+internal val AndroidWithFingerprint = AndroidPhone.copy(strongBiometric = true)
+
+/** An iPhone with a passcode: the Secure Enclave seals imported keys and makes P-256 ones. */
+internal val IPhone = KeyringDevice(Platform.Ios, secureEnclave = true, screenLockSet = true, levels = setOf(1, 2))
 
 /** 2023-11-14 22:13:42 UTC, the 2FA frames' moment. */
 private const val AT = 1_700_000_022_000L

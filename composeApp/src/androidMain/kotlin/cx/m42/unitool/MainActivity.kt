@@ -172,6 +172,7 @@ class MainActivity : FragmentActivity() {
             title = strings.operation(reason, reason.app?.value),
             subtitle = strings.keyLine(key.label, key.comment, key.id.fingerprint),
             description = null,
+            cancel = strings.cancel,
         )
     }
 

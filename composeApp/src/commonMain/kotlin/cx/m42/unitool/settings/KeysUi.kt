@@ -24,6 +24,9 @@ internal interface KeysUi {
     /** The web: level 3 is "in the browser" (05 §2.3). */
     val inBrowser: Boolean
 
+    /** The device has a chip, so level 3 is the person's choice (09, D242) and the wizard offers both. */
+    val chipHere: Boolean get() = admin.device.levels.any { it < 3 }
+
     /** Reseals every secret to [id] and makes it the anchor (05 §3). */
     suspend fun sealSecretsWith(id: KeyId)
 }

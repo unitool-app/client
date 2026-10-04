@@ -143,6 +143,7 @@ internal class Keyring(
             can = capabilities(key),
             createdAt = record.createdAt,
             usable = usable,
+            biometricOnly = record.biometricOnly,
         )
     }
 
@@ -494,6 +495,26 @@ internal class Keyring(
     private fun placement(key: SshPublicKey, generated: Boolean): KeyStorage =
         chip?.placement(key, generated) ?: KeyStorage.SealedByPassphrase
 
+    /** "Only a strong biometric" needs a chip that holds or seals the key and such a biometric enrolled (09, D245). */
+    private fun biometricPossible(storage: KeyStorage, options: ImportOptions): Boolean =
+        !options.biometricOnly || (storage.level < 3 && chip?.device?.strongBiometric == true)
+
+    /**
+     * Where [key] goes at the level the person chose (09, D237); null when it cannot go there. Level 3
+     * is always possible; level 2 wherever the chip could take the key at all — a chip that holds a
+     * key can also seal one, which is how the key's passphrase stays a second lock (D244).
+     */
+    private fun placement(key: SshPublicKey, generated: Boolean, level: Int?): KeyStorage? {
+        val best = chip?.placement(key, generated)
+        return when (level) {
+            null -> best ?: KeyStorage.SealedByPassphrase
+            3 -> KeyStorage.SealedByPassphrase
+            1 -> best?.takeIf { it.level == 1 }
+            2 -> best?.sealedBySameChip()
+            else -> null
+        }
+    }
+
     private suspend fun importFile(
         bytes: ByteArray,
         passphrase: CharArray?,
@@ -507,6 +528,9 @@ internal class Keyring(
         }
         try {
             record(parsed.publicKey.id)?.let { existing -> return ImportOutcome.AlreadyThere(info(existing)!!) }
+            // Before any passphrase is asked for: what this key cannot have is said at once.
+            val storage = placement(parsed.publicKey, generated = false, options.level) ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
+            if (!biometricPossible(storage, options)) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
             val given = if (parsed.isEncrypted) passphrase?.size ?: 0 else 0
             if (parsed.isEncrypted && (passphrase == null || passphrase.isEmpty())) return ImportOutcome.WrongPassphrase
             val key = when (val d = SecretBytes.utf8(passphrase ?: CharArray(0)).use { parsed.decrypt(if (parsed.isEncrypted) it else null) }) {
@@ -538,12 +562,15 @@ internal class Keyring(
     private suspend fun storeKey(key: PrivateKey, encryptedFile: ByteArray, options: ImportOptions, origin: KeyOrigin): ImportOutcome {
         val public = key.publicKey
         OpenSshKeyFile.refusalFor(public)?.let { return ImportOutcome.Rejected(it) }
-        val storage = placement(public, generated = origin is KeyOrigin.Generated)
+        val storage = placement(public, generated = origin is KeyOrigin.Generated, options.level)
+            ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
+        if (!biometricPossible(storage, options)) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
         val id = public.fingerprint
+        // The chip reads who may confirm from here (ChipBackend): the record does not exist yet.
         val info = SshKeyInfo(
             id = KeyId(id), type = public.type, publicKey = public.authorizedKeysLine(), label = public.label,
             comment = options.comment ?: key.comment, storage = storage, policy = options.policy, origin = origin,
-            can = capabilities(public), createdAt = clock.now(),
+            can = capabilities(public), createdAt = clock.now(), biometricOnly = options.biometricOnly,
         )
         var alias: String? = null
         var sealed: String? = null
@@ -579,6 +606,7 @@ internal class Keyring(
             sealed = sealed,
             file = if (storage.level == 3) Base64.encode(encryptedFile) else null,
             keepPassphrase = options.keepPassphrase && storage.level == 2,
+            biometricOnly = options.biometricOnly,
         )
         update { f -> f.copy(keys = f.keys + record) }
         journal(UseRecord(clock.now(), null, KeyId(id), if (origin is KeyOrigin.Generated) KeyOperation.Generate else KeyOperation.Import, outcome = "ok"))
@@ -592,8 +620,12 @@ internal class Keyring(
                 val key = PrivateKey.ed25519(seed, options.comment ?: "unitool")
                 seed.fill(0)
                 return key.use {
-                    val level = placement(it.publicKey, generated = true).level
-                    val file = if (level == 3) {
+                    val storage = placement(it.publicKey, generated = true, options.level) ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
+                    if (!biometricPossible(storage, options)) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
+                    val level = storage.level
+                    // A passphrase where it is the only lock (3) or a second one the person kept (2, D244).
+                    val keep = options.keepPassphrase && level == 2
+                    val file = if (level == 3 || keep) {
                         val chars = passphrase ?: return ImportOutcome.NeedsNewPassphrase(0)
                         if (chars.size < MIN_PASSPHRASE) return ImportOutcome.NeedsNewPassphrase(chars.size)
                         SecretBytes.utf8(chars).use { secret -> OpenSshKeyFile.write(it, secret, random = random) }
@@ -601,19 +633,23 @@ internal class Keyring(
                         OpenSshKeyFile.write(it, null)
                     }
                     try {
-                        storeKey(it, file, options.copy(keepPassphrase = false), KeyOrigin.Generated(attested = false))
+                        storeKey(it, file, options.copy(keepPassphrase = keep), KeyOrigin.Generated(attested = false))
                     } finally {
                         file.fill(0)
                     }
                 }
             }
             GeneratedKind.EcdsaP256 -> {
+                // Born in the chip or not at all (05 §4.3): no file to seal, none to keep under a passphrase.
+                if (options.level != null && options.level != 1) return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
                 val backend = chip ?: return ImportOutcome.Failed("no-chip")
+                if (options.biometricOnly && !backend.device.strongBiometric) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
                 if (!backend.device.screenLockSet) return ImportOutcome.NoScreenLock
                 val alias = ALIAS_PREFIX + "gen" + random(6).joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
                 val placeholder = SshKeyInfo(
                     KeyId("SHA256:new"), "ecdsa-sha2-nistp256", "", "ECDSA 256", options.comment ?: "unitool",
                     KeyStorage.StrongBox, options.policy, KeyOrigin.Generated(true), setOf(KeyCapability.Sign), clock.now(),
+                    biometricOnly = options.biometricOnly,
                 )
                 return when (val made = backend.generate(alias, kind, options.policy, UseReason(null, placeholder, KeyOperation.Generate))) {
                     is ChipResult.Ok -> {
@@ -621,7 +657,7 @@ internal class Keyring(
                         val record = KeyRecord(
                             id = public.fingerprint, publicKey = public.authorizedKeysLine(), comment = placeholder.comment,
                             storage = storage, policy = options.policy, origin = KeyOrigin.Generated(attested = storage != KeyStorage.SecureEnclave),
-                            createdAt = clock.now(), alias = alias,
+                            createdAt = clock.now(), alias = alias, biometricOnly = options.biometricOnly,
                         )
                         update { f -> f.copy(keys = f.keys + record) }
                         journal(UseRecord(clock.now(), null, KeyId(record.id), KeyOperation.Generate, outcome = "ok"))
@@ -785,6 +821,12 @@ internal class Keyring(
 
     companion object {
         const val ALIAS_PREFIX = "cx.m42.services.ssh."
+
+        /** `ImportOptions.level` asked for a level this device or this key cannot have (09, D238). */
+        const val LEVEL_UNAVAILABLE = "level.unavailable"
+
+        /** `ImportOptions.biometricOnly` where no strong biometric is enrolled, or at level 3 (09, D245). */
+        const val BIOMETRIC_UNAVAILABLE = "biometric.unavailable"
         const val JOURNAL = 200
         const val MAX_TRIES = 3
     }

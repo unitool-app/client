@@ -101,7 +101,7 @@ public class SshKeyringHost internal constructor(
         val findings = mutableListOf<Finding>()
         val device = keyring.device
         val anchor = keyring.secretsKey.value
-        keyring.keys.value.forEach { key -> findings += KeyFindings.of(key, anchor, inBrowser) }
+        keyring.keys.value.forEach { key -> findings += KeyFindings.of(key, anchor, inBrowser, chipHere = device.levels.any { it < 3 }) }
         if (device.levels.any { it < 3 } && !device.screenLockSet) {
             findings += DiagnosticsCode.DeviceNoScreenLock.finding(Subject.Device)
         }

@@ -222,6 +222,31 @@ class KeystoreBackendTest {
     }
 
     @Test
+    fun aKeyThePersonKeepsUnderItsPassphraseLeavesTheKeystoreAlone() = runBlocking<Unit> {
+        // 09, D237: "Under the key's passphrase only" on a phone with a chip is level 3, and only that.
+        val records = PrefsRecordStore(context)
+        records.clear()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val host = SshKeyringHost.withChip(records, NoPrompter, KeystoreBackend(context, { null }, nobody), Clock { System.currentTimeMillis() }, Platform.Android, scope)
+        val before = keystore.aliases().toList().toSet()
+        val pass = "canary passphrase for level three"
+        val file = canary().use { k -> SecretBytes.utf8(pass.toCharArray()).use { OpenSshKeyFile.write(k, it, rounds = 4) } }
+        val key = assertIs<ImportOutcome.Imported>(host.admin.import(file, pass.toCharArray(), ImportOptions(level = 3))).key
+        try {
+            assertEquals(KeyStorage.SealedByPassphrase, key.storage)
+            assertEquals(before, keystore.aliases().toList().toSet(), "nothing went into the Keystore")
+            val found = mutableListOf<String>()
+            context.dataDir.walkTopDown().filter { it.isFile && it.length() < 20_000_000 }.forEach { f ->
+                LeakScanner.scan(f.readBytes(), listOf(Canary.ED25519_SEED)).forEach { found += "${f.name}: ${it.encoding}" }
+            }
+            assertEquals(emptyList(), found, "I1: the file is under its passphrase")
+        } finally {
+            host.admin.delete(key.id)
+            records.clear()
+        }
+    }
+
+    @Test
     fun removingTheScreenLockTakesTheKeyAndTheRecordStaysUnusable() = runBlocking<Unit> {
         if (!setPin) return@runBlocking // a person's own lock is not ours to remove
         val backend = backend()

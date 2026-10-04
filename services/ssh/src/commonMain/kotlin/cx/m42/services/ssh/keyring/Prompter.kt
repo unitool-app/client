@@ -22,8 +22,15 @@ public data class UseReason(
 /**
  * The words on the device's own prompt for one operation (01 §5.2) — `BiometricPrompt` on Android,
  * the `LAContext` reason on iOS: the host's, from [UseReason]. This module has none of its own (07 §2.2).
+ * [cancel] labels the button Android requires when the screen lock is no way out — a key only a
+ * strong biometric opens (09, D245).
  */
-public class PromptText(public val title: String, public val subtitle: String?, public val description: String?)
+public class PromptText(
+    public val title: String,
+    public val subtitle: String?,
+    public val description: String?,
+    public val cancel: String = "Cancel",
+)
 
 /**
  * The person, as the keyring asks them things. The host's UI implements it — a sheet over the shell

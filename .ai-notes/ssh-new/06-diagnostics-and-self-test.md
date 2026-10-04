@@ -197,7 +197,10 @@ I5 на JVM). Кнопка «Share report» → `FileSharer` как текст.
 | `key.level2` | Ok | **Encrypted with a key from the secure chip ({hardware}).** Decrypted into memory only for one operation, after you confirm. | — |
 | `key.level3` | Info | **Stored in the app's files, protected only by its passphrase.** | Rekey |
 | `key.level3.browser` | Unsafe | **Stored in the browser, protected only by its passphrase.** The decrypted key lives in the tab's memory while unlocked. | — |
-| `key.unusable` | Broken | **This key can no longer be used here:** the screen lock was removed. Import it again from your computer. | ImportKeyAgain |
+| `key.level3.chip-available` (09) | Info | **Stored in the app's files, protected only by its passphrase.** This device has a secure chip. To keep the key in it, delete the key and add it again. | — |
+| `key.no-second-lock` (09) | Attention | **Anyone who can unlock this device can use this key.** The screen lock — PIN, pattern, passcode, fingerprint or face — is enough. The key's own passphrase is a second lock the device does not have. | — |
+| `key.biometric-only` (09) | Ok | **Opens only with your fingerprint, not with the screen lock.** A face of the strongest class counts as a fingerprint. If a fingerprint is added or all are removed, the key stops working here: import it again from your computer. | — |
+| `key.unusable` | Broken | **This key can no longer be used here:** the screen lock was removed, or — for a key only a fingerprint opens — the fingerprints changed (09). Import it again from your computer. | ImportKeyAgain |
 | `key.secrets-anchor` | Info | **This key seals the host's secrets.** It cannot be deleted until secrets are re-sealed with another key. | — |
 | `key.session-policy` | Attention | **Confirmation is remembered for {minutes} minutes.** Anyone holding the unlocked device can use this key within that window. | — |
 | `device.no-screen-lock` | Unsafe | **No screen lock.** Keys that need your confirmation cannot be created; secret storage is weaker. Set a PIN, pattern or passcode. | EnableScreenLock |

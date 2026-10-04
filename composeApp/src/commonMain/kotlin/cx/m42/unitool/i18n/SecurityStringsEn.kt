@@ -84,6 +84,12 @@ internal object SecurityStringsEn : SecurityStrings {
     override val everyUse = "Every time the key is used"
     override fun session(minutes: Int) = "Once, then for $minutes minutes"
     override val keepPassphrase = "Also ask for the key's own passphrase every time"
+    override val keepInChip = "In the device's chip"
+    override val keepUnderPassphrase = "Under the key's passphrase only"
+    override val biometricOnly = "Only my fingerprint — not the screen lock's PIN"
+    override val keepAsItWas = "Keep it as it was"
+    override val turnOffAnyway = "Turn it off anyway"
+    override val noPassphraseInChip = "Made inside the chip: there is no file, so there is no passphrase to keep."
     override val add = "Add"
     override val importing = "Adding…"
 

@@ -74,6 +74,8 @@ internal data class KeyRecord(
     val file: String? = null,
     /** Level 2 with the file's own passphrase kept as a second lock (01 §5.4). */
     val keepPassphrase: Boolean = false,
+    /** Levels 1–2: only a strong biometric opens it, not the screen lock (09, D245). */
+    val biometricOnly: Boolean = false,
     val usable: Boolean = true,
 )
 

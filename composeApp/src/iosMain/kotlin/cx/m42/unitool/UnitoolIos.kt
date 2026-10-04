@@ -6,7 +6,10 @@ import cx.m42.unitool.settings.HostTools
 import cx.m42.services.share.IosFileSharer
 import cx.m42.services.vault.IosKeychainVault
 import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.ios
 import cx.m42.services.ssh.keyring.FileRecordStore
+import cx.m42.services.ssh.keyring.PromptText
+import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.services.vault.VaultDiagnostics
 import cx.m42.superizer.host.SystemClock
 import cx.m42.unitool.i18n.securityStrings
@@ -61,14 +64,14 @@ object UnitoolIos {
     fun host(): Superizer {
         superizer?.let { return it }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        // The Secure Enclave seals the host's secrets as it sealed the 2FA accounts before (Б4). The
-        // keyring stays at level 3 until an iPhone's self-test report is green (D175, D180): the
-        // self-test runs the enclave's steps so that report can say so, and then this line becomes
-        // SshKeyringHost.ios(texts, …) with the same words as MainActivity's promptText.
+        // The Secure Enclave seals the host's secrets as it sealed the 2FA accounts before (Б4), and
+        // since the iPhone's self-test came back green (2026-09-27, D175 closed by 09 D239) it holds
+        // the keyring too: imported keys sealed by it behind Face ID, a P-256 made inside it. Keys
+        // added before stay at level 3 and open with their passphrase, as they did (D241).
         val prompts = KeyPrompts()
         val vault = IosKeychainVault()
         val records = FileRecordStore()
-        val keyring = SshKeyringHost.passphraseOnly(records, prompts, SystemClock, cx.m42.superizer.runtime.Platform.Ios, scope)
+        val keyring = SshKeyringHost.ios(::promptText, records, prompts, SystemClock, scope)
         val selfTest = IosSelfTest(records) { securityStrings(language()).selfTest }
         val security = UnitoolSecurity(keyring, prompts, chipVault = vault, chipVaultDiagnostics = VaultDiagnostics(vault), platformSelfTest = selfTest)
             .also { this.security = it }
@@ -94,6 +97,18 @@ object UnitoolIos {
     }
 
     private fun language(): String = superizer?.settings?.langTag?.value ?: "en"
+
+    /** The words of the system's Face ID / passcode sheet: what, by whom, with which key — as MainActivity's. */
+    private fun promptText(reason: UseReason): PromptText {
+        val strings = securityStrings(language())
+        val key = reason.key
+        return PromptText(
+            title = strings.operation(reason, reason.app?.value),
+            subtitle = strings.keyLine(key.label, key.comment, key.id.fingerprint),
+            description = null,
+            cancel = strings.cancel,
+        )
+    }
 
     /** `unitool://…` from anywhere on the device — SwiftUI's `onOpenURL`. */
     fun deliverLink(url: String) {

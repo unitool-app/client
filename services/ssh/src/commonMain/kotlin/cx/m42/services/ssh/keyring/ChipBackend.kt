@@ -16,6 +16,9 @@ import cx.m42.superizer.ssh.UsePolicy
  * Every method that touches a key bound to authentication puts the device's own prompt up, bound to
  * that one operation (`CryptoObject` / `LAContext`, 01 §5.1), with the words the host gives it for
  * [UseReason]. The keyring never sees the device's answer — only the result or its absence.
+ *
+ * Who may answer is `reason.key.biometricOnly` (09, D245): a strong biometric alone, or that or the
+ * screen lock. [store] and [generate] bind the key to it; every use asks the same way.
  */
 internal interface ChipBackend {
 

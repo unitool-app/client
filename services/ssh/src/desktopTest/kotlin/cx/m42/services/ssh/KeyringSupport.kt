@@ -71,13 +71,17 @@ internal class SoftwareChip(
     var answer: Boolean = true,
     var screenLock: Boolean = true,
     private val level: Int = 2,
+    private val strongBiometric: Boolean = false,
 ) : ChipBackend {
     var asks = 0
+
+    /** Who was allowed to answer each prompt, as the keyring told the chip (D245): true is "a strong biometric only". */
+    val biometricOnlyAsked = mutableListOf<Boolean>()
     private val resident = mutableMapOf<String, PrivateKey>()
     private val wraps = mutableMapOf<String, ByteArray>()
 
     override val device: KeyringDevice
-        get() = KeyringDevice(Platform.Android, sdk = 35, tee = true, screenLockSet = screenLock, levels = setOf(level))
+        get() = KeyringDevice(Platform.Android, sdk = 35, tee = true, screenLockSet = screenLock, levels = setOf(level), strongBiometric = strongBiometric)
 
     override fun placement(key: SshPublicKey, generated: Boolean): KeyStorage? =
         if (level == 1) KeyStorage.Tee else KeyStorage.SealedByChip(Chip.Tee)
@@ -88,6 +92,7 @@ internal class SoftwareChip(
     }
 
     override suspend fun store(alias: String, storage: KeyStorage, key: PrivateKey, file: ByteArray, policy: UsePolicy, reason: UseReason): ChipResult<String?> {
+        biometricOnlyAsked += reason.key.biometricOnly
         if (!screenLock) return ChipResult.NoScreenLock
         if (storage.level == 1) {
             resident[alias] = PrivateKey(key.publicKey, key.comment, key.fields.copy())
@@ -104,6 +109,7 @@ internal class SoftwareChip(
 
     override suspend fun unseal(alias: String, sealed: String, reason: UseReason): ChipResult<ByteArray> {
         val wrap = wraps[alias] ?: return ChipResult.Unusable
+        biometricOnlyAsked += reason.key.biometricOnly
         if (!prompt()) return ChipResult.Cancelled
         val body = Base64.decode(sealed.removePrefix("v1:"))
         return AesGcm.open(wrap, body.copyOf(12), body.copyOfRange(12, body.size))?.let { ChipResult.Ok(it) } ?: ChipResult.Failed("tag")
@@ -111,6 +117,7 @@ internal class SoftwareChip(
 
     override suspend fun sign(alias: String, key: SshPublicKey, data: ByteArray, rsaHash: Hash, reason: UseReason): ChipResult<ByteArray> {
         val inside = resident[alias] ?: return ChipResult.Unusable
+        biometricOnlyAsked += reason.key.biometricOnly
         if (!prompt()) return ChipResult.Cancelled
         return SoftwareOps.signatureBlob(inside, data, rsaHash)?.let { ChipResult.Ok(it) } ?: ChipResult.Failed("sign")
     }

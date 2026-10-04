@@ -1,5 +1,6 @@
 package cx.m42.unitool.settings
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -24,14 +25,19 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import cx.m42.services.ssh.diagnostics.KeyFindings
+import cx.m42.services.ssh.keyring.sealedBySameChip
 import cx.m42.superizer.HostScreen
 import cx.m42.superizer.Superizer
+import cx.m42.superizer.diagnostics.DiagnosticsCode
 import cx.m42.superizer.diagnostics.Subject
+import cx.m42.superizer.diagnostics.finding
+import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportOptions
 import cx.m42.superizer.ssh.ImportOutcome
 import cx.m42.superizer.ssh.ImportRefusal
 import cx.m42.superizer.ssh.Inspection
+import cx.m42.superizer.ssh.KeyStorage
 import cx.m42.superizer.ssh.KeyringDevice
 import cx.m42.superizer.ssh.MIN_PASSPHRASE
 import cx.m42.superizer.ssh.SshKeyAdmin
@@ -146,8 +152,91 @@ private class ImportWizard(private val admin: SshKeyAdmin) {
     var problem by mutableStateOf<Problem?>(null)
     var busy by mutableStateOf(false)
     var policy by mutableStateOf<UsePolicy>(UsePolicy.EveryUse)
-    var keepPassphrase by mutableStateOf(false)
     var kind by mutableStateOf(GeneratedKind.Ed25519)
+
+    val device: KeyringDevice = admin.device
+
+    /** The device has a chip, so where a key lives is the person's to choose (09, D237). */
+    val chipHere: Boolean = device.levels.any { it < 3 }
+
+    /** In the chip — the default (question 118) — or under the key's passphrase only. */
+    var inChip by mutableStateOf(true)
+
+    /** Android warns before a key in the chip is left to whoever unlocks the phone (D244). */
+    val warnsWithoutPassphrase: Boolean = device.platform == Platform.Android
+
+    /** "Only my fingerprint" is offered: Android with a strong biometric enrolled (D245). */
+    val offersBiometricOnly: Boolean = warnsWithoutPassphrase && device.strongBiometric
+
+    /** Only a strong biometric opens the key, not the screen lock — the default where it is offered (D245). */
+    var biometricOnly by mutableStateOf(offersBiometricOnly)
+        private set
+
+    /** The key's passphrase as a second lock: level 2 even where the chip could hold the key — Android's default without a fingerprint (D244). */
+    var keepPassphrase by mutableStateOf(warnsWithoutPassphrase && !offersBiometricOnly)
+        private set
+
+    /** A change that would leave the key to the screen lock alone, waiting for the warning's answer: (biometricOnly, keepPassphrase). */
+    private var pending by mutableStateOf<Pair<Boolean, Boolean>?>(null)
+
+    val confirming: Boolean get() = pending != null
+
+    /** A P-256 made here has no file, so no passphrase to keep (05 §4.3). */
+    private val passphraseApplies: Boolean get() = !(creating && kind == GeneratedKind.EcdsaP256)
+
+    /** Android, in the chip, with no lock of the key's own: whoever unlocks the phone can use it. */
+    fun onlyScreenLock(bio: Boolean = biometricOnly, keep: Boolean = keepPassphrase): Boolean =
+        warnsWithoutPassphrase && !(offersBiometricOnly && bio) && !(passphraseApplies && keep)
+
+    /** Moves a switch — or, if that would leave only the screen lock, asks first (D244). */
+    fun change(bio: Boolean = biometricOnly, keep: Boolean = keepPassphrase) {
+        if (onlyScreenLock(bio, keep) && !onlyScreenLock()) {
+            pending = bio to keep
+            return
+        }
+        biometricOnly = bio
+        keepPassphrase = keep
+        pending = null
+    }
+
+    fun confirmChange() {
+        pending?.let { (bio, keep) ->
+            biometricOnly = bio
+            keepPassphrase = keep
+        }
+        pending = null
+    }
+
+    fun cancelChange() {
+        pending = null
+    }
+
+    /** The chip could take a key that would otherwise live at [best]. */
+    fun chipFor(best: KeyStorage?): Boolean = chipHere && best != null && best.level < 3
+
+    /** Where a key whose best is [best] goes with the choices as they stand. */
+    fun chosen(best: KeyStorage): KeyStorage = when {
+        !chipFor(best) || !inChip -> KeyStorage.SealedByPassphrase
+        keepPassphrase -> best.sealedBySameChip() ?: best
+        else -> best
+    }
+
+    /** The choices as the keyring takes them; [chipCan]: the chip could take this key at all. */
+    fun options(chipCan: Boolean, comment: String? = null): ImportOptions {
+        val chip = chipHere && chipCan && inChip
+        return ImportOptions(
+            policy = policy,
+            comment = comment,
+            level = when {
+                !chipHere -> null
+                !chip -> 3
+                keepPassphrase -> 2
+                else -> null
+            },
+            keepPassphrase = chip && keepPassphrase,
+            biometricOnly = chip && offersBiometricOnly && biometricOnly,
+        )
+    }
     var comment by mutableStateOf("")
 
     /** The "Set a passphrase" step is for a key being created, not a file being imported. */
@@ -192,7 +281,7 @@ private class ImportWizard(private val admin: SshKeyAdmin) {
         val found = inspection ?: return
         busy = true
         problem = null
-        val options = ImportOptions(policy = policy, keepPassphrase = keepPassphrase && found.wouldBe?.level == 2)
+        val options = options(chipFor(found.wouldBe))
         val outcome = try {
             admin.import(bytes.copyOf(), given?.copyOf(), options, fresh)
         } finally {
@@ -205,7 +294,14 @@ private class ImportWizard(private val admin: SshKeyAdmin) {
         busy = true
         problem = null
         val outcome = try {
-            admin.generate(kind, ImportOptions(policy = policy, comment = comment.trim().ifEmpty { null }), passphrase)
+            val name = comment.trim().ifEmpty { null }
+            // P-256 is born in the chip or not at all: no level to choose, no passphrase to keep.
+            val options = if (kind == GeneratedKind.EcdsaP256) {
+                ImportOptions(policy = policy, comment = name, biometricOnly = offersBiometricOnly && biometricOnly)
+            } else {
+                options(chipHere, name)
+            }
+            admin.generate(kind, options, passphrase)
         } finally {
             busy = false
         }
@@ -333,6 +429,18 @@ private fun CreateStep(wizard: ImportWizard, strings: SecurityStrings, device: K
             modifier = Modifier.testTag("import:name"),
         )
     }
+    if (wizard.kind == GeneratedKind.EcdsaP256) {
+        Section(title = strings.wouldLive) {
+            FindingRow(KeyFindings.placement(bornInChip(device), Subject.Key(""), inBrowser = false))
+            BiometricFinding(wizard, Subject.Key(""))
+            RowDivider()
+            RowText(strings.noPassphraseInChip, color = AppTheme.muted, small = true)
+        }
+        LockChoices(wizard, strings, Subject.Key(""), passphrase = false)
+    } else if (wizard.chipHere) {
+        // Which level the chip gives a key made here is the keyring's to say; the choice is the person's.
+        WhereChoice(wizard, strings, if (wizard.inChip) null else KeyStorage.SealedByPassphrase, Subject.Key(""), inBrowser = false)
+    }
     PolicyChoice(wizard, strings)
     ProblemLine(wizard, strings)
     PageButton(if (wizard.busy) strings.working else strings.create, "import:create-key", enabled = !wizard.busy) { create() }
@@ -368,9 +476,14 @@ private fun InspectStep(wizard: ImportWizard, strings: SecurityStrings, inBrowse
         return
     }
 
-    found.wouldBe?.let { storage ->
-        Section(title = strings.wouldLive) {
-            FindingRow(KeyFindings.placement(storage, Subject.Key(found.id?.fingerprint.orEmpty()), inBrowser))
+    val subject = Subject.Key(found.id?.fingerprint.orEmpty())
+    found.wouldBe?.let { best ->
+        if (wizard.chipFor(best)) {
+            WhereChoice(wizard, strings, wizard.chosen(best), subject, inBrowser)
+        } else {
+            Section(title = strings.wouldLive) {
+                FindingRow(KeyFindings.placement(best, subject, inBrowser))
+            }
         }
     }
 
@@ -387,16 +500,6 @@ private fun InspectStep(wizard: ImportWizard, strings: SecurityStrings, inBrowse
     }
 
     PolicyChoice(wizard, strings)
-    if (found.encrypted && found.wouldBe?.level == 2) {
-        Card {
-            ToggleRow(
-                label = strings.keepPassphrase,
-                checked = wizard.keepPassphrase,
-                onCheckedChange = { wizard.keepPassphrase = it },
-                modifier = Modifier.testTag("import:keep-passphrase"),
-            )
-        }
-    }
     ProblemLine(wizard, strings)
     PageButton(
         text = if (wizard.busy) strings.importing else strings.add,
@@ -408,6 +511,83 @@ private fun InspectStep(wizard: ImportWizard, strings: SecurityStrings, inBrowse
         add(chars)
     }
     PageButton(strings.back, "import:back", variant = ButtonVariant.Outline) { wizard.stepBack() }
+}
+
+/**
+ * Where the key will live (09, D237): in the chip or under its passphrase only, then — in the chip —
+ * the key's own locks ([LockChoices]). [chosen] is shown in the catalogue's words when it is known.
+ */
+@Composable
+private fun WhereChoice(wizard: ImportWizard, strings: SecurityStrings, chosen: KeyStorage?, subject: Subject, inBrowser: Boolean) {
+    Section(title = strings.wouldLive) {
+        Box(Modifier.testTag("import:where-chip")) {
+            ChoiceRow(strings.keepInChip, wizard.inChip) { wizard.inChip = true }
+        }
+        RowDivider()
+        Box(Modifier.testTag("import:where-passphrase")) {
+            ChoiceRow(strings.keepUnderPassphrase, !wizard.inChip) { wizard.inChip = false }
+        }
+        chosen?.let {
+            RowDivider()
+            FindingRow(KeyFindings.placement(it, subject, inBrowser))
+        }
+        if (wizard.inChip) BiometricFinding(wizard, subject)
+    }
+    if (wizard.inChip) LockChoices(wizard, strings, subject, passphrase = true)
+}
+
+/** "Only my fingerprint", in the catalogue's words, when it is chosen (D245). */
+@Composable
+private fun BiometricFinding(wizard: ImportWizard, subject: Subject) {
+    if (!wizard.offersBiometricOnly || !wizard.biometricOnly) return
+    RowDivider()
+    FindingRow(DiagnosticsCode.KeyBiometricOnly.finding(subject))
+}
+
+/**
+ * The key's own locks in the chip: only a strong biometric (Android with one enrolled, on by default
+ * there, D245), and its passphrase ([passphrase]: the key has a file to keep it on). A change that
+ * would leave only the screen lock is warned about first and changes nothing until answered (D244).
+ */
+@Composable
+private fun LockChoices(wizard: ImportWizard, strings: SecurityStrings, subject: Subject, passphrase: Boolean) {
+    val warned = wizard.confirming || wizard.onlyScreenLock()
+    if (!wizard.offersBiometricOnly && !passphrase && !warned) return
+    Card {
+        if (wizard.offersBiometricOnly) {
+            // Still on while the warning waits: nothing changes until the person says so.
+            ToggleRow(
+                label = strings.biometricOnly,
+                checked = wizard.biometricOnly,
+                onCheckedChange = { wizard.change(bio = it) },
+                modifier = Modifier.testTag("import:biometric-only"),
+            )
+        }
+        if (passphrase) {
+            if (wizard.offersBiometricOnly) RowDivider()
+            ToggleRow(
+                label = strings.keepPassphrase,
+                checked = wizard.keepPassphrase,
+                onCheckedChange = { wizard.change(keep = it) },
+                modifier = Modifier.testTag("import:keep-passphrase"),
+            )
+        }
+        if (warned) {
+            if (wizard.offersBiometricOnly || passphrase) RowDivider()
+            FindingRow(DiagnosticsCode.KeyNoSecondLock.finding(subject))
+        }
+    }
+    if (wizard.confirming) {
+        PageButton(strings.keepAsItWas, "import:keep-stay") { wizard.cancelChange() }
+        PageButton(strings.turnOffAnyway, "import:keep-drop", variant = ButtonVariant.Outline) { wizard.confirmChange() }
+    }
+}
+
+/** Where a P-256 made here lives: the chip it is born in (05 §4.3). */
+private fun bornInChip(device: KeyringDevice): KeyStorage = when {
+    device.secureEnclave -> KeyStorage.SecureEnclave
+    device.strongBox -> KeyStorage.StrongBox
+    else -> KeyStorage.Tee
 }
 
 /** Every use (the default) or a session (01 §5.3), with what a session costs said next to it. */

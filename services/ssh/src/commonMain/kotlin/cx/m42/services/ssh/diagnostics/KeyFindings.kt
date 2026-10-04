@@ -17,11 +17,15 @@ import cx.m42.superizer.ssh.UsePolicy
  */
 public object KeyFindings {
 
-    /** Everything about [key]: its level (or that it is unusable), whether it seals the host's secrets, its session. */
-    public fun of(key: SshKeyInfo, anchor: KeyId?, inBrowser: Boolean): List<Finding> {
+    /**
+     * Everything about [key]: its level (or that it is unusable), whether it seals the host's secrets,
+     * its session. [chipHere]: this device has a chip, so level 3 is a choice, not a lack (09, D242).
+     */
+    public fun of(key: SshKeyInfo, anchor: KeyId?, inBrowser: Boolean, chipHere: Boolean = false): List<Finding> {
         val subject = Subject.Key(key.id.fingerprint)
         return buildList {
-            add(if (key.usable) placement(key.storage, subject, inBrowser) else DiagnosticsCode.KeyUnusable.finding(subject))
+            add(if (key.usable) placement(key.storage, subject, inBrowser, chipHere) else DiagnosticsCode.KeyUnusable.finding(subject))
+            if (key.usable && key.biometricOnly) add(DiagnosticsCode.KeyBiometricOnly.finding(subject))
             if (key.id == anchor) add(DiagnosticsCode.KeySecretsAnchor.finding(subject))
             (key.policy as? UsePolicy.Session)?.let {
                 add(DiagnosticsCode.KeySessionPolicy.finding(subject, mapOf("minutes" to ((it.seconds + 59) / 60).toString())))
@@ -30,13 +34,13 @@ public object KeyFindings {
     }
 
     /** The level [storage] is, as a finding about [subject]. */
-    public fun placement(storage: KeyStorage, subject: Subject, inBrowser: Boolean): Finding = when (storage.level) {
+    public fun placement(storage: KeyStorage, subject: Subject, inBrowser: Boolean, chipHere: Boolean = false): Finding = when (storage.level) {
         1 -> DiagnosticsCode.KeyLevel1.finding(subject, mapOf("hardware" to hardware(storage), "level" to "1"))
         2 -> DiagnosticsCode.KeyLevel2.finding(subject, mapOf("hardware" to hardware(storage), "level" to "2"))
-        else -> if (inBrowser) {
-            DiagnosticsCode.KeyLevel3Browser.finding(subject, mapOf("level" to "3"))
-        } else {
-            DiagnosticsCode.KeyLevel3.finding(subject, mapOf("level" to "3"))
+        else -> when {
+            inBrowser -> DiagnosticsCode.KeyLevel3Browser.finding(subject, mapOf("level" to "3"))
+            chipHere -> DiagnosticsCode.KeyLevel3ChipAvailable.finding(subject, mapOf("level" to "3"))
+            else -> DiagnosticsCode.KeyLevel3.finding(subject, mapOf("level" to "3"))
         }
     }
 

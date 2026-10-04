@@ -93,6 +93,12 @@ internal object SecurityStringsRu : SecurityStrings {
     override val everyUse = "При каждом использовании ключа"
     override fun session(minutes: Int) = "Один раз, затем $minutes мин"
     override val keepPassphrase = "И каждый раз спрашивать пароль самого ключа"
+    override val keepInChip = "В чипе устройства"
+    override val keepUnderPassphrase = "Только под паролем ключа"
+    override val biometricOnly = "Только мой отпечаток — не PIN-код телефона"
+    override val keepAsItWas = "Оставить как было"
+    override val turnOffAnyway = "Всё равно выключить"
+    override val noPassphraseInChip = "Создаётся внутри чипа: файла нет, поэтому и пароля у него нет."
     override val add = "Добавить"
     override val importing = "Добавляю…"
 

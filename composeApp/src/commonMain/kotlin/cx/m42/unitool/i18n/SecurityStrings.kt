@@ -58,6 +58,13 @@ internal interface SecurityStrings {
     val everyUse: String
     fun session(minutes: Int): String
     val keepPassphrase: String
+    // Where it will live (09, D237): the choice; what each choice protects is the catalogue's.
+    val keepInChip: String
+    val keepUnderPassphrase: String
+    val biometricOnly: String
+    val keepAsItWas: String
+    val turnOffAnyway: String
+    val noPassphraseInChip: String
     val add: String
     val importing: String
     fun refusal(refusal: ImportRefusal): String

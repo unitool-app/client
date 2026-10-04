@@ -59,7 +59,8 @@ import kotlinx.coroutines.withContext
  * `PrivateKey` named `XDH` carrying PKCS#8 with a hand-made certificate — the one way step 0 found
  * (P1, P2). Level 2 seals the key file with an AES-GCM key of its own. Every key is bound to
  * authentication with a zero timeout for "every use" (01 §5.1), needs an unlocked device, and
- * survives a new fingerprint (D144). Each operation puts the platform's `BiometricPrompt` up with a
+ * survives a new fingerprint (D144) — unless only a strong biometric may open it (09, D245): then the
+ * screen lock does not, and a new fingerprint ends the key, or whoever knows the PIN could enrol one. Each operation puts the platform's `BiometricPrompt` up with a
  * `CryptoObject` for exactly that `Signature` or `Cipher` — except the X25519 twin: no
  * `CryptoObject` can hold a `KeyAgreement`, so that key opens for [AGREE_WINDOW] seconds after the
  * same prompt (impl, 01 §5.1).
@@ -91,6 +92,8 @@ internal class KeystoreBackend(
         get() {
             val lock = app.getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
             val chip = sdk >= 30 && hardware != "software"
+            val strong = chip && app.getSystemService(BiometricManager::class.java)
+                ?.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
             return KeyringDevice(
                 platform = Platform.Android,
                 sdk = sdk,
@@ -99,6 +102,7 @@ internal class KeystoreBackend(
                 curve25519InKeystore = chip && curve25519,
                 screenLockSet = lock,
                 levels = if (chip) setOf(1, 2) else setOf(3),
+                strongBiometric = strong,
             )
         }
 
@@ -122,11 +126,12 @@ internal class KeystoreBackend(
         withContext(Dispatchers.IO) {
             if (!device.screenLockSet) return@withContext ChipResult.NoScreenLock
             try {
+                val bio = reason.key.biometricOnly
                 if (storage.level == 1) {
-                    importResident(alias, key, storage == KeyStorage.StrongBox, policy)
+                    importResident(alias, key, storage == KeyStorage.StrongBox, policy, bio)
                     ChipResult.Ok(null)
                 } else {
-                    val wrap = makeWrapKey(alias, storage is KeyStorage.SealedByChip && storage.under == Chip.StrongBox, policy)
+                    val wrap = makeWrapKey(alias, storage is KeyStorage.SealedByChip && storage.under == Chip.StrongBox, policy, bio)
                     val cipher = Cipher.getInstance(AES_GCM).apply { init(Cipher.ENCRYPT_MODE, wrap) }
                     when (val shown = prompt(reason, BiometricPrompt.CryptoObject(cipher))) {
                         is ChipResult.Ok -> ChipResult.Ok("v1:" + Base64.encode(cipher.iv + cipher.doFinal(file)))
@@ -142,14 +147,16 @@ internal class KeystoreBackend(
             }
         }
 
-    /** [window]: the least number of seconds a confirmation lasts — 0 is "this one operation". */
-    private fun protection(purposes: Int, policy: UsePolicy, strongBox: Boolean, window: Int = 0): KeyProtection.Builder =
+    /** [window]: the least number of seconds a confirmation lasts — 0 is "this one operation". [bio]: a strong biometric only (D245). */
+    private fun protection(purposes: Int, policy: UsePolicy, strongBox: Boolean, bio: Boolean, window: Int = 0): KeyProtection.Builder =
         KeyProtection.Builder(purposes)
             .setUserAuthenticationRequired(true)
-            .setUserAuthenticationParameters(maxOf(timeout(policy), window), KEY_AUTH)
+            .setUserAuthenticationParameters(maxOf(timeout(policy), window), keyAuth(bio))
             .setUnlockedDeviceRequired(true)
-            .setInvalidatedByBiometricEnrollment(false)
+            .setInvalidatedByBiometricEnrollment(bio)
             .apply { if (strongBox) setIsStrongBoxBacked(true) }
+
+    private fun keyAuth(bio: Boolean): Int = if (bio) KeyProperties.AUTH_BIOMETRIC_STRONG else KEY_AUTH
 
     private fun timeout(policy: UsePolicy): Int = when (policy) {
         UsePolicy.EveryUse -> 0
@@ -182,15 +189,15 @@ internal class KeystoreBackend(
         }
     }
 
-    private fun importResident(alias: String, key: PrivateKey, strongBox: Boolean, policy: UsePolicy) {
+    private fun importResident(alias: String, key: PrivateKey, strongBox: Boolean, policy: UsePolicy, bio: Boolean) {
         val public = key.publicKey
         when (val kind = public.kind) {
             is SshPublicKey.Kind.Ed25519 -> importCurve25519(
                 alias,
                 key,
                 kind,
-                protection(KeyProperties.PURPOSE_SIGN, policy, false).setDigests(KeyProperties.DIGEST_NONE).build(),
-                protection(KeyProperties.PURPOSE_AGREE_KEY, policy, false, window = AGREE_WINDOW).build(),
+                protection(KeyProperties.PURPOSE_SIGN, policy, false, bio).setDigests(KeyProperties.DIGEST_NONE).build(),
+                protection(KeyProperties.PURPOSE_AGREE_KEY, policy, false, bio, window = AGREE_WINDOW).build(),
             )
             is SshPublicKey.Kind.Rsa -> {
                 val fields = WireReader(key.fields.bytes)
@@ -208,7 +215,7 @@ internal class KeystoreBackend(
                 keystore.setEntry(
                     "$alias.sign",
                     KeyStore.PrivateKeyEntry(private, arrayOf(certificate)),
-                    protection(KeyProperties.PURPOSE_SIGN, policy, false)
+                    protection(KeyProperties.PURPOSE_SIGN, policy, false, bio)
                         .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
                         .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
                         .build(),
@@ -217,7 +224,7 @@ internal class KeystoreBackend(
                 keystore.setEntry(
                     "$alias.decrypt",
                     KeyStore.PrivateKeyEntry(private, arrayOf(certificate)),
-                    protection(KeyProperties.PURPOSE_DECRYPT, policy, false)
+                    protection(KeyProperties.PURPOSE_DECRYPT, policy, false, bio)
                         .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                         .setDigests(KeyProperties.DIGEST_NONE)
                         .build(),
@@ -236,7 +243,7 @@ internal class KeystoreBackend(
                 keystore.setEntry(
                     "$alias.sign",
                     KeyStore.PrivateKeyEntry(private, arrayOf(HandMadeCertificate(publicKey.encoded, ECDSA_SHA256_OID, "EC"))),
-                    protection(KeyProperties.PURPOSE_SIGN, policy, strongBox)
+                    protection(KeyProperties.PURPOSE_SIGN, policy, strongBox, bio)
                         .setDigests(digest(kind.curve))
                         .build(),
                 )
@@ -245,7 +252,7 @@ internal class KeystoreBackend(
         }
     }
 
-    private fun makeWrapKey(alias: String, strongBox: Boolean, policy: UsePolicy): SecretKey =
+    private fun makeWrapKey(alias: String, strongBox: Boolean, policy: UsePolicy, bio: Boolean): SecretKey =
         KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER).apply {
             init(
                 KeyGenParameterSpec.Builder("$alias.wrap", KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
@@ -253,9 +260,9 @@ internal class KeystoreBackend(
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                     .setKeySize(256)
                     .setUserAuthenticationRequired(true)
-                    .setUserAuthenticationParameters(timeout(policy), KEY_AUTH)
+                    .setUserAuthenticationParameters(timeout(policy), keyAuth(bio))
                     .setUnlockedDeviceRequired(true)
-                    .setInvalidatedByBiometricEnrollment(false)
+                    .setInvalidatedByBiometricEnrollment(bio)
                     .apply { if (strongBox) setIsStrongBoxBacked(true) }
                     .build(),
             )
@@ -275,9 +282,9 @@ internal class KeystoreBackend(
                                 .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
                                 .setDigests(KeyProperties.DIGEST_SHA256)
                                 .setUserAuthenticationRequired(true)
-                                .setUserAuthenticationParameters(timeout(policy), KEY_AUTH)
+                                .setUserAuthenticationParameters(timeout(policy), keyAuth(reason.key.biometricOnly))
                                 .setUnlockedDeviceRequired(true)
-                                .setInvalidatedByBiometricEnrollment(false)
+                                .setInvalidatedByBiometricEnrollment(reason.key.biometricOnly)
                                 .setAttestationChallenge(alias.encodeToByteArray())
                                 .apply { if (strongBox) setIsStrongBoxBacked(true) }
                                 .build(),
@@ -393,7 +400,8 @@ internal class KeystoreBackend(
     /**
      * The platform's `BiometricPrompt` with [crypto] as the one operation it authorises (01 §5.1);
      * without one, the confirmation opens a key's window instead (the X25519 twin). STRONG
-     * biometrics or the screen lock.
+     * biometrics or the screen lock — or, for a key bound to them alone, only STRONG biometrics, and
+     * then Android wants a button to say no with (D245).
      */
     private suspend fun prompt(reason: UseReason, crypto: BiometricPrompt.CryptoObject?): ChipResult<Unit> {
         val text = texts(reason)
@@ -405,7 +413,17 @@ internal class KeystoreBackend(
                 val prompt = BiometricPrompt.Builder(context)
                     .setTitle(text.title)
                     .apply { text.subtitle?.let(::setSubtitle); text.description?.let(::setDescription) }
-                    .setAllowedAuthenticators(PROMPT_AUTH)
+                    .apply {
+                        if (reason.key.biometricOnly) {
+                            setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                            // The framework tells this button to its own listener, not to the callback.
+                            setNegativeButton(text.cancel, context.mainExecutor) { _, _ ->
+                                if (continuation.isActive) continuation.resume(ChipResult.Cancelled)
+                            }
+                        } else {
+                            setAllowedAuthenticators(PROMPT_AUTH)
+                        }
+                    }
                     .setConfirmationRequired(false)
                     .build()
                 val callback = object : BiometricPrompt.AuthenticationCallback() {
@@ -419,6 +437,8 @@ internal class KeystoreBackend(
                             when (errorCode) {
                                 BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED, BiometricPrompt.BIOMETRIC_ERROR_CANCELED,
                                 BiometricPrompt.BIOMETRIC_ERROR_TIMEOUT -> ChipResult.Cancelled
+                                // Every fingerprint removed: the Keystore has invalidated a key bound to them.
+                                BiometricPrompt.BIOMETRIC_ERROR_NO_BIOMETRICS -> ChipResult.Unusable
                                 BiometricPrompt.BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL -> ChipResult.NoScreenLock
                                 else -> ChipResult.Failed("prompt-$errorCode", errString.toString())
                             },
