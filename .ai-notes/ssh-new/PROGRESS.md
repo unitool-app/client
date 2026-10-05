@@ -21,7 +21,7 @@
 | 5b | iOS: `SecureEnclaveBackend`, `SshKeyringHost.ios`, шаги enclave в самопроверке | 🟢 самопроверка зелёная на iPhone владельца 2026-09-27 (TestFlight 1.0 (11), см. §3); `SshKeyringHost.ios` не включён — iOS-хост на уровне 3, пока владелец не решит (D175) | в том же коммите |
 | 6 | UI: Settings → SSH keys, карточка ключа, мастер импорта, «Создать ключ», Storage & security, баннер на Home, строка защиты в 2FA, модуль выбора файла | ✅ полный `verify.sh` зелёный (`KeysScreensTest`, `SecureWindowTest` на `unitool35`); ⏸ скриншоты 26–41 ждут приёмки владельца | ветка `ssh-keyring`; `composeApp/…/settings/`, `services/file-picker` |
 | 7 | Бэкап на ключи GitHub и восстановление, импорт 2FA из файла, I17/I18, выпуск | ✅ код: полный `verify.sh` зелёный (`BackupTest` I17/I18 с настоящим `age`, `BackupScreenTest`, `TwoFaFileImportTest`, `BackupCipherTest`); ⏸ PRIVACY и листинг — предложение в [08](08-privacy-and-listing-proposal.md), вопрос 90; ⏸ выпуск и ручная приёмка 03 §7 | ветка `ssh-keyring`; `services/backup`, `composeApp/…/settings/BackupScreens.kt` |
-| 09 | Выбор уровня (чип / чип + пароль / только пароль), `ImportOptions.level`; только отпечаток на Android (`biometricOnly`, D245); iPhone на Secure Enclave (D239); P-256 на iPhone | ✅ закоммичено: `verify.sh` — desktop-тесты (`KeyringTest`, `KeyLevelChoiceTest`), скриншоты, iOS-klib зелёные; Android `assembleDebug`/`assembleRelease` и web пересобраны отдельно после правки кнопки «Отмена» и Metaspace — зелёные; ⏸ инструментальные тесты не гонялись — эмулятор не стартует, на диске < 1 ГБ; ⏸ iPhone — сборка TestFlight | Superizer 0.4.1 (`contract-3`), unitool `ssh-keyring`; [09](09-level-choice-and-ios-chip.md) §8–§9 |
+| 09 | Выбор уровня (чип / чип + пароль / только пароль), `ImportOptions.level`; только отпечаток на Android (D245) и только Face ID / Touch ID на iPhone (D246) — `biometricOnly`; свой замок обязателен (D247); iPhone на Secure Enclave (D239); P-256 на iPhone | ✅ D237–D247 закоммичены. `verify.sh` 2026-10-05 с эмулятором: desktop, web, iOS-klib, `assembleDebug`, самопроверка, сейф и кольцо на устройстве — зелёные; скриншоты и `assembleRelease` упали от окружения (соседний прогон стёр результаты тестов; демон убит нехваткой памяти) и зелёные при повторе отдельно. На эмуляторе `unitool35` `KeystoreBackendTest` 9/9: ключ под паролем не трогает Keystore; с зарегистрированным отпечатком (сенсор strength 15) Keystore пишет `AUTH_BIOMETRIC_STRONG` и сброс при новом отпечатке; без отпечатка — `biometric.unavailable`. ⏸ iPhone — сборка TestFlight; ⏸ телефон с отпечатком руками | Superizer 0.4.1 (`contract-3`), unitool `ssh-keyring`; [09](09-level-choice-and-ios-chip.md) §8–§10 |
 
 ## 2. Инварианты 03 §1 — чем доказаны
 
@@ -102,7 +102,8 @@
   настоящего `storage.location`.
 - Заметка 09: проверить на iPhone (TestFlight) импорт из QR на уровень 2 по Face ID и создание P-256;
   на Android-телефоне с отпечатком — импорт «только отпечаток», что PIN его не открывает и что новый
-  отпечаток делает ключ непригодным; ответить на вопрос 123 (Face ID без код-пароля на iPhone).
+  отпечаток делает ключ непригодным; на iPhone — лист только с Face ID, без «Ввести код-пароль», и
+  ключ пропадает после «Сбросить Face ID» (D246).
 - Перед пушем Unitool запушить Superizer 0.4.1 (CI Unitool собирает Superizer из его `master`).
 - Ответить на вопрос 90: вписать ли текст PRIVACY и листинга из [08](08-privacy-and-listing-proposal.md).
 - Выпуск Unitool с шагами 5–7: после публикации Superizer 0.4.0 и ответа на вопрос 90.

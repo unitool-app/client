@@ -86,9 +86,9 @@ class KeystoreBackendTest {
 
     private fun backend() = KeystoreBackend(context, { null }, nobody)
 
-    private fun reason(key: SshPublicKey) = UseReason(
+    private fun reason(key: SshPublicKey, biometricOnly: Boolean = false) = UseReason(
         null,
-        SshKeyInfo(key.id, key.type, key.authorizedKeysLine(), key.label, "t", KeyStorage.Tee, UsePolicy.EveryUse, KeyOrigin.Imported, setOf(KeyCapability.Sign), 0),
+        SshKeyInfo(key.id, key.type, key.authorizedKeysLine(), key.label, "t", KeyStorage.Tee, UsePolicy.EveryUse, KeyOrigin.Imported, setOf(KeyCapability.Sign), 0, biometricOnly = biometricOnly),
         KeyOperation.Import,
     )
 
@@ -179,11 +179,18 @@ class KeystoreBackendTest {
         val records = PrefsRecordStore(context)
         records.clear()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val host = SshKeyringHost.withChip(records, NoPrompter, KeystoreBackend(context, { null }, nobody), Clock { System.currentTimeMillis() }, Platform.Android, scope)
+        val backend = KeystoreBackend(context, { null }, nobody)
+        val host = SshKeyringHost.withChip(records, NoPrompter, backend, Clock { System.currentTimeMillis() }, Platform.Android, scope)
         val pass = "canary passphrase for the heap"
         val file = canary().use { k -> SecretBytes.utf8(pass.toCharArray()).use { OpenSshKeyFile.write(k, it, rounds = 4) } }
-        val outcome = host.admin.import(file, pass.toCharArray(), ImportOptions())
-        assertTrue(outcome is ImportOutcome.Imported || outcome is ImportOutcome.Cancelled || outcome is ImportOutcome.NoScreenLock, "$outcome")
+        // The keyring's own path, decrypting the file, at the one level that needs nobody here: since
+        // D247 a key in the chip needs a finger or its passphrase, and neither answers in a test.
+        val outcome = host.admin.import(file, pass.toCharArray(), ImportOptions(level = 3))
+        assertTrue(outcome is ImportOutcome.Imported, "$outcome")
+        // …and the seed's way into the Keystore itself, below the keyring's rule.
+        if (backend.curve25519) {
+            canary().use { assertEquals(ChipResult.Ok(null), backend.store(alias, KeyStorage.Tee, it, ByteArray(0), UsePolicy.EveryUse, reason(it.publicKey))) }
+        }
 
         // I1: every file of the app, every encoding of the seed: nothing.
         val found = mutableListOf<String>()
@@ -217,6 +224,7 @@ class KeystoreBackendTest {
         } finally {
             dump.delete()
             (outcome as? ImportOutcome.Imported)?.let { host.admin.delete(it.key.id) }
+            backend.delete(alias)
             records.clear()
         }
     }
@@ -244,6 +252,31 @@ class KeystoreBackendTest {
             host.admin.delete(key.id)
             records.clear()
         }
+    }
+
+    @Test
+    fun aKeyOnlyAFingerprintOpensIsBoundToItAloneOrNotMadeAtAll() = runBlocking<Unit> {
+        // 09, D245: the screen lock must not open it, and a new fingerprint must end it.
+        val backend = backend()
+        if (!backend.device.strongBiometric) {
+            // No fingerprint here (the emulator, unless one was enrolled): the keyring refuses before the Keystore is touched.
+            val records = PrefsRecordStore(context)
+            records.clear()
+            val host = SshKeyringHost.withChip(records, NoPrompter, backend, Clock { System.currentTimeMillis() }, Platform.Android, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+            val before = keystore.aliases().toList().toSet()
+            val file = rsa().use { k -> SecretBytes.utf8("rsa passphrase, long enough".toCharArray()).use { OpenSshKeyFile.write(k, it, rounds = 4) } }
+            assertEquals(ImportOutcome.Failed("biometric.unavailable"), host.admin.import(file, "rsa passphrase, long enough".toCharArray(), ImportOptions(biometricOnly = true)))
+            assertEquals(before, keystore.aliases().toList().toSet())
+            records.clear()
+            return@runBlocking
+        }
+        rsa().use { assertEquals(ChipResult.Ok(null), backend.store(alias, KeyStorage.Tee, it, ByteArray(0), UsePolicy.EveryUse, reason(it.publicKey, biometricOnly = true))) }
+        for (suffix in listOf(".sign", ".decrypt")) {
+            val info = KeyFactory.getInstance("RSA", "AndroidKeyStore").getKeySpec(keystore.getKey(alias + suffix, null), KeyInfo::class.java)
+            assertEquals(KeyProperties.AUTH_BIOMETRIC_STRONG, info.userAuthenticationType, "$suffix: the finger, not the lock")
+            assertTrue(info.isInvalidatedByBiometricEnrollment, "$suffix: a new finger ends it")
+        }
+        backend.delete(alias)
     }
 
     @Test

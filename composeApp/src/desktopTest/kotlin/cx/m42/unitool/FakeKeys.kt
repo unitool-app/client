@@ -120,8 +120,11 @@ internal val AndroidPhone = KeyringDevice(
 /** The same phone with a fingerprint enrolled (D245). */
 internal val AndroidWithFingerprint = AndroidPhone.copy(strongBiometric = true)
 
-/** An iPhone with a passcode: the Secure Enclave seals imported keys and makes P-256 ones. */
+/** An iPhone with a passcode and no Face ID or Touch ID enrolled: the Secure Enclave seals imported keys and makes P-256 ones. */
 internal val IPhone = KeyringDevice(Platform.Ios, secureEnclave = true, screenLockSet = true, levels = setOf(1, 2))
+
+/** The same iPhone with Face ID set up (D246). */
+internal val IPhoneWithFaceId = IPhone.copy(strongBiometric = true)
 
 /** 2023-11-14 22:13:42 UTC, the 2FA frames' moment. */
 private const val AT = 1_700_000_022_000L

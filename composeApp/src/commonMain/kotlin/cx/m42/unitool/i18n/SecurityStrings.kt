@@ -62,8 +62,8 @@ internal interface SecurityStrings {
     val keepInChip: String
     val keepUnderPassphrase: String
     val biometricOnly: String
-    val keepAsItWas: String
-    val turnOffAnyway: String
+    val biometricOnlyIphone: String
+    val passphraseRequired: String
     val noPassphraseInChip: String
     val add: String
     val importing: String

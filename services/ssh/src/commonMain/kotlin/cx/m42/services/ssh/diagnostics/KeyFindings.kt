@@ -26,6 +26,10 @@ public object KeyFindings {
         return buildList {
             add(if (key.usable) placement(key.storage, subject, inBrowser, chipHere) else DiagnosticsCode.KeyUnusable.finding(subject))
             if (key.usable && key.biometricOnly) add(DiagnosticsCode.KeyBiometricOnly.finding(subject))
+            // From before D247: in the chip, and only the screen lock between it and whoever holds the phone.
+            if (key.usable && key.storage.level < 3 && !key.biometricOnly && !key.passphraseKept) {
+                add(DiagnosticsCode.KeyNoSecondLock.finding(subject))
+            }
             if (key.id == anchor) add(DiagnosticsCode.KeySecretsAnchor.finding(subject))
             (key.policy as? UsePolicy.Session)?.let {
                 add(DiagnosticsCode.KeySessionPolicy.finding(subject, mapOf("minutes" to ((it.seconds + 59) / 60).toString())))

@@ -26,9 +26,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 /**
- * "Where it will live" in the wizard (09, D237–D244), on a phone made of data: what is offered,
- * what is chosen by default, the warning before Android's key loses its passphrase, and the
- * [ImportOptions] the keyring is handed in the end. That the keyring honours them is KeyringTest's.
+ * "Where it will live" in the wizard (09, D237–D247), on a phone made of data: what is offered,
+ * what is chosen by default, that a key in the chip always keeps a lock of its own — a biometric or
+ * its passphrase — and the [ImportOptions] the keyring is handed in the end. That the keyring
+ * honours them is KeyringTest's.
  */
 @OptIn(ExperimentalTestApi::class)
 class KeyLevelChoiceTest : UnitoolTest() {
@@ -83,29 +84,34 @@ class KeyLevelChoiceTest : UnitoolTest() {
         paste(keys)
         shown("finding:${DiagnosticsCode.KeyLevel1.id}")
         shown("finding:${DiagnosticsCode.KeyBiometricOnly.id}")
-        onNodeWithTag("finding:${DiagnosticsCode.KeyNoSecondLock.id}").assertDoesNotExist()
+        onNodeWithTag("import:passphrase-required").assertDoesNotExist()
         add()
         assertEquals(null to ImportOptions(level = null, keepPassphrase = false, biometricOnly = true), keys.admin.asked.single())
     }
 
     @Test
-    fun androidWarnsBeforeTheFingerprintStopsBeingTheOnlyWayIn() = runComposeUiTest {
+    fun theFingerprintOffMakesThePassphraseRequiredNotTheScreenLock() = runComposeUiTest {
+        // D247: there is no "turn it off anyway" — without the finger, the key's passphrase is its lock.
         val keys = FakeKeys(device = AndroidWithFingerprint)
         paste(keys)
         tap("import:biometric-only")
-        shown("finding:${DiagnosticsCode.KeyNoSecondLock.id}")
-        tap("import:keep-stay")
-        onNodeWithTag("finding:${DiagnosticsCode.KeyNoSecondLock.id}").assertDoesNotExist()
-        shown("finding:${DiagnosticsCode.KeyBiometricOnly.id}")
-
-        // With the passphrase on first, the screen lock is never all there is: nothing to warn about.
-        tap("import:keep-passphrase")
-        tap("import:biometric-only")
-        onNodeWithTag("import:keep-stay").assertDoesNotExist()
-        onNodeWithTag("finding:${DiagnosticsCode.KeyBiometricOnly.id}").assertDoesNotExist()
+        shown("import:passphrase-required")
         shown("finding:${DiagnosticsCode.KeyLevel2.id}")
+        onNodeWithTag("finding:${DiagnosticsCode.KeyBiometricOnly.id}").assertDoesNotExist()
+        tap("import:keep-passphrase")
         add()
         assertEquals(null to ImportOptions(level = 2, keepPassphrase = true, biometricOnly = false), keys.admin.asked.single())
+    }
+
+    @Test
+    fun theFingerprintAndThePassphraseTogether() = runComposeUiTest {
+        val keys = FakeKeys(device = AndroidWithFingerprint)
+        paste(keys)
+        tap("import:keep-passphrase")
+        shown("finding:${DiagnosticsCode.KeyLevel2.id}")
+        shown("finding:${DiagnosticsCode.KeyBiometricOnly.id}")
+        add()
+        assertEquals(null to ImportOptions(level = 2, keepPassphrase = true, biometricOnly = true), keys.admin.asked.single())
     }
 
     @Test
@@ -121,37 +127,18 @@ class KeyLevelChoiceTest : UnitoolTest() {
     }
 
     @Test
-    fun androidWithoutAFingerprintKeepsTheKeyInTheChipUnderItsPassphraseByDefault() = runComposeUiTest {
+    fun androidWithoutAFingerprintKeepsTheKeyUnderItsPassphraseAndCannotDropIt() = runComposeUiTest {
         val keys = FakeKeys()
         paste(keys)
         shown("import:where-chip")
         shown("import:where-passphrase")
-        // The chip could hold it (level 1); with the passphrase kept it is sealed by the same chip.
+        // The chip could hold it (level 1); with its passphrase it is sealed by the same chip.
         shown("finding:${DiagnosticsCode.KeyLevel2.id}")
-        onNodeWithTag("finding:${DiagnosticsCode.KeyNoSecondLock.id}").assertDoesNotExist()
+        shown("import:passphrase-required")
         onNodeWithTag("import:biometric-only").assertDoesNotExist()
-        add()
-        assertEquals(null to ImportOptions(level = 2, keepPassphrase = true), keys.admin.asked.single())
-    }
-
-    @Test
-    fun androidWarnsBeforeTheKeyLosesItsPassphraseAndChangesNothingUntilTold() = runComposeUiTest {
-        val keys = FakeKeys()
-        paste(keys)
         tap("import:keep-passphrase")
-        shown("finding:${DiagnosticsCode.KeyNoSecondLock.id}")
-        tap("import:keep-stay")
-        onNodeWithTag("import:keep-stay").assertDoesNotExist()
-        onNodeWithTag("finding:${DiagnosticsCode.KeyNoSecondLock.id}").assertDoesNotExist()
-        shown("finding:${DiagnosticsCode.KeyLevel2.id}")
-
-        tap("import:keep-passphrase")
-        tap("import:keep-drop")
-        // Inside the chip now, and the warning stays where the choice is.
-        shown("finding:${DiagnosticsCode.KeyLevel1.id}")
-        shown("finding:${DiagnosticsCode.KeyNoSecondLock.id}")
         add()
-        assertEquals(null to ImportOptions(level = null, keepPassphrase = false), keys.admin.asked.single())
+        assertEquals(null to ImportOptions(level = 2, keepPassphrase = true), keys.admin.asked.single(), "the switch did not move")
     }
 
     @Test
@@ -166,38 +153,63 @@ class KeyLevelChoiceTest : UnitoolTest() {
     }
 
     @Test
-    fun anIPhoneSealsTheKeyBehindFaceIdAndAsksNothingBeforeThePassphraseGoes() = runComposeUiTest {
+    fun anIPhoneWithoutFaceIdKeepsTheKeyUnderItsPassphrase() = runComposeUiTest {
         val keys = FakeKeys(device = IPhone, wouldBe = KeyStorage.SealedByChip(Chip.SecureEnclave))
         paste(keys)
         shown("finding:${DiagnosticsCode.KeyLevel2.id}")
-        tap("import:keep-passphrase")
-        onNodeWithTag("import:keep-stay").assertDoesNotExist()
-        tap("import:keep-passphrase")
-        onNodeWithTag("import:keep-stay").assertDoesNotExist()
-        onNodeWithTag("finding:${DiagnosticsCode.KeyNoSecondLock.id}").assertDoesNotExist()
+        shown("import:passphrase-required")
         add()
-        // On, then off again: the default (question 118) — the chip, without the passphrase.
-        assertEquals(null to ImportOptions(level = null, keepPassphrase = false), keys.admin.asked.single())
+        assertEquals(null to ImportOptions(level = 2, keepPassphrase = true), keys.admin.asked.single())
     }
 
     @Test
-    fun anIPhoneMakesAP256InsideTheEnclaveWithNothingToChoose() = runComposeUiTest {
+    fun anIPhoneWithFaceIdLetsOnlyItOpenTheKeyByDefault() = runComposeUiTest {
+        val keys = FakeKeys(device = IPhoneWithFaceId, wouldBe = KeyStorage.SealedByChip(Chip.SecureEnclave))
+        paste(keys)
+        shown("finding:${DiagnosticsCode.KeyLevel2.id}")
+        shown("finding:${DiagnosticsCode.KeyBiometricOnly.id}")
+        onNode(hasText("Only Face ID or Touch ID — not the passcode")).assertExists()
+        add()
+        assertEquals(null to ImportOptions(level = null, keepPassphrase = false, biometricOnly = true), keys.admin.asked.single())
+    }
+
+    @Test
+    fun anIPhoneWithFaceIdOffMakesThePassphraseRequiredNotThePasscode() = runComposeUiTest {
+        val keys = FakeKeys(device = IPhoneWithFaceId, wouldBe = KeyStorage.SealedByChip(Chip.SecureEnclave))
+        paste(keys)
+        tap("import:biometric-only")
+        shown("import:passphrase-required")
+        add()
+        assertEquals(null to ImportOptions(level = 2, keepPassphrase = true, biometricOnly = false), keys.admin.asked.single())
+    }
+
+    @Test
+    fun anIPhoneWithFaceIdMakesAP256OnlyItOpens() = runComposeUiTest {
+        val keys = FakeKeys(device = IPhoneWithFaceId, wouldBe = KeyStorage.SealedByChip(Chip.SecureEnclave))
+        open(keys)
+        tap("import:create")
+        tapText("ECDSA P-256 — signs only, made inside the chip")
+        shown("finding:${DiagnosticsCode.KeyLevel1.id}")
+        shown("finding:${DiagnosticsCode.KeyBiometricOnly.id}")
+        tap("import:create-key")
+        assertEquals(GeneratedKind.EcdsaP256 to ImportOptions(biometricOnly = true), keys.admin.asked.single())
+    }
+
+    @Test
+    fun anIPhoneWithoutFaceIdHasNoP256ToMake() = runComposeUiTest {
+        // It would have no lock of its own: no file for a passphrase, no biometric (D247).
         val keys = FakeKeys(device = IPhone, wouldBe = KeyStorage.SealedByChip(Chip.SecureEnclave))
         open(keys)
         tap("import:create")
-        onNodeWithTag("import:where-chip").performScrollTo().assertIsDisplayed()
-        tapText("ECDSA P-256 — signs only, made inside the chip")
-        onNodeWithTag("import:where-chip").assertDoesNotExist()
-        shown("finding:${DiagnosticsCode.KeyLevel1.id}")
-        tap("import:create-key")
-        assertEquals(GeneratedKind.EcdsaP256 to ImportOptions(), keys.admin.asked.single())
+        onNode(hasText("ECDSA P-256 — signs only, made inside the chip")).assertDoesNotExist()
     }
 
     @Test
-    fun aKeyMadeOnAndroidKeepsItsPassphraseLikeAnImportedOne() = runComposeUiTest {
+    fun aKeyMadeOnAndroidWithoutAFingerprintKeepsItsPassphraseLikeAnImportedOne() = runComposeUiTest {
         val keys = FakeKeys()
         open(keys)
         tap("import:create")
+        onNode(hasText("ECDSA P-256 — signs only, made inside the chip")).assertDoesNotExist()
         tap("import:create-key")
         assertEquals(GeneratedKind.Ed25519 to ImportOptions(level = 2, keepPassphrase = true), keys.admin.asked.single())
     }

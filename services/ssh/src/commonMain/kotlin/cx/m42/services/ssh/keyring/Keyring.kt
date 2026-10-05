@@ -144,6 +144,7 @@ internal class Keyring(
             createdAt = record.createdAt,
             usable = usable,
             biometricOnly = record.biometricOnly,
+            passphraseKept = record.keepPassphrase,
         )
     }
 
@@ -495,6 +496,17 @@ internal class Keyring(
     private fun placement(key: SshPublicKey, generated: Boolean): KeyStorage =
         chip?.placement(key, generated) ?: KeyStorage.SealedByPassphrase
 
+    /** "Keep the passphrase" with no level asks for level 2, where the passphrase can count (01 §5.4). */
+    private fun wantedLevel(options: ImportOptions): Int? =
+        options.level ?: if (options.keepPassphrase && chip?.device?.levels?.any { it < 3 } == true) 2 else null
+
+    /**
+     * D247: a key in the chip has a lock of its own — a strong biometric, or its passphrase asked for
+     * too — and is never opened by the screen lock alone. Level 3 is its passphrase already.
+     */
+    private fun ownLock(storage: KeyStorage, options: ImportOptions): Boolean =
+        storage.level == 3 || options.biometricOnly || (options.keepPassphrase && storage.level == 2)
+
     /** "Only a strong biometric" needs a chip that holds or seals the key and such a biometric enrolled (09, D245). */
     private fun biometricPossible(storage: KeyStorage, options: ImportOptions): Boolean =
         !options.biometricOnly || (storage.level < 3 && chip?.device?.strongBiometric == true)
@@ -529,8 +541,9 @@ internal class Keyring(
         try {
             record(parsed.publicKey.id)?.let { existing -> return ImportOutcome.AlreadyThere(info(existing)!!) }
             // Before any passphrase is asked for: what this key cannot have is said at once.
-            val storage = placement(parsed.publicKey, generated = false, options.level) ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
+            val storage = placement(parsed.publicKey, generated = false, wantedLevel(options)) ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
             if (!biometricPossible(storage, options)) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
+            if (!ownLock(storage, options)) return ImportOutcome.Failed(OWN_LOCK_REQUIRED)
             val given = if (parsed.isEncrypted) passphrase?.size ?: 0 else 0
             if (parsed.isEncrypted && (passphrase == null || passphrase.isEmpty())) return ImportOutcome.WrongPassphrase
             val key = when (val d = SecretBytes.utf8(passphrase ?: CharArray(0)).use { parsed.decrypt(if (parsed.isEncrypted) it else null) }) {
@@ -562,9 +575,10 @@ internal class Keyring(
     private suspend fun storeKey(key: PrivateKey, encryptedFile: ByteArray, options: ImportOptions, origin: KeyOrigin): ImportOutcome {
         val public = key.publicKey
         OpenSshKeyFile.refusalFor(public)?.let { return ImportOutcome.Rejected(it) }
-        val storage = placement(public, generated = origin is KeyOrigin.Generated, options.level)
+        val storage = placement(public, generated = origin is KeyOrigin.Generated, wantedLevel(options))
             ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
         if (!biometricPossible(storage, options)) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
+        if (!ownLock(storage, options)) return ImportOutcome.Failed(OWN_LOCK_REQUIRED)
         val id = public.fingerprint
         // The chip reads who may confirm from here (ChipBackend): the record does not exist yet.
         val info = SshKeyInfo(
@@ -620,8 +634,9 @@ internal class Keyring(
                 val key = PrivateKey.ed25519(seed, options.comment ?: "unitool")
                 seed.fill(0)
                 return key.use {
-                    val storage = placement(it.publicKey, generated = true, options.level) ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
+                    val storage = placement(it.publicKey, generated = true, wantedLevel(options)) ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
                     if (!biometricPossible(storage, options)) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
+                    if (!ownLock(storage, options)) return ImportOutcome.Failed(OWN_LOCK_REQUIRED)
                     val level = storage.level
                     // A passphrase where it is the only lock (3) or a second one the person kept (2, D244).
                     val keep = options.keepPassphrase && level == 2
@@ -644,6 +659,8 @@ internal class Keyring(
                 if (options.level != null && options.level != 1) return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
                 val backend = chip ?: return ImportOutcome.Failed("no-chip")
                 if (options.biometricOnly && !backend.device.strongBiometric) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)
+                // No file, so no passphrase: a biometric is the only lock of its own it can have (D247).
+                if (!options.biometricOnly) return ImportOutcome.Failed(OWN_LOCK_REQUIRED)
                 if (!backend.device.screenLockSet) return ImportOutcome.NoScreenLock
                 val alias = ALIAS_PREFIX + "gen" + random(6).joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
                 val placeholder = SshKeyInfo(
@@ -827,6 +844,9 @@ internal class Keyring(
 
         /** `ImportOptions.biometricOnly` where no strong biometric is enrolled, or at level 3 (09, D245). */
         const val BIOMETRIC_UNAVAILABLE = "biometric.unavailable"
+
+        /** A key for the chip with neither a biometric nor its passphrase: the screen lock alone would open it (09, D247). */
+        const val OWN_LOCK_REQUIRED = "own-lock-required"
         const val JOURNAL = 200
         const val MAX_TRIES = 3
     }

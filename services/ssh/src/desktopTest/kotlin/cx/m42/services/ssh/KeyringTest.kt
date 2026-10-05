@@ -51,9 +51,10 @@ class KeyringTest {
 
     @Test
     fun theCanaryIsNowhereAfterImportSignDecryptAndDelete() = runTest {
-        for (chip in listOf(null, SoftwareChip(level = 2), SoftwareChip(level = 1))) {
+        for (chip in listOf(null, SoftwareChip(level = 2, strongBiometric = true), SoftwareChip(level = 1, strongBiometric = true))) {
             val f = KeyringFixture(backgroundScope, chip)
-            val imported = f.importCanary()
+            // In the chip with a lock of its own (D247): the finger.
+            val imported = f.importCanary(ImportOptions(biometricOnly = chip != null))
             assertEquals(if (chip == null) 3 else chip.device.levels.single(), imported.key.storage.level)
             f.prompter.passphrases.addAll(List(4) { pass })
 
@@ -236,10 +237,10 @@ class KeyringTest {
 
     @Test
     fun deleteAsksAndLeavesNothingAndTheSecretsKeyCannotGo() = runTest {
-        val chip = SoftwareChip(level = 1)
+        val chip = SoftwareChip(level = 1, strongBiometric = true)
         val f = KeyringFixture(backgroundScope, chip)
-        val a = f.importCanary().key
-        val b = assertIs<ImportOutcome.Imported>(f.admin.import(encryptedFile(GOOD), GOOD.toCharArray(), ImportOptions())).key
+        val a = f.importCanary(ImportOptions(biometricOnly = true)).key
+        val b = assertIs<ImportOutcome.Imported>(f.admin.import(encryptedFile(GOOD), GOOD.toCharArray(), ImportOptions(biometricOnly = true))).key
         f.prompter.passphrases.add(pass)
         f.app("git").sign(a.id, "git", "x".toByteArray())
 
@@ -258,9 +259,9 @@ class KeyringTest {
 
     @Test
     fun aKeyTheChipDroppedIsUnusableAndStillShown() = runTest {
-        val chip = SoftwareChip(level = 1)
+        val chip = SoftwareChip(level = 1, strongBiometric = true)
         val f = KeyringFixture(backgroundScope, chip)
-        val key = f.importCanary().key
+        val key = f.importCanary(ImportOptions(biometricOnly = true)).key
         chip.dropEverything()
         assertEquals(SshOutcome.Unusable, f.app("git").sign(key.id, "git", "x".toByteArray()))
         val shown = f.admin.keys.value.single()
@@ -352,9 +353,9 @@ class KeyringTest {
         assertEquals(SshOutcome.Failed("wrong-passphrase"), f.app("git").sign(key.id, "git", "y".toByteArray()), "the device alone does not open it")
         assertEquals(emptyList(), LeakScanner.scan(f.everything(), canaries))
 
-        // Without the passphrase, the best the chip offers — inside it.
+        // "Keep the passphrase" alone, with no level, is the same level 2.
         val g = KeyringFixture(backgroundScope, SoftwareChip(level = 1))
-        assertEquals(KeyStorage.Tee, g.importCanary(ImportOptions(level = null)).key.storage)
+        assertEquals(KeyStorage.SealedByChip(Chip.Tee), g.importCanary(ImportOptions(keepPassphrase = true)).key.storage)
     }
 
     @Test
@@ -405,6 +406,42 @@ class KeyringTest {
         assertEquals(null, noFinger.records.text)
         assertEquals(null, levelThree.records.text)
         assertEquals(null, desktop.records.text)
+    }
+
+    @Test
+    fun aKeyInTheChipNeedsALockOfItsOwnNeverTheScreenLockAlone() = runTest {
+        // D247: without a fingerprint or face, its passphrase; never the PIN or passcode by itself.
+        for (chip in listOf(SoftwareChip(level = 1), SoftwareChip(level = 2), SoftwareChip(level = 1, strongBiometric = true))) {
+            val f = KeyringFixture(backgroundScope, chip)
+            assertEquals(ImportOutcome.Failed("own-lock-required"), f.admin.import(canaryFile(pass), pass.toCharArray(), ImportOptions()))
+            val best = chip.device.levels.single()
+            assertEquals(ImportOutcome.Failed("own-lock-required"), f.admin.import(canaryFile(pass), pass.toCharArray(), ImportOptions(level = best)))
+            assertEquals(ImportOutcome.Failed("own-lock-required"), f.admin.generate(GeneratedKind.Ed25519, ImportOptions(), GOOD.toCharArray()))
+            // A P-256 made in the chip has no file to keep a passphrase on: a biometric or nothing.
+            assertEquals(ImportOutcome.Failed("own-lock-required"), f.admin.generate(GeneratedKind.EcdsaP256, ImportOptions(), null))
+            assertEquals(null, f.records.text, "nothing stored")
+            assertEquals(0, chip.biometricOnlyAsked.size, "and the chip was never asked")
+        }
+        // Either lock will do, and level 3 is its passphrase already.
+        val f = KeyringFixture(backgroundScope, SoftwareChip(level = 1, strongBiometric = true))
+        assertEquals(true, f.importCanary(ImportOptions(biometricOnly = true)).key.biometricOnly)
+        val kept = assertIs<ImportOutcome.Imported>(f.admin.import(encryptedFile(GOOD), GOOD.toCharArray(), ImportOptions(level = 2, keepPassphrase = true))).key
+        assertEquals(true, kept.passphraseKept)
+        assertIs<ImportOutcome.Imported>(f.admin.import(encryptedFile(GOOD + "!"), (GOOD + "!").toCharArray(), ImportOptions(level = 3)))
+        assertTrue(f.admin.keys.value.none { key ->
+            DiagnosticsCode.KeyNoSecondLock.id in KeyFindings.of(key, null, inBrowser = false).map { it.code }
+        }, "none of them is left to the screen lock")
+    }
+
+    @Test
+    fun aKeyFromBeforeTheRuleThatOnlyTheScreenLockGuardsSaysSo() {
+        val legacy = cx.m42.superizer.ssh.SshKeyInfo(
+            KeyId("SHA256:old"), "ssh-ed25519", "ssh-ed25519 AAAA", "ED25519", "old", KeyStorage.Tee, UsePolicy.EveryUse,
+            cx.m42.superizer.ssh.KeyOrigin.Imported, emptySet(), 0,
+        )
+        assertTrue(DiagnosticsCode.KeyNoSecondLock.id in KeyFindings.of(legacy, null, inBrowser = false).map { it.code })
+        assertTrue(DiagnosticsCode.KeyNoSecondLock.id !in KeyFindings.of(legacy.copy(passphraseKept = true, storage = KeyStorage.SealedByChip(Chip.Tee)), null, false).map { it.code })
+        assertTrue(DiagnosticsCode.KeyNoSecondLock.id !in KeyFindings.of(legacy.copy(storage = KeyStorage.SealedByPassphrase), null, false).map { it.code })
     }
 
     private fun aliasOf(id: KeyId) = "cx.m42.services.ssh." + id.fingerprint.removePrefix("SHA256:").filter { it.isLetterOrDigit() }.take(16)
