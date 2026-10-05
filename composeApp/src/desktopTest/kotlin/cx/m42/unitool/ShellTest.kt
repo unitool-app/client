@@ -256,7 +256,7 @@ class ShellTest : UnitoolTest() {
     private fun ComposeUiTest.unlockBenchApp() {
         onNodeWithContentDescription("Открыть меню").performClick()
         waitForIdle()
-        onNodeWithContentDescription("Активировать").performClick()
+        onNodeWithContentDescription("Премиум").performClick()
         waitForIdle()
         onNodeWithTag("activate:promo").performTextInput(TestApp.PROMO_CODE)
         onNodeWithTag("activate:apply").performScrollTo().performClick()

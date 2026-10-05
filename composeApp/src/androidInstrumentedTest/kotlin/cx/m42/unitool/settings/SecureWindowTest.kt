@@ -55,7 +55,7 @@ class SecureWindowTest {
         // Settings: their promo code opens them (idea/09).
         onNode(hasContentDescription("Open menu").or(hasContentDescription("Открыть меню"))).performClick()
         waitForIdle()
-        onNode(hasContentDescription("Activate").or(hasContentDescription("Активировать"))).performClick()
+        onNode(hasContentDescription("Premium").or(hasContentDescription("Премиум"))).performClick()
         waitForIdle()
         onNodeWithTag("activate:promo").performTextInput("{ssh-keys}")
         onNodeWithTag("activate:apply").performScrollTo().performClick()

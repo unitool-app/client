@@ -85,7 +85,7 @@ class Screenshots {
     private fun labelFor(lang: String, label: String): String = if (lang == "en") {
         mapOf(
             "Открыть меню" to "Open menu",
-            "Активировать" to "Activate",
+            "Премиум" to "Premium",
             "Настройки" to "Settings",
             "Назад" to "Back",
         )[label] ?: label
@@ -222,7 +222,7 @@ class Screenshots {
         Screen("03-calculator") { tapTag(CALCULATOR_TILE) },
         Screen("04-calculator-scientific") {
             tapIcon("Открыть меню")
-            tapIcon("Активировать")
+            tapIcon("Премиум")
             typeInto("activate:promo", "SCI")
             tapTag("activate:apply")
         },
@@ -230,7 +230,7 @@ class Screenshots {
         Screen("06-converter-offline", offline = true) { addConverter(); tapTag(CONVERTER_TILE) },
         Screen("07-activate") {
             tapIcon("Открыть меню")
-            tapIcon("Активировать")
+            tapIcon("Премиум")
         },
         Screen("08-settings") {
             tapIcon("Открыть меню")
@@ -242,13 +242,13 @@ class Screenshots {
         },
         Screen("10-service-menu") {
             tapIcon("Открыть меню")
-            tapIcon("Активировать")
+            tapIcon("Премиум")
             typeInto("activate:promo", SERVICE_CODE)
             tapTag("activate:apply")
         },
         Screen("11-test-app") {
             tapIcon("Открыть меню")
-            tapIcon("Активировать")
+            tapIcon("Премиум")
             typeInto("activate:promo", cx.m42.apps.testapp.TestApp.PROMO_CODE)
             tapTag("activate:apply")
         },
@@ -363,14 +363,14 @@ class Screenshots {
         },
         Screen("41-ssh-keys-en", lang = "en", kind = HostKind.Phone(PhoneKeys)) {
             tapIcon("Open menu")
-            tapIcon("Activate")
+            tapIcon("Premium")
             typeInto("activate:promo", "{ssh-keys}")
             tapTag("activate:apply")
         },
         // idea/09: the secret app, opened by its code — and the Activate screen with the camera button.
         Screen("43-secret-app") {
             tapIcon("Открыть меню")
-            tapIcon("Активировать")
+            tapIcon("Премиум")
             typeInto("activate:promo", cx.m42.apps.testapp.SecretTestApp.PROMO_CODE)
             tapTag("activate:apply")
         },
@@ -384,7 +384,7 @@ class Screenshots {
     /** The SSH keys screen, which only its promo code opens (idea/09). */
     private fun DriveScope.openKeys() {
         tapIcon("Открыть меню")
-        tapIcon("Активировать")
+        tapIcon("Премиум")
         typeInto("activate:promo", "{ssh-keys}")
         tapTag("activate:apply")
     }

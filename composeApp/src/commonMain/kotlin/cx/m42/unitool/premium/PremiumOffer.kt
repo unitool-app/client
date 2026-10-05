@@ -38,8 +38,10 @@ import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import cx.m42.superizer.ActivateBanner
+import cx.m42.superizer.ActivateEntry
 import cx.m42.superizer.HostScreen
 import cx.m42.superizer.Superizer
+import cx.m42.superizer.app.AppIcon
 import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.theme.AppTheme
 import cx.m42.superizer.ui.components.AppButton
@@ -61,7 +63,12 @@ import kotlin.math.sin
  * So the buttons only say that purchases come later. The prices are [PremiumPrices]' placeholders.
  * A real offer reads them from the store (`Product.displayPrice`, `ProductDetails.formattedPrice`).
  */
-internal object PremiumOffer : ActivateBanner {
+internal object PremiumOffer : ActivateBanner, ActivateEntry {
+    /** In the drawer, Activate is a star and "Premium" rather than a QR code: buying comes first. */
+    override val icon: AppIcon = AppIcon.Named("star")
+
+    override fun title(langTag: String): String = premiumStrings(langTag).entry
+
     @Composable
     override fun Content(superizer: Superizer, open: (HostScreen) -> Unit): Boolean {
         val langTag by superizer.settings.langTag.collectAsState()

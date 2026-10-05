@@ -5,6 +5,8 @@ package cx.m42.unitool.i18n
  * translation. The small print follows what each store's own subscription screens say.
  */
 internal interface PremiumStrings {
+    /** Activate's name in the drawer and on its bar: the door is the offer now. */
+    val entry: String
     val title: String
     val lead: String
     val monthly: String
@@ -22,6 +24,7 @@ internal interface PremiumStrings {
 }
 
 internal object PremiumStringsEn : PremiumStrings {
+    override val entry = "Premium"
     override val title = "Unitool Premium"
     override val lead = "Buy Premium here, or enter a promo code below."
     override val monthly = "Monthly"
@@ -47,6 +50,7 @@ internal object PremiumStringsEn : PremiumStrings {
 }
 
 internal object PremiumStringsRu : PremiumStrings {
+    override val entry = "Премиум"
     override val title = "Unitool Premium"
     override val lead = "Премиум можно купить здесь или ввести промокод ниже."
     override val monthly = "Месяц"

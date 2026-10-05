@@ -156,8 +156,10 @@ private fun buildHost(
         ),
     )
 
-    // Premium, above the code on Activate: a mock-up that sells nothing yet (PremiumOffer).
+    // Premium, above the code on Activate: a mock-up that sells nothing yet (PremiumOffer). The
+    // drawer's door to it is a star called Premium, not a QR code.
     activateBanner(PremiumOffer)
+    activateEntry(PremiumOffer)
 
     // The platform's optional services (D19), for the apps through the registry: the 2FA app draws
     // its scan button from whether the camera is there, its export from whether there is a share

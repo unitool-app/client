@@ -232,7 +232,7 @@ class ActivationTest : UnitoolTest() {
     private fun androidx.compose.ui.test.ComposeUiTest.openActivate() {
         onNodeWithContentDescription("Открыть меню").performClick()
         waitForIdle()
-        onNodeWithContentDescription("Активировать").performClick()
+        onNodeWithContentDescription("Премиум").performClick()
         waitForIdle()
     }
 }

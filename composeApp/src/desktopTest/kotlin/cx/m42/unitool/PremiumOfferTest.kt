@@ -8,6 +8,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import cx.m42.unitool.i18n.premiumStrings
@@ -32,8 +33,11 @@ class PremiumOfferTest : UnitoolTest() {
         waitForIdle()
         onNodeWithContentDescription("Открыть меню").performClick()
         waitForIdle()
-        onNodeWithContentDescription("Активировать").performClick()
+        onNodeWithContentDescription("Премиум").performClick()
         waitForIdle()
+        // The drawer's door was a star called Premium, and the bar says the same.
+        onNodeWithContentDescription("Активировать").assertDoesNotExist()
+        onNodeWithText("Премиум").assertIsDisplayed()
 
         val card = onNodeWithTag("premium:card").assertIsDisplayed().getUnclippedBoundsInRoot()
         val promo = onNodeWithTag("activate:promo").getUnclippedBoundsInRoot()

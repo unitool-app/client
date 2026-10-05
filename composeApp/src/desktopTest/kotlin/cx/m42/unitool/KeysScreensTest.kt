@@ -94,7 +94,7 @@ class KeysScreensTest : UnitoolTest() {
     private fun ComposeUiTest.openKeys() {
         onNodeWithContentDescription("Open menu").performClick()
         waitForIdle()
-        onNodeWithContentDescription("Activate").performClick()
+        onNodeWithContentDescription("Premium").performClick()
         waitForIdle()
         type("activate:promo", "{ssh-keys}")
         tap("activate:apply")
