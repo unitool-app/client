@@ -1,5 +1,7 @@
 package cx.m42.unitool
 
+import androidx.compose.ui.test.assertTextEquals
+
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -149,6 +151,81 @@ class ActivationTest : UnitoolTest() {
 
         onNodeWithTag("test-app:root").assertDoesNotExist()
         onNodeWithTag(CALCULATOR_TILE).assertIsDisplayed()
+    }
+
+    /**
+     * idea/09, as the owner put it: the code opens the secret app; out of it, and it is gone — not
+     * on Home, in the menu or in "+"; the code again, and it is back with what it kept.
+     */
+    @Test
+    fun theSecretAppOpensByItsCodeAndIsNowhereOnceLeft() = runComposeUiTest {
+        setContent { UnitoolApp(testSuperizer()) }
+        waitForIdle()
+
+        enterCode(cx.m42.apps.testapp.SecretTestApp.PROMO_CODE)
+        onNodeWithTag("secret-test:root").assertIsDisplayed()
+        onNodeWithTag("secret-test:visits").assertTextEquals("Визит 1")
+
+        onNodeWithContentDescription("Открыть меню").performClick()
+        waitForIdle()
+        onNodeWithText("Главная").performClick()
+        waitForIdle()
+        onNodeWithTag("home:tile-secret-test").assertDoesNotExist()
+        // The menu from Home, where nothing behind it is the app's own title bar.
+        onNodeWithContentDescription("Открыть меню").performClick()
+        waitForIdle()
+        onNodeWithText("Секретное приложение").assertDoesNotExist()
+        onNodeWithText("Все приложения").performClick()
+        waitForIdle()
+        onNodeWithTag("catalog:row-secret-test").assertDoesNotExist()
+        onNodeWithTag("catalog:row-calculator").assertIsDisplayed()
+
+        enterCode("secret2026")
+        onNodeWithTag("secret-test:visits").assertTextEquals("Визит 2")
+    }
+
+    @Test
+    fun aQrCodeNamingTheSecretAppIsAnUnknownApp() = runComposeUiTest {
+        setContent { UnitoolApp(testSuperizer()) }
+        waitForIdle()
+
+        openActivate()
+        onNodeWithTag("activate:qr").performTextInput("""{"type":"app_activation","appId":"secret-test"}""")
+        onNodeWithTag("activate:apply").performClick()
+        waitForIdle()
+
+        onNodeWithTag("activate:error").assertIsDisplayed()
+        onNodeWithTag("secret-test:root").assertDoesNotExist()
+    }
+
+    @Test
+    fun theCameraOnTheActivateScreenActivatesWhatItReads() = runComposeUiTest {
+        val payload = """{"schemaVersion":1,"type":"app_activation","appId":"calculator","config":{"mode":"scientific"}}"""
+        setContent { UnitoolApp(testSuperizer { qrScanner { payload } }) }
+        waitForIdle()
+
+        openActivate()
+        onNodeWithTag("activate:scan").performClick()
+        waitForIdle()
+
+        onNodeWithTag("calculator:key-√").assertIsDisplayed()
+    }
+
+    @Test
+    fun withoutACameraTheActivateScreenHasNoScanButton() = runComposeUiTest {
+        setContent { UnitoolApp(testSuperizer()) }
+        waitForIdle()
+
+        openActivate()
+        onNodeWithTag("activate:qr").assertIsDisplayed()
+        onNodeWithTag("activate:scan").assertDoesNotExist()
+    }
+
+    private fun androidx.compose.ui.test.ComposeUiTest.enterCode(code: String) {
+        openActivate()
+        onNodeWithTag("activate:promo").performTextInput(code)
+        onNodeWithTag("activate:apply").performClick()
+        waitForIdle()
     }
 
     private fun androidx.compose.ui.test.ComposeUiTest.openActivate() {

@@ -234,5 +234,21 @@ release:
 
 The hidden bench app is in the release build. That is deliberate — it is how a problem on a real
 device gets diagnosed — and it is unreachable without the promo code, which is the same code that
-opens the Service Menu. Changing `SERVICE_CODE` in `UnitoolHost.kt` before a public release is the
-one thing to remember.
+opens the Service Menu. Changing the Service Menu's code before a public release is the one thing to
+remember: a new code through `./scripts/promo-hash.sh`, its hash in place of the old row in
+`UnitoolHost.kt`, and `SERVICE_CODE` in `composeApp/src/desktopTest/.../TestSupport.kt` to match.
+
+**Every promo code goes to the stores' reviewers** (idea/09 §6, question 124). Both stores forbid
+"hidden, dormant, or undocumented features": Apple's guideline 2.3.1, Google Play's Deceptive
+Behavior policy. A tool only a code opens counts as one unless the reviewers are told about it.
+The listing already says that some tools open by promo code. Before each upload that adds a code
+or a hidden or secret app:
+
+- **Play Console** → App content → App access → "All or some functionality is restricted": every
+  code in `promoCodes(…)` in `UnitoolHost.kt`, and what each one opens.
+- **App Store Connect** → the build's Notes for Review, with the same list. External TestFlight
+  goes through Beta App Review, so it needs the list too.
+
+The build holds the codes only as hashes. The list to paste, with what each code opens, is
+`.secrets/promo-codes.md`, outside git; `PromoCodesTest` fails if a code given out there no longer
+matches its row.

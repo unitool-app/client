@@ -224,7 +224,7 @@ internal object SecurityStringsRu : SecurityStrings {
         GitHubKeys.Problem.Server -> "GitHub ответил не так, как ожидалось. Попробуйте позже."
     }
     override val cannotEncryptTo = "age не шифрует на такой ключ"
-    override val restoreHint = "Копия, сделанная на другом устройстве. Ключ, на который она зашифрована, сначала должен появиться здесь, в SSH-ключах; копия, открытая на компьютере (age -d … > backup.json), читается как есть."
+    override val restoreHint = "Копия, сделанная на другом устройстве. Ключ, на который она зашифрована, сначала нужно добавить на это устройство; копия, открытая на компьютере (age -d … > backup.json), читается как есть."
     override val restoreButton = "Восстановить"
     override val cancelledText = "Ничего не сделано."
     override val secretsLocked = "Не удалось открыть секрет, поэтому копия не сделана."

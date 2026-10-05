@@ -42,6 +42,10 @@ ONE APP, SEVERAL TOOLS
 Unitool is a host. The home screen holds the tools you put on it: "+" opens the full list, a tap
 adds one, a long press takes it off again. Nothing appears there that you did not put there.
 
+Some tools are not in the list at all: a promo code from an organisation or from the tool's
+author opens them. Type it in the menu under Activate, or let the camera read a QR code that
+carries it. Some codes add the tool to your home screen; others open it for one visit only.
+
 SETTINGS
 
 • Language — English or Russian, switched instantly, no restart
@@ -65,7 +69,8 @@ On Android 13 and later the app asks whether you want notifications at all. Refu
 else works exactly the same.
 
 Permissions: internet, vibration (switchable off in Settings), notifications on Android 13 and
-later (yours to refuse), the camera — only when you scan a QR code in the 2FA app yourself — and
+later (yours to refuse), the camera — only when you scan a QR code yourself, in the 2FA app or on
+the Activate screen — and
 biometrics, so the 2FA app can open with your fingerprint or face. Android does the check; the app
 learns only yes or no.
 

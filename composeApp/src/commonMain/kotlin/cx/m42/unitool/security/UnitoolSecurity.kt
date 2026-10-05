@@ -7,7 +7,7 @@ import cx.m42.unitool.settings.BackupSection
 import cx.m42.unitool.settings.DiagnosticsBanner
 import cx.m42.unitool.settings.HostTools
 import cx.m42.unitool.settings.KeysUi
-import cx.m42.unitool.settings.SshKeysSection
+import cx.m42.unitool.settings.SshKeysScreen
 import cx.m42.unitool.settings.StorageSecuritySection
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.diagnostics.DiagnosticsSource
@@ -76,9 +76,10 @@ public class UnitoolSecurity(
         builder.backupKeys { keyring.keyNames() }
         // age to the GitHub account's keys, opened by the keyring through its sheet (05 §3.1).
         builder.backupCipher(AgeBackupCipher(keyring::openForHost))
-        // The host's own screens (07 §2.4): keys first, then how everything is kept; the banner on
-        // Home whenever that is worse than the listing promises (06 §7).
-        builder.hostSection(SshKeysSection(keysUi, tools))
+        // The host's own screens (07 §2.4). SSH keys are not among the Settings sections: only the
+        // promo code `{ssh-keys}` opens them (idea/09). Then how everything is kept, and the banner
+        // on Home whenever that is worse than the listing promises (06 §7).
+        builder.hostScreen(SshKeysScreen(keysUi, tools))
         builder.hostSection(StorageSecuritySection(keysUi, tools))
         builder.hostSection(BackupSection(tools))
         builder.homeBanner(DiagnosticsBanner(keysUi, tools))

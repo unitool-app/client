@@ -249,7 +249,7 @@ private fun Protection(findings: List<Finding>) {
     val bad = finding.status >= Status.Unsafe
     val facts = finding.facts
     val title = Regex("\\{([a-z]+)\\}").replace(words.title(finding.code)) { facts[it.groupValues[1]] ?: it.value }
-    // The fix is the host's (Settings → SSH keys); an app can say what it is, not open it.
+    // The fix is the host's (its SSH keys screen, behind the `{ssh-keys}` code); an app can say what it is, not open it.
     val detail = if (bad) words.detail(finding.code, facts) else ""
     Text(
         text = listOf(title, detail).filter { it.isNotBlank() }.joinToString(" "),

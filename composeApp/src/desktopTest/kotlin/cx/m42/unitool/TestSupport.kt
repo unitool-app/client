@@ -85,6 +85,12 @@ internal fun offlineNetwork(): FakeNetwork = FakeNetwork().apply {
     fail("https://api.frankfurter.app/latest?from=USD")
 }
 
+/**
+ * The Service Menu's code. Plain here, in the tests, and only a hash in the build (idea/09, D256);
+ * `PromoCodesTest` is what proves the two still agree.
+ */
+internal const val SERVICE_CODE = "SERVICE"
+
 internal const val CALCULATOR_TILE = "home:tile-calculator"
 internal const val CONVERTER_TILE = "home:tile-currency-converter"
 internal const val TWOFA_TILE = "home:tile-2fa"

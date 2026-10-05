@@ -219,7 +219,7 @@ internal object SecurityStringsEn : SecurityStrings {
         GitHubKeys.Problem.Server -> "GitHub did not answer as expected. Try again later."
     }
     override val cannotEncryptTo = "age cannot encrypt to this kind of key"
-    override val restoreHint = "A backup made on another device. The SSH key it was encrypted to has to be here first, under SSH keys; a backup opened on a computer (age -d … > backup.json) is read as it is."
+    override val restoreHint = "A backup made on another device. The SSH key it was encrypted to has to be added on this device first; a backup opened on a computer (age -d … > backup.json) is read as it is."
     override val restoreButton = "Restore"
     override val cancelledText = "Nothing was done."
     override val secretsLocked = "A secret could not be opened, so no backup was made."

@@ -90,8 +90,18 @@ class KeysScreensTest : UnitoolTest() {
         waitForIdle()
     }
 
+    /** SSH keys are not in Settings: their promo code opens them (idea/09). */
+    private fun ComposeUiTest.openKeys() {
+        onNodeWithContentDescription("Open menu").performClick()
+        waitForIdle()
+        onNodeWithContentDescription("Activate").performClick()
+        waitForIdle()
+        type("activate:promo", "{ssh-keys}")
+        tap("activate:apply")
+    }
+
     private fun ComposeUiTest.pasteKey(file: String) {
-        openSettings()
+        openKeys()
         tap("keys:add")
         tap("import:paste")
         type("import:paste-field", file)
@@ -110,9 +120,13 @@ class KeysScreensTest : UnitoolTest() {
         onNodeWithTag("home:storage-banner").assertTextContains("Not protected", substring = true)
 
         openSettings()
-        onNodeWithTag("settings:host:ssh-keys").performScrollTo()
-        onNodeWithTag("keys:empty").assertIsDisplayed()
         onNodeWithTag("settings:host:storage").performScrollTo().assertIsDisplayed()
+        // Not in Settings (idea/09): the keys are behind their code, and the list says there are none.
+        onNodeWithTag("settings:host:ssh-keys").assertDoesNotExist()
+        onNodeWithTag("keys:add").assertDoesNotExist()
+        openKeys()
+        onNodeWithTag("host:ssh-keys").assertIsDisplayed()
+        onNodeWithTag("keys:empty").assertIsDisplayed()
     }
 
     @Test
@@ -243,7 +257,7 @@ class KeysScreensTest : UnitoolTest() {
         setContent { UnitoolApp(superizer, security) }
         waitForIdle()
 
-        openSettings()
+        openKeys()
         tap("keys:add")
         tap("import:create")
         type("import:name", "made-here")
@@ -269,7 +283,7 @@ class KeysScreensTest : UnitoolTest() {
         setContent { UnitoolApp(superizer, security) }
         waitForIdle()
 
-        openSettings()
+        openKeys()
         tap("keys:row-0")
         onNodeWithTag("key:card").assertIsDisplayed()
         onNodeWithTag("key:public").assertTextContains("ssh-ed25519 ", substring = true)

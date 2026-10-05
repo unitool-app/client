@@ -70,8 +70,15 @@ http://localhost:8082/?activate=%7B%22type%22%3A%22app_activation%22%2C%22appId%
 ```
 
 Promo codes this build ships: `SCI` opens the calculator in scientific mode, `TEST-2026` unlocks the
-hidden bench app and puts it on Home, `SERVICE` opens the Service Menu. Seven taps on the build stamp
-in Settings do the same, but only in a debug build — in a release the promo code is the only door.
+hidden bench app and puts it on Home, `SECRET-2026` opens the secret test app for one visit,
+`SERVICE` opens the Service Menu, and `[ssh-keys]` (or `{ssh-keys}`) opens SSH keys, which Settings
+does not list. A code in brackets must be typed exactly as written; the others ignore case, spaces
+and dashes. Seven taps on the build stamp in Settings do the same, but only in
+a debug build — in a release the promo code is the only door.
+
+The build holds the codes only as hashes (`HashedPromoCodes`, idea/09). A new code:
+`./scripts/promo-hash.sh <code>` gives the key for the table in `UnitoolHost.kt`; the codes and
+what they open are listed in `.secrets/promo-codes.md`, outside git.
 
 ## Screenshots
 

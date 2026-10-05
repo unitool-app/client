@@ -315,10 +315,11 @@ class Screenshots {
             tapTag("2fa:read-link")
         },
         // ssh-new step 6: the host's keys, on a phone with a chip — three keys at three levels.
-        Screen("26-settings-keys", kind = HostKind.Phone(PhoneKeys)) { openSettings(); scroll("keys:add") },
-        Screen("27-key-card", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:row-0") },
-        Screen("28-key-card-session", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:row-2") },
-        Screen("29-import-sources", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:add") },
+        // SSH keys are not in Settings: their promo code opens them (idea/09).
+        Screen("26-ssh-keys", kind = HostKind.Phone(PhoneKeys)) { openKeys() },
+        Screen("27-key-card", kind = HostKind.Phone(PhoneKeys)) { openKeys(); tapTag("keys:row-0") },
+        Screen("28-key-card-session", kind = HostKind.Phone(PhoneKeys)) { openKeys(); tapTag("keys:row-2") },
+        Screen("29-import-sources", kind = HostKind.Phone(PhoneKeys)) { openKeys(); tapTag("keys:add") },
         Screen("30-import-inspect", kind = HostKind.Phone(PhoneKeys)) { importPasted("encrypted") },
         Screen("31-import-set-passphrase", kind = HostKind.Phone(PhoneKeys)) {
             importPasted("unencrypted")
@@ -326,7 +327,7 @@ class Screenshots {
             typeInto("import:new-first", "short one")
         },
         Screen("32-import-refused", kind = HostKind.Phone(PhoneKeys)) { importPasted("-----BEGIN RSA PRIVATE KEY-----") },
-        Screen("33-import-create", kind = HostKind.Phone(PhoneKeys)) { openSettings(); tapTag("keys:add"); tapTag("import:create") },
+        Screen("33-import-create", kind = HostKind.Phone(PhoneKeys)) { openKeys(); tapTag("keys:add"); tapTag("import:create") },
         // Storage & security in each status (06 §9): the chip (Ok), a key's passphrase (Info), no
         // backup (Attention, in all of them), a software key (Unsafe), no vault (Missing), a lost key (Broken).
         Screen("34-storage-phone") { openSettings(); tapTag("storage:open") },
@@ -346,10 +347,18 @@ class Screenshots {
             typeInto("backup:github", "octocat")
             tapTag("backup:find-keys")
         },
-        Screen("41-settings-keys-en", lang = "en", kind = HostKind.Phone(PhoneKeys)) {
+        Screen("41-ssh-keys-en", lang = "en", kind = HostKind.Phone(PhoneKeys)) {
             tapIcon("Open menu")
-            tapIcon("Settings")
-            scroll("keys:add")
+            tapIcon("Activate")
+            typeInto("activate:promo", "{ssh-keys}")
+            tapTag("activate:apply")
+        },
+        // idea/09: the secret app, opened by its code — and the Activate screen with the camera button.
+        Screen("43-secret-app") {
+            tapIcon("Открыть меню")
+            tapIcon("Активировать")
+            typeInto("activate:promo", cx.m42.apps.testapp.SecretTestApp.PROMO_CODE)
+            tapTag("activate:apply")
         },
     )
 
@@ -358,9 +367,17 @@ class Screenshots {
         tapIcon("Настройки")
     }
 
-    /** Settings, Add a key, Paste: [text] decides what the fake keyring says it is. */
+    /** The SSH keys screen, which only its promo code opens (idea/09). */
+    private fun DriveScope.openKeys() {
+        tapIcon("Открыть меню")
+        tapIcon("Активировать")
+        typeInto("activate:promo", "{ssh-keys}")
+        tapTag("activate:apply")
+    }
+
+    /** SSH keys, Add a key, Paste: [text] decides what the fake keyring says it is. */
     private fun DriveScope.importPasted(text: String) {
-        openSettings()
+        openKeys()
         tapTag("keys:add")
         tapTag("import:paste")
         typeInto("import:paste-field", text)

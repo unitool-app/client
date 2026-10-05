@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runAndroidComposeUiTest
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -48,12 +49,16 @@ class SecureWindowTest {
     }
 
     @Test
-    fun theImportWizardCannotBeCapturedAndSettingsCan() = runAndroidComposeUiTest<MainActivity> {
+    fun theImportWizardCannotBeCapturedAndTheKeyListCan() = runAndroidComposeUiTest<MainActivity> {
         waitForIdle()
-        // Whatever the emulator's language, Unitool speaks one of its two.
+        // Whatever the emulator's language, Unitool speaks one of its two. SSH keys are not in
+        // Settings: their promo code opens them (idea/09).
         onNode(hasContentDescription("Open menu").or(hasContentDescription("Открыть меню"))).performClick()
         waitForIdle()
-        onNode(hasContentDescription("Settings").or(hasContentDescription("Настройки"))).performClick()
+        onNode(hasContentDescription("Activate").or(hasContentDescription("Активировать"))).performClick()
+        waitForIdle()
+        onNodeWithTag("activate:promo").performTextInput("{ssh-keys}")
+        onNodeWithTag("activate:apply").performClick()
         waitForIdle()
         onNodeWithTag("keys:add").performScrollTo().performClick()
         waitForIdle()
@@ -65,9 +70,9 @@ class SecureWindowTest {
 
         onNode(hasContentDescription("Back").or(hasContentDescription("Назад"))).performClick()
         waitForIdle()
-        onNodeWithTag("settings:host:ssh-keys").assertExists()
-        assertFalse(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "Settings is not")
-        assertTrue(settles { screencap()?.let { !blank(it) } == true }, "and Settings can be captured; ${seen()}")
+        onNodeWithTag("host:ssh-keys").assertExists()
+        assertFalse(flags() and WindowManager.LayoutParams.FLAG_SECURE != 0, "the key list is not")
+        assertTrue(settles { screencap()?.let { !blank(it) } == true }, "and the key list can be captured; ${seen()}")
     }
 
     /**
@@ -86,7 +91,7 @@ class SecureWindowTest {
     /**
      * No image at all is nothing shown too: on the API 33 emulator in CI `screencap` gives none while a
      * secure window is on screen, where API 35's gives a black one. That `screencap` works at all is
-     * the second half's to prove — Settings has to come out as a picture.
+     * the second half's to prove — the key list has to come out as a picture.
      */
     private fun showsNothing(shot: Bitmap?): Boolean = shot == null || blank(shot)
 

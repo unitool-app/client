@@ -55,7 +55,7 @@
 	  the app the moment it opens the camera.
 	-->
 	<key>NSCameraUsageDescription</key>
-	<string>Unitool reads the QR code a site shows when you set up two-factor sign-in. The picture is examined on the phone and is never saved or sent.</string>
+	<string>Unitool reads a QR code: the one a site shows when you set up two-factor sign-in, or an activation code that opens a tool. The picture is examined on the phone and is never saved or sent.</string>
 	<!--
 	  The 2FA app opens behind Face ID (note 06). A Face ID device kills an app that asks without this
 	  string; the host refuses to offer the lock at all when it is missing, and a debug build crashes

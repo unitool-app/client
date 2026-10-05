@@ -13,6 +13,7 @@ import cx.m42.unitool.security.KeyPromptSheet
 import cx.m42.apps.calculator.CalculatorApp
 import cx.m42.apps.calculator.CalculatorConfig
 import cx.m42.apps.converter.ConverterApp
+import cx.m42.apps.testapp.SecretTestApp
 import cx.m42.apps.testapp.TestApp
 import cx.m42.apps.twofa.TwoFaApp
 import cx.m42.superizer.LanguageOption
@@ -24,12 +25,14 @@ import cx.m42.superizer.app.AppConfig
 import cx.m42.superizer.app.AppId
 import cx.m42.superizer.app.SuperizerApp
 import cx.m42.superizer.host.SuperizerBuilder
+import cx.m42.superizer.host.activation.HashedPromoCodes
 import cx.m42.superizer.host.build
 import cx.m42.superizer.host.platform.currentPlatform
 import cx.m42.superizer.runtime.HostInfo
 import cx.m42.superizer.ui.shell.SuperizerShell
 import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.unitool.settings.HostTools
+import cx.m42.unitool.settings.SshKeysScreen
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.superizer.runtime.FilePicker
@@ -108,34 +111,58 @@ private fun buildHost(
     // Hidden (D8). It is a diagnostic instrument, and it stays invisible until someone types the
     // code below — which is also the only way the Service Menu opens in a release.
     register(TestApp())
+    // Secret (idea/09): never listed anywhere, opened by its code for one visit at a time. A test
+    // piece, to see what the type looks like; its code goes to the stores' reviewers with the rest.
+    register(SecretTestApp())
 
     // What a fresh install has on Home (D48): the calculator, because that is what Unitool was.
     // The converter is one tap away in the catalog; the bench app gets there by its promo code.
     home("calculator")
 
+    // Codes as hashes (idea/09, D256): the APK carries none that `strings` would print. A key is
+    // the output of `scripts/promo-hash.sh <code>`; the codes themselves, and what each opens, are
+    // in `.secrets/promo-codes.md` — the list that goes to the stores' reviewers (RELEASING.md).
     promoCodes(
-        mapOf(
-            // The visible effect of a config, reachable by typing five characters (07).
-            "SCI" to ActivationResult.Success(
-                Activation(
-                    AppId("calculator"),
-                    AppConfig(buildJsonObject { put("mode", JsonPrimitive(CalculatorConfig.SCIENTIFIC)) }),
+        HashedPromoCodes(
+            salt = PROMO_SALT,
+            codes = mapOf(
+                // The calculator in scientific mode: the visible effect of a config (07).
+                "527ca0002cf993fe333a82300743ab1d0afce7b25d0d03acfcc2628b5dfb0972" to ActivationResult.Success(
+                    Activation(
+                        AppId("calculator"),
+                        AppConfig(buildJsonObject { put("mode", JsonPrimitive(CalculatorConfig.SCIENTIFIC)) }),
+                    ),
                 ),
-            ),
-            TestApp.PROMO_CODE to ActivationResult.Success(
-                Activation(AppId("test-app"), TestApp.promoConfig()),
+                // The bench app, unlocked onto Home (D8, D48).
+                "b63a66698da50056b59749499b4d1d2ba6b7f99c8f17e50f8a8ab23b0196080c" to ActivationResult.Success(
+                    Activation(AppId("test-app"), TestApp.promoConfig()),
+                ),
+                // The secret test app, for one visit (idea/09).
+                "601ada16eec56caa326c645b27c9d66cf9fc81ccde4aae82875625796e615037" to ActivationResult.Success(
+                    Activation(AppId("secret-test"), SecretTestApp.promoConfig()),
+                ),
+                // The Service Menu — the one door into it in a release build (D34). A host command,
+                // not a reserved app id (D20), and a row like any other so its code is hashed too.
+                "5fbc3d115453b3a3426b4c6dc14737226136dec4c71526dc7a9c4aab3c3f8bdc" to
+                    ActivationResult.HostCommand(ActivationResult.Command.OpenServiceMenu),
+                // SSH keys, which Settings does not list (idea/09). Bracketed, so exact: only the
+                // code as written opens them, and a near miss opens nothing. Both brackets — the
+                // owner wrote it with each. A build without the security layer has no such screen,
+                // and there the code is simply unknown.
+                "f458affb8d674cd1effa3e6429cfe36901c0890602fd4153a95f939f6741f2c1" to ActivationResult.OpenHostScreen(SshKeysScreen.ID),
+                "b9666358dbb806fbfafde72c98e46c2b92bca3fa811e6a23280c123d8cce657e" to ActivationResult.OpenHostScreen(SshKeysScreen.ID),
             ),
         ),
     )
 
-    // D20: a host command, not a reserved app id. The shell matches an enum, so `service-menu`
-    // never becomes a name a real app could collide with.
-    serviceCode(SERVICE_CODE)
-
     // The platform's optional services (D19), for the apps through the registry: the 2FA app draws
     // its scan button from whether the camera is there, its export from whether there is a share
     // sheet. The host's own screens get the same objects directly.
-    tools.qr?.let { service(QrScanner.Key, it) }
+    tools.qr?.let { camera ->
+        service(QrScanner.Key, camera)
+        // The same camera behind the Activate screen's scan button: point it at an activation QR.
+        qrScanner { camera.scan() }
+    }
     tools.sharer?.let { service(FileSharer.Key, it) }
     tools.files?.let { service(FilePicker.Key, it) }
 
@@ -168,5 +195,8 @@ public fun SuperizerBuilder.registerExtra(app: SuperizerApp<*>) {
 
 public const val SCHEME: String = "unitool"
 
-/** The one door into the Service Menu in a release build (D34). */
-public const val SERVICE_CODE: String = "SERVICE"
+/**
+ * What `HashedPromoCodes` mixes into every code before hashing it, and what `scripts/promo-hash.sh`
+ * uses by default. Changing it changes every key in the table above.
+ */
+public const val PROMO_SALT: String = "unitool:"

@@ -171,9 +171,9 @@ internal object TwoFaStringsRu : TwoFaStrings {
     override val alreadyHere = "Уже есть на этом устройстве"
     override val scanMore = "Сканировать ещё QR-код"
     override val importFile = "Импорт из файла"
-    override val importFileHint = "Файл экспорта (.age) откроется вашим SSH-ключом из Настройки → SSH-ключи; файл, уже расшифрованный на компьютере, читается как есть."
+    override val importFileHint = "Файл экспорта (.age) откроется вашим SSH-ключом, добавленным на это устройство; файл, уже расшифрованный на компьютере, читается как есть."
     override fun fileProblem(problem: FileProblem) = when (problem) {
-        FileProblem.NoKey -> "Ни один SSH-ключ здесь не открывает этот файл. Добавьте ключ, на который он зашифрован, в Настройки → SSH-ключи."
+        FileProblem.NoKey -> "Ни один SSH-ключ здесь не открывает этот файл. Сначала добавьте на это устройство ключ, на который он зашифрован."
         FileProblem.NotOpened -> "Файл не удалось открыть."
         FileProblem.NoAccounts -> "В этом файле нет аккаунтов."
     }
@@ -337,9 +337,9 @@ internal object TwoFaStringsEn : TwoFaStrings {
     override val alreadyHere = "Already on this device"
     override val scanMore = "Scan another QR code"
     override val importFile = "Import from a file"
-    override val importFileHint = "The export file (.age) opens with your SSH key from Settings → SSH keys; a file already opened on a computer is read as it is."
+    override val importFileHint = "The export file (.age) opens with your SSH key added on this device; a file already opened on a computer is read as it is."
     override fun fileProblem(problem: FileProblem) = when (problem) {
-        FileProblem.NoKey -> "None of the SSH keys here opens this file. Add the key it was encrypted to in Settings → SSH keys."
+        FileProblem.NoKey -> "None of the SSH keys here opens this file. Add the key it was encrypted to on this device first."
         FileProblem.NotOpened -> "The file could not be opened."
         FileProblem.NoAccounts -> "There are no accounts in this file."
     }

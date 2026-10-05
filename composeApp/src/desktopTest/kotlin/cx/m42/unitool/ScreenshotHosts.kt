@@ -24,7 +24,7 @@ import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.unitool.settings.BackupSection
 import cx.m42.unitool.settings.DiagnosticsBanner
 import cx.m42.unitool.settings.HostTools
-import cx.m42.unitool.settings.SshKeysSection
+import cx.m42.unitool.settings.SshKeysScreen
 import cx.m42.unitool.settings.StorageSecuritySection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
@@ -54,7 +54,7 @@ internal sealed interface HostKind {
             builder.secretVault(FakeSecretVault())
             builder.diagnosticsSource(VaultDiagnostics(object : HardwareVault { override fun hardware(): String = this@Phone.hardware }))
             if (lost) builder.diagnosticsSource(DiagnosticsSource { Inspected(listOf(DiagnosticsCode.VaultKeyLost.finding(Subject.HostSecrets))) })
-            builder.hostSection(SshKeysSection(fake, tools))
+            builder.hostScreen(SshKeysScreen(fake, tools))
             builder.hostSection(StorageSecuritySection(fake, tools))
             builder.hostSection(BackupSection(tools))
             builder.homeBanner(DiagnosticsBanner(fake, tools))

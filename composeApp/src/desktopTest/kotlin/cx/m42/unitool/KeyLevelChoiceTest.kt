@@ -18,7 +18,7 @@ import cx.m42.superizer.ssh.ImportOptions
 import cx.m42.superizer.ssh.KeyStorage
 import cx.m42.superizer.testing.FakeSecretVault
 import cx.m42.unitool.settings.HostTools
-import cx.m42.unitool.settings.SshKeysSection
+import cx.m42.unitool.settings.SshKeysScreen
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.CoroutineScope
@@ -40,7 +40,7 @@ class KeyLevelChoiceTest : UnitoolTest() {
         val tools = HostTools()
         return buildUnitool(scope, debug = true, tools = tools, network = ratesNetwork()) {
             secretVault(FakeSecretVault())
-            hostSection(SshKeysSection(keys, tools))
+            hostScreen(SshKeysScreen(keys, tools))
         }.also { it.settings.chooseLanguage("en") }
     }
 
@@ -59,8 +59,11 @@ class KeyLevelChoiceTest : UnitoolTest() {
         waitForIdle()
         onNodeWithContentDescription("Open menu").performClick()
         waitForIdle()
-        onNodeWithContentDescription("Settings").performClick()
+        // SSH keys are not in Settings: their promo code opens them (idea/09).
+        onNodeWithContentDescription("Activate").performClick()
         waitForIdle()
+        onNodeWithTag("activate:promo").performTextInput("{ssh-keys}")
+        tap("activate:apply")
         tap("keys:add")
     }
 

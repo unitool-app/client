@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
 import cx.m42.services.ssh.diagnostics.KeyFindings
 import cx.m42.superizer.HostScreen
-import cx.m42.superizer.HostSection
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.diagnostics.Finding
 import cx.m42.superizer.ssh.KeyCapability
@@ -51,39 +50,53 @@ import cx.m42.unitool.security.statusColor
 import kotlinx.coroutines.launch
 
 /**
- * "SSH keys" in Settings (02 §5): every key with where it lives, a card per key, and the way to add
- * one. The words for *where* are the catalogue's (D179); everything else is [SecurityStrings].
+ * SSH keys (02 §5): every key with where it lives, a card per key, and the way to add one. The words
+ * for *where* are the catalogue's (D179); everything else is [SecurityStrings].
+ *
+ * Not in Settings: only the promo code `{ssh-keys}` opens it (idea/09, the owner, 2026-10-05). Most
+ * people never need a key of their own, and whoever does is given the code. What Storage & security
+ * offers as the fix for a finding — "add an SSH key" where nothing seals the secrets — still leads
+ * to the wizard: that is a problem on screen, not a way into this list.
  */
-internal class SshKeysSection(private val keys: KeysUi, private val tools: HostTools) : HostSection {
-    override val id: String = "ssh-keys"
+internal class SshKeysScreen(private val keys: KeysUi, private val tools: HostTools) : HostScreen {
+    override val id: String = ID
 
     override fun title(langTag: String): String = securityStrings(langTag).sshKeys
 
     @Composable
-    override fun Content(superizer: Superizer, open: (HostScreen) -> Unit) {
+    override fun Content(superizer: Superizer, back: () -> Unit, open: (HostScreen) -> Unit) {
         val langTag by superizer.settings.langTag.collectAsState()
         val strings = securityStrings(langTag)
         val list by keys.admin.keys.collectAsState()
         val anchor by keys.secretsKey.collectAsState()
 
-        RowText(strings.sshKeysHint, color = AppTheme.muted, small = true)
-        if (list.isEmpty()) {
-            RowDivider()
-            RowText(strings.noKeys, Modifier.testTag("keys:empty"), color = AppTheme.muted)
-        }
-        list.forEachIndexed { i, key ->
-            RowDivider()
-            KeyRow(key, KeyFindings.of(key, anchor, keys.inBrowser, keys.chipHere).first(), "keys:row-$i") {
-                open(KeyCardScreen(keys, tools, key.id))
+        Page("keys:screen") {
+            Card {
+                RowText(strings.sshKeysHint, color = AppTheme.muted, small = true)
+                if (list.isEmpty()) {
+                    RowDivider()
+                    RowText(strings.noKeys, Modifier.testTag("keys:empty"), color = AppTheme.muted)
+                }
+                list.forEachIndexed { i, key ->
+                    RowDivider()
+                    KeyRow(key, KeyFindings.of(key, anchor, keys.inBrowser, keys.chipHere).first(), "keys:row-$i") {
+                        open(KeyCardScreen(keys, tools, key.id))
+                    }
+                }
+                RowDivider()
+                ActionRow(strings.addKey, "keys:add") { open(ImportKeyScreen(keys, tools)) }
+                if (list.isNotEmpty()) {
+                    RowDivider()
+                    // `ssh-add -x` without a passphrase: every session and every opened secret, forgotten now.
+                    ActionRow(strings.lockKeys, "keys:lock-all") { keys.admin.lockAll() }
+                }
             }
         }
-        RowDivider()
-        ActionRow(strings.addKey, "keys:add") { open(ImportKeyScreen(keys, tools)) }
-        if (list.isNotEmpty()) {
-            RowDivider()
-            // `ssh-add -x` without a passphrase: every session and every opened secret, forgotten now.
-            ActionRow(strings.lockKeys, "keys:lock-all") { keys.admin.lockAll() }
-        }
+    }
+
+    companion object {
+        /** What the promo table's `OpenHostScreen` names, and the test tag `host:ssh-keys`. */
+        const val ID: String = "ssh-keys"
     }
 }
 

@@ -131,9 +131,11 @@ Asked for, and refusable:
   silently. You can refuse it. The app works exactly as before if you do; you simply do not see
   notifications.
 - `android.permission.CAMERA` — only when you tap "Scan QR code" in the 2FA app, to read the setup
-  code a site shows you. The picture is examined on the phone as it arrives and is never saved or
-  sent; the one thing that comes out of it is the text of the code, and that is kept only if you
-  then tap Save. Refuse it and nothing else changes: the same link can be pasted instead.
+  code a site shows you, or "Scan a QR code" on the Activate screen, to read an activation code.
+  The picture is examined on the phone as it arrives and is never saved or sent; the one thing
+  that comes out of it is the text of the code. In the 2FA app that text is kept only if you then
+  tap Save; on the Activate screen it opens the tool it names. Refuse it and nothing else changes:
+  the same text can be pasted instead.
 
 Granted at install time, never prompted for:
 
