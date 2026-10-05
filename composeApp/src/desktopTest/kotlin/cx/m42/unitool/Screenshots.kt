@@ -56,14 +56,16 @@ class Screenshots {
     /**
      * A viewport to render at, and the density that makes it one.
      *
-     * Two of them, because the two audiences want different pictures and neither can be cropped out
-     * of the other:
+     * Three of them, because the store audiences want different pictures and none can be cropped
+     * out of another:
      *
      *  - [Phone] is the shape of a phone people actually hold — 412×915 dp, 20:9, what a Pixel
      *    reports. These are the screens in the README.
      *  - [PlayListing] is what the Play Console accepts, which is narrower: 16:9 or 9:16 and at
      *    least 1080 px on the short side. A 20:9 capture is rejected outright, so the listing gets
      *    its own render rather than a letterboxed copy.
+     *  - [AppStoreListing] is Apple's 6.5-inch portrait slot: 414×896 dp at 3×, exactly
+     *    1242×2688 px. It is rendered at its native aspect ratio rather than resized from Play.
      */
     private data class Viewport(
         val name: String,
@@ -78,6 +80,18 @@ class Screenshots {
 
     private val Phone = Viewport("phone", 412, 915, 2f, "build/screenshots/phone")
     private val PlayListing = Viewport("play", 360, 640, 3f, "build/screenshots/play")
+    private val AppStoreListing = Viewport("appstore-6.5", 414, 896, 3f, "build/screenshots/appstore-6.5")
+
+    private fun labelFor(lang: String, label: String): String = if (lang == "en") {
+        mapOf(
+            "Открыть меню" to "Open menu",
+            "Активировать" to "Activate",
+            "Настройки" to "Settings",
+            "Назад" to "Back",
+        )[label] ?: label
+    } else {
+        label
+    }
 
     /** The verbs a screenshot needs. By tag where there is one, by label where a human would look. */
     private class DriveScope(
@@ -131,8 +145,8 @@ class Screenshots {
             }
             waitForIdle()
             DriveScope(
-                tap = { label -> onNodeWithText(label).performClick(); waitForIdle() },
-                tapIcon = { label -> onNodeWithContentDescription(label).performClick(); waitForIdle() },
+                tap = { label -> onNodeWithText(labelFor(lang, label)).performClick(); waitForIdle() },
+                tapIcon = { label -> onNodeWithContentDescription(labelFor(lang, label)).performClick(); waitForIdle() },
                 tapTag = { tag ->
                     // Scrolled into view first: the 640 dp listing frame is short enough that a
                     // form's last button sits below the fold, and a click there lands on nothing.
@@ -409,13 +423,19 @@ class Screenshots {
 
     @Test
     fun captureEveryScreen() {
-        for (viewport in listOf(Phone, PlayListing)) {
+        val requestedViewport = System.getenv("UNITOOL_SCREENSHOT_VIEWPORT")
+        val viewports = listOf(Phone, PlayListing, AppStoreListing).filter {
+            requestedViewport == null || it.name == requestedViewport
+        }
+        require(viewports.isNotEmpty()) { "Unknown screenshot viewport: $requestedViewport" }
+        for (viewport in viewports) {
             // Emptied first. A frame left over from a screen that no longer exists is worse than a
             // missing one: it is the picture somebody uploads to a store listing by mistake.
             File(viewport.directory).listFiles()?.forEach { if (it.name.endsWith(".png")) it.delete() }
             for (screen in screens) {
                 val device = FakeDeviceAuthenticator(screen.lock, screen.answer)
-                shot(viewport, screen.name, screen.lang, screen.offline, screen.clock, device, screen.kind, screen.drive)
+                val language = if (viewport == AppStoreListing) "en" else screen.lang
+                shot(viewport, screen.name, language, screen.offline, screen.clock, device, screen.kind, screen.drive)
             }
         }
     }
