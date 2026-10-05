@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import kotlin.test.Test
@@ -29,7 +30,7 @@ class ActivationTest : UnitoolTest() {
 
         openActivate()
         onNodeWithTag("activate:promo").performTextInput("SCI")
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
 
         // The visible effect of a config (07): a row of keys that is not there in standard mode,
@@ -45,7 +46,7 @@ class ActivationTest : UnitoolTest() {
 
         openActivate()
         onNodeWithTag("activate:promo").performTextInput(cx.m42.apps.testapp.TestApp.PROMO_CODE)
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
 
         onNodeWithTag("test-app:root").assertIsDisplayed()
@@ -61,7 +62,7 @@ class ActivationTest : UnitoolTest() {
         onNodeWithTag("activate:qr").performTextInput(
             """{"schemaVersion":1,"type":"app_activation","appId":"calculator","config":{"mode":"scientific"}}""",
         )
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
 
         // The same screen the promo code produced. That the two paths are indistinguishable from
@@ -76,7 +77,7 @@ class ActivationTest : UnitoolTest() {
 
         openActivate()
         onNodeWithTag("activate:qr").performTextInput("just some text")
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
 
         onNodeWithTag("activate:error").assertIsDisplayed()
@@ -90,7 +91,7 @@ class ActivationTest : UnitoolTest() {
 
         openActivate()
         onNodeWithTag("activate:promo").performTextInput("NOPE")
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
 
         onNodeWithText("Код не найден").assertIsDisplayed()
@@ -105,7 +106,7 @@ class ActivationTest : UnitoolTest() {
 
         openActivate()
         onNodeWithTag("activate:promo").performTextInput(SERVICE_CODE)
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
 
         onNodeWithTag("service:root").assertIsDisplayed()
@@ -191,7 +192,7 @@ class ActivationTest : UnitoolTest() {
 
         openActivate()
         onNodeWithTag("activate:qr").performTextInput("""{"type":"app_activation","appId":"secret-test"}""")
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
 
         onNodeWithTag("activate:error").assertIsDisplayed()
@@ -224,7 +225,7 @@ class ActivationTest : UnitoolTest() {
     private fun androidx.compose.ui.test.ComposeUiTest.enterCode(code: String) {
         openActivate()
         onNodeWithTag("activate:promo").performTextInput(code)
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
     }
 

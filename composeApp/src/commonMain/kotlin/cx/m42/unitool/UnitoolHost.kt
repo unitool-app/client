@@ -30,6 +30,7 @@ import cx.m42.superizer.host.build
 import cx.m42.superizer.host.platform.currentPlatform
 import cx.m42.superizer.runtime.HostInfo
 import cx.m42.superizer.ui.shell.SuperizerShell
+import cx.m42.unitool.premium.PremiumOffer
 import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.unitool.settings.HostTools
 import cx.m42.unitool.settings.SshKeysScreen
@@ -154,6 +155,9 @@ private fun buildHost(
             ),
         ),
     )
+
+    // Premium, above the code on Activate: a mock-up that sells nothing yet (PremiumOffer).
+    activateBanner(PremiumOffer)
 
     // The platform's optional services (D19), for the apps through the registry: the 2FA app draws
     // its scan button from whether the camera is there, its export from whether there is a share

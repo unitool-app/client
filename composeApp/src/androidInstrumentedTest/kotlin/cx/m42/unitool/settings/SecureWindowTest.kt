@@ -58,7 +58,7 @@ class SecureWindowTest {
         onNode(hasContentDescription("Activate").or(hasContentDescription("Активировать"))).performClick()
         waitForIdle()
         onNodeWithTag("activate:promo").performTextInput("{ssh-keys}")
-        onNodeWithTag("activate:apply").performClick()
+        onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()
         onNodeWithTag("keys:add").performScrollTo().performClick()
         waitForIdle()
