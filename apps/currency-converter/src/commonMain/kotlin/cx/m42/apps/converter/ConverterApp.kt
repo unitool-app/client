@@ -63,7 +63,7 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
                     "0-15.6zM11 6h2v2.2h1.8v2H9.2c-.3 0-.5.2-.5.5s.2.5.5.5h2.4a2.5 2.5 0 0 1 0 5H13V18h-2v-1.8H9.2v-2h5.6" +
                     "c.3 0 .5-.2.5-.5s-.2-.5-.5-.5h-2.4a2.5 2.5 0 0 1 0-5H11V6z",
             ),
-            category = "Финансы",
+            category = "Finance",
         ),
         deepLinks = setOf("rate"),
         pushTopics = setOf("rates"),

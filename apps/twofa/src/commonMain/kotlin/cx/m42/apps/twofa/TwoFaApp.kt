@@ -55,7 +55,7 @@ public class TwoFaApp : SuperizerApp<TwoFaConfig>() {
                     "M5 10h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1z" +
                     "M12 13.5a1.5 1.5 0 0 0-.75 2.8V19h1.5v-2.7a1.5 1.5 0 0 0-.75-2.8z",
             ),
-            category = "Безопасность",
+            category = "Security",
         ),
         deepLinks = setOf("add"),
         // Behind the device's own lock, always (06, D139): the codes are the second factor, and a

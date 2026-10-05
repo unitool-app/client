@@ -52,7 +52,7 @@ public class CalculatorApp : SuperizerApp<CalculatorConfig>() {
             // A name from the host's glyph pack. The converter ships its own path instead, so both
             // halves of D29 are exercised by the MVP rather than one of them being theory.
             icon = AppIcon.Named("calculator"),
-            category = "Инструменты",
+            category = "Tools",
         ),
     )
 
