@@ -39,6 +39,11 @@
 
 ### Новый раздел «SSH keys» — после «The 2FA lock»
 
+> **(impl, 2026-10-05)** «Settings → SSH keys» в этом предложении устарело: ключи открываются
+> промокодом (02 §5). В `play/` этой фразы нет — устарело только само предложение. Когда оно пойдёт
+> в `PRIVACY.md` и листинг, писать «открываются промокодом», **не называя код** (договорено с
+> сессией idea/09, которая правит `play/`).
+
 > You can add your own SSH keys in Settings → SSH keys: from a file, pasted, scanned as a QR code,
 > or made on the phone. A key is never kept without a passphrase: a file with none, or with one
 > shorter than twelve characters, is stored only after you set a new one.

@@ -143,7 +143,8 @@ public fun homeBanner(banner: HomeBanner)
 `hostSections` после `ProtectionSection` и до секций приложений. Home рисует баннер первым.
 Строки заголовков — из реализации, по `langTag` хоста; библиотека их не знает.
 
-Что реализует Unitool: `SshKeysSection` + `SshKeysScreen`, `KeyCardScreen`, `ImportKeyScreen`,
+(impl, 2026-10-05: `SshKeysSection` снят — список ключей открывается промокодом `{ssh-keys}`, см.
+02 §5.) Что реализует Unitool: `SshKeysSection` + `SshKeysScreen`, `KeyCardScreen`, `ImportKeyScreen`,
 `StorageSecuritySection` + `StorageSecurityScreen`, `BackupSection` + `BackupScreen`,
 `DiagnosticsBanner`. Всё в `composeApp/…/settings/`, из компонентов библиотеки, со своими
 таблицами строк en/ru.
