@@ -282,7 +282,7 @@ class TwoFaInstanceTest {
 
     @Test
     fun aCodeThatIsNotASetupLinkStaysVisibleWithTheReason() {
-        // What people most often point a new authenticator at: the old one's export screen.
+        // Google Authenticator's transfer code, cut short: it reads as no accounts at all.
         val camera = FakeCamera("otpauth-migration://offline?data=CjEKCkhlbGxvId6tvu8SGA")
         runAppTest(TwoFaApp(), prepare = { it.provide(QrScanner.Key, camera) }) {
             val twofa = instance as TwoFaInstance

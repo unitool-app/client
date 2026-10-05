@@ -863,6 +863,15 @@ private fun ImportPage(instance: TwoFaInstance, strings: TwoFaStrings) {
             color = tokens.muted,
             modifier = Modifier.testTag("2fa:import-intro"),
         )
+        // Google Authenticator's transfer shown as several codes: which are still to scan. One code needs no count.
+        batch.transfers.values.filter { it.size > 1 }.forEachIndexed { index, transfer ->
+            Text(
+                text = strings.transferParts(transfer),
+                style = tokens.body,
+                color = if (transfer.scanned.size < transfer.size) tokens.foreground else tokens.muted,
+                modifier = Modifier.padding(top = 8.dp).testTag("2fa:import-transfer-$index"),
+            )
+        }
         if (batch.found.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             Card {

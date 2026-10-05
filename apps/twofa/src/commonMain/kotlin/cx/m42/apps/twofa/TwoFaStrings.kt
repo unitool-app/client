@@ -88,6 +88,7 @@ internal interface TwoFaStrings {
     fun importIntro(found: Int, addable: Int): String
     fun importAdd(count: Int): String
     fun importFailed(failed: ImportBatch.Failed): String
+    fun transferParts(transfer: ImportBatch.Transfer): String
 
     fun storageProblem(problem: StorageProblem): String
     val unlock: String
@@ -108,7 +109,8 @@ internal object TwoFaStringsRu : TwoFaStrings {
     override val byLink = "Ссылка"
     override val byKey = "Ключ вручную"
     override val scan = "Сканировать QR-код"
-    override val scanHint = "Откроется камера — наведите её на QR-код, который показывает сайт."
+    override val scanHint =
+        "Откроется камера — наведите её на QR-код, который показывает сайт, или на QR-код переноса из Google Authenticator."
     override val orPaste = "Или вставьте ссылку"
     override val link = "Ссылка otpauth://"
     override val linkHint =
@@ -188,8 +190,8 @@ internal object TwoFaStringsRu : TwoFaStrings {
         DraftError.BadSecret -> "Ключ не похож на Base32: допустимы буквы A–Z и цифры 2–7"
         DraftError.NotOtpAuth -> "Это не ссылка otpauth://totp/…"
         DraftError.Hotp -> "Коды по счётчику (HOTP) пока не поддерживаются"
-        DraftError.Migration ->
-            "Это QR-код переноса из Google Authenticator, он пока не поддерживается. Отсканируйте QR-код на сайте сервиса."
+        DraftError.Migration -> "Не удалось прочитать QR-код переноса из Google Authenticator. Отсканируйте его ещё раз."
+        DraftError.BadAlgorithm -> "Такой алгоритм не поддерживается: только SHA1, SHA256 и SHA512"
         DraftError.BadDigits -> "В коде может быть от 6 до 8 цифр"
         DraftError.BadPeriod -> "Период — от 1 до 300 секунд"
     }
@@ -231,7 +233,17 @@ internal object TwoFaStringsRu : TwoFaStrings {
 
     override fun importAdd(count: Int): String = "Добавить ${accounts(count)}"
 
-    override fun importFailed(failed: ImportBatch.Failed): String = "Ссылка ${failed.position}: ${error(failed.error)}"
+    override fun importFailed(failed: ImportBatch.Failed): String =
+        "${failed.title.ifEmpty { "Ссылка ${failed.position}" }}: ${error(failed.error)}"
+
+    override fun transferParts(transfer: ImportBatch.Transfer): String =
+        if (transfer.scanned.size < transfer.size) {
+            val codes = if (transfer.size % 10 == 1 && transfer.size % 100 != 11) "QR-кода" else "QR-кодов"
+            "Google Authenticator: отсканировано ${transfer.scanned.size} из ${transfer.size} $codes. " +
+                "Отсканируйте остальные — их аккаунты добавятся к этому списку."
+        } else {
+            "Google Authenticator: отсканированы все QR-коды переноса (${transfer.size})."
+        }
 
     /** 1 аккаунт, 2 аккаунта, 5 аккаунтов, 11 аккаунтов, 21 аккаунт. */
     private fun accounts(n: Int): String {
@@ -275,7 +287,7 @@ internal object TwoFaStringsEn : TwoFaStrings {
     override val byLink = "Link"
     override val byKey = "Enter key"
     override val scan = "Scan QR code"
-    override val scanHint = "The camera opens — point it at the QR code the site shows."
+    override val scanHint = "The camera opens — point it at the QR code the site shows, or at Google Authenticator's transfer code."
     override val orPaste = "Or paste the link"
     override val link = "otpauth:// link"
     override val linkHint = "It is what the site's QR code contains. Paste the whole link — or several, one per line."
@@ -353,8 +365,8 @@ internal object TwoFaStringsEn : TwoFaStrings {
         DraftError.BadSecret -> "That is not Base32: only letters A–Z and digits 2–7"
         DraftError.NotOtpAuth -> "That is not an otpauth://totp/… link"
         DraftError.Hotp -> "Counter-based codes (HOTP) are not supported yet"
-        DraftError.Migration ->
-            "That is a Google Authenticator transfer code, which is not supported yet. Scan the QR code on the service's site instead."
+        DraftError.Migration -> "This Google Authenticator transfer code could not be read. Scan it again."
+        DraftError.BadAlgorithm -> "That algorithm is not supported: only SHA1, SHA256 and SHA512"
         DraftError.BadDigits -> "A code has 6 to 8 digits"
         DraftError.BadPeriod -> "The period is 1 to 300 seconds"
     }
@@ -396,7 +408,15 @@ internal object TwoFaStringsEn : TwoFaStrings {
 
     override fun importAdd(count: Int): String = "Add ${accounts(count)}"
 
-    override fun importFailed(failed: ImportBatch.Failed): String = "Link ${failed.position}: ${error(failed.error)}"
+    override fun importFailed(failed: ImportBatch.Failed): String =
+        "${failed.title.ifEmpty { "Link ${failed.position}" }}: ${error(failed.error)}"
+
+    override fun transferParts(transfer: ImportBatch.Transfer): String =
+        if (transfer.scanned.size < transfer.size) {
+            "Google Authenticator: ${transfer.scanned.size} of ${transfer.size} QR codes scanned. Scan the rest — their accounts join this list."
+        } else {
+            "Google Authenticator: all ${transfer.size} transfer QR codes scanned."
+        }
 
     private fun accounts(n: Int): String = if (n == 1) "1 account" else "$n accounts"
 

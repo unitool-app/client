@@ -379,14 +379,15 @@ internal class TwoFaInstance(
 
     /**
      * Parses the pasted link into the form. On success the form shows what it read, for Save. More
-     * than one link — a whole export — goes to the import page instead, all of them at once.
+     * than one account — a whole export, or Google Authenticator's transfer code — goes to the
+     * import page instead, all of them at once.
      */
     fun readLink(): Boolean {
-        val links = Import.links(link.value)
-        if (links.size > 1) {
+        if (Import.isBatch(link.value)) {
             startImport(link.value)
             return true
         }
+        val links = Import.links(link.value)
         OtpAuthUri.parse(links.singleOrNull() ?: link.value)
             .onSuccess {
                 draft.value = it

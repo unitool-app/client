@@ -112,7 +112,7 @@ public object Base32 {
 }
 
 /** Why a draft is not an account yet. The screen turns each into a sentence. */
-public enum class DraftError { EmptyName, EmptySecret, BadSecret, NotOtpAuth, Hotp, Migration, BadDigits, BadPeriod }
+public enum class DraftError { EmptyName, EmptySecret, BadSecret, NotOtpAuth, Hotp, Migration, BadAlgorithm, BadDigits, BadPeriod }
 
 /**
  * What the add form holds, before it is an account.
@@ -160,9 +160,9 @@ public object OtpAuthUri {
 
     public fun parse(text: String): Result<AccountDraft> {
         val uri = text.trim()
-        // Google Authenticator's "transfer accounts" code: a protobuf of many accounts, and the QR
-        // people most often point a new authenticator at by mistake. Named, so the error can say so.
-        if (uri.startsWith("otpauth-migration:", ignoreCase = true)) return draftFailure(DraftError.Migration)
+        // Google Authenticator's "transfer accounts" code: many accounts, never one draft. The import
+        // page reads it (GoogleMigration); one that gets here did not read, and the error says so.
+        if (GoogleMigration.isMigration(uri)) return draftFailure(DraftError.Migration)
         if (!uri.startsWith("otpauth://", ignoreCase = true)) return draftFailure(DraftError.NotOtpAuth)
         val rest = uri.substring("otpauth://".length)
         val type = rest.substringBefore('/').lowercase()
@@ -174,8 +174,7 @@ public object OtpAuthUri {
             pair.substringBefore('=').lowercase() to percentDecode(pair.substringAfter('='), plusIsSpace = true)
         }
 
-        val labelIssuer = label.substringBefore(':', "").trim()
-        val name = if (':' in label) label.substringAfter(':').trim() else label.trim()
+        val (labelIssuer, name) = splitLabel(label)
 
         val secret = params["secret"].orEmpty()
         val draft = AccountDraft(
@@ -204,6 +203,10 @@ public object OtpAuthUri {
             if (account.period != 30) append("&period=").append(account.period)
         }
     }
+
+    /** `Issuer:account` → the issuer and the account; a label with no colon is the account alone. */
+    internal fun splitLabel(label: String): Pair<String, String> =
+        if (':' in label) label.substringBefore(':').trim() to label.substringAfter(':').trim() else "" to label.trim()
 
     private fun draftFailure(error: DraftError): Result<AccountDraft> = Result.failure(DraftException(error))
 
