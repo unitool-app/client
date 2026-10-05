@@ -2,10 +2,11 @@
 # laptop have to mean the same thing, and they only do when they run the same thing.
 name: verify
 
+# By hand only (owner, 2026-10-05): it never held a release back — android-play.yml runs its own
+# `./gradlew verify` before the upload — so on every push it only spent runner time. Run it with
+# `gh workflow run verify.yml --ref main` when the browser, the emulator or real ssh/age matter.
 on:
-  push:
-    branches: [main, master]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
