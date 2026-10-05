@@ -20,7 +20,7 @@ import kotlinx.coroutines.SupervisorJob
  *  - **Preferences go to a temp directory.** The host stores the language, the haptics switch, the
  *    unlocked set and the session snapshot; a test must not read — or overwrite — the developer's.
  *  - **The network is a fake.** The converter fetches rates, and a suite whose result depends on
- *    frankfurter.app being up is a suite somebody will eventually disable.
+ *    open.er-api.com being up is a suite somebody will eventually disable.
  *
  * The host scope is `Unconfined` on purpose. Everything the handler does is suspending but never
  * *delayed*, so an unconfined dispatcher runs the whole launch sequence synchronously and a test
@@ -62,8 +62,9 @@ internal fun testSuperizer(
 /** Fixed rates, so a screenshot of the converter is the same picture every time it is taken. */
 internal fun ratesNetwork(): FakeNetwork = FakeNetwork().apply {
     respond(
-        "https://api.frankfurter.app/latest?from=USD",
-        """{"amount":1.0,"base":"USD","date":"2026-09-19","rates":{"EUR":0.92,"GBP":0.79,"RUB":92.10}}""",
+        "https://open.er-api.com/v6/latest/USD",
+        """{"result":"success","provider":"https://www.exchangerate-api.com","time_last_update_unix":1789776151,""" +
+            """"base_code":"USD","rates":{"USD":1,"EUR":0.92,"GBP":0.79,"RUB":92.10,"VND":26000}}""",
     )
     respond("https://api.github.com/users/octocat/keys", GITHUB_KEYS)
 }
@@ -82,7 +83,7 @@ private val GITHUB_KEYS = listOf(
 /** The same source, unreachable — what the offline path and the retry button are drawn against. */
 internal fun offlineNetwork(): FakeNetwork = FakeNetwork().apply {
     online.value = false
-    fail("https://api.frankfurter.app/latest?from=USD")
+    fail("https://open.er-api.com/v6/latest/USD")
 }
 
 /**

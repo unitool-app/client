@@ -14,7 +14,7 @@ Four apps ship today:
 | | |
 |---|---|
 | **Калькулятор** | four functions, percent, and a scientific mode a config turns on |
-| **Конвертер валют** | ECB rates over the network, with a cache that works offline |
+| **Конвертер валют** | rates for over 160 currencies (RUB and VND among them) from ExchangeRate-API, with a cache that works offline |
 | **Коды 2FA** | TOTP codes (RFC 6238) from a scanned QR code, an `otpauth://` link or a typed key, offline, with the keys encrypted at rest under an Android Keystore or iOS Secure Enclave key and the app behind the device's biometrics; exports every account as an [age](https://age-encryption.org) file encrypted to a GitHub user's SSH keys, which a new phone takes back in one scan (`age -d … | qrencode -t ansiutf8`) or one paste |
 | **Test App** | hidden; one card per runtime service, for whoever is building on this |
 

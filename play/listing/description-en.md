@@ -33,7 +33,7 @@ CALCULATOR
 
 CURRENCY CONVERTER
 
-• European Central Bank reference rates
+• Rates for over 160 currencies, the ruble and the Vietnamese dong among them
 • The last table it downloaded is kept, so the converter still answers with no signal
 • Your own short list of currencies, instead of every currency there is
 

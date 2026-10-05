@@ -18,8 +18,10 @@ internal interface ConverterStrings {
      * The grey line under the answer. Whole phrase and not two fragments, because "from cache" is
      * an aside in English and a separate clause in Russian — assembling it at the call site is how
      * a translation ends up in the word order of the language it was translated from.
+     *
+     * [credit] is the publisher the table names, when it names one (`Rates.credit`).
      */
-    fun source(date: String, fromCache: Boolean): String
+    fun source(date: String, fromCache: Boolean, credit: String?): String
 }
 
 internal object ConverterStringsEn : ConverterStrings {
@@ -33,8 +35,10 @@ internal object ConverterStringsEn : ConverterStrings {
     override val retry = "Try again"
     override val settingsHint = "Which currency to start from"
 
-    override fun source(date: String, fromCache: Boolean): String =
-        if (fromCache) "ECB rates for $date · cached, offline" else "ECB rates for $date · live"
+    override fun source(date: String, fromCache: Boolean, credit: String?): String {
+        val rates = if (credit != null) "Rates by $credit for $date" else "Rates for $date"
+        return if (fromCache) "$rates · cached, offline" else "$rates · live"
+    }
 }
 
 internal object ConverterStringsRu : ConverterStrings {
@@ -48,8 +52,10 @@ internal object ConverterStringsRu : ConverterStrings {
     override val retry = "Повторить"
     override val settingsHint = "С какой валюты начинать"
 
-    override fun source(date: String, fromCache: Boolean): String =
-        if (fromCache) "Курс ЕЦБ на $date · кэш, офлайн" else "Курс ЕЦБ на $date · сеть"
+    override fun source(date: String, fromCache: Boolean, credit: String?): String {
+        val rates = if (credit != null) "Курс от $credit на $date" else "Курс на $date"
+        return if (fromCache) "$rates · кэш, офлайн" else "$rates · сеть"
+    }
 }
 
 internal val ConverterStringTables: Map<String, ConverterStrings> = mapOf(

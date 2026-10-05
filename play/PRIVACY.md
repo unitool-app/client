@@ -1,6 +1,6 @@
 # Privacy Policy — Unitool
 
-**Last updated: 25 September 2026**
+**Last updated: 5 October 2026**
 
 ## The short version
 
@@ -67,8 +67,9 @@ says, above its screen, that it is not protected.
 
 Four things, and this is all of them.
 
-**Exchange rates.** When you open the currency converter it requests a rate table published by the
-European Central Bank, from `api.frankfurter.app` (or the documented fallback, `open.er-api.com`).
+**Exchange rates.** When you open the currency converter it requests a rate table published by
+ExchangeRate-API, from `open.er-api.com` (or the European Central Bank's, from `api.frankfurter.app`,
+if the converter has been set up to use that one).
 The request asks for the whole table and carries nothing of yours — no amount, no currency you
 picked, no identifier. As with any request to any server, the provider can see the address it came
 from. The answer is cached on your device, and a cached table is used without asking when you are

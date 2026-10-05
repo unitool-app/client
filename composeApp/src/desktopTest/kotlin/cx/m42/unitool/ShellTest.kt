@@ -155,7 +155,7 @@ class ShellTest : UnitoolTest() {
         waitForIdle()
 
         onNodeWithTag("currency-converter:result").assertIsDisplayed()
-        onNodeWithText("Курс ЕЦБ на 2026-09-19 · сеть").assertIsDisplayed()
+        onNodeWithText("Курс от Exchange Rate API на 2026-09-19 · сеть").assertIsDisplayed()
     }
 
     @Test

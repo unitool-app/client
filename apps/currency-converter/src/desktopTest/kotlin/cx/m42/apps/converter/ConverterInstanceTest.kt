@@ -19,7 +19,8 @@ class ConverterInstanceTest {
 
     private val url = ConverterConfig.DEFAULT_RATES_URL
     private val payload =
-        """{"amount":1.0,"base":"USD","date":"2026-09-19","rates":{"EUR":0.92,"GBP":0.79,"RUB":92.10}}"""
+        """{"result":"success","provider":"https://www.exchangerate-api.com","time_last_update_unix":1789776151,""" +
+            """"base_code":"USD","rates":{"USD":1,"EUR":0.92,"GBP":0.79,"RUB":92.10,"VND":26000}}"""
 
     private fun config(json: String) = AppConfig(Json.parseToJsonElement(json) as JsonObject)
 
@@ -84,6 +85,19 @@ class ConverterInstanceTest {
     }
 
     @Test
+    fun dongsAreConvertedToRublesThroughTheDollar() = runAppTest(
+        ConverterApp(),
+        config = config("""{"from":"VND","to":"RUB"}"""),
+        prepare = { it.network.respond(url, payload) },
+    ) {
+        // Neither is on the ECB's list, which is why the default source is not the ECB any more.
+        val converter = instance as ConverterInstance
+        converter.setAmount("1000000")
+        val rubles = converter.result!!
+        assertTrue(kotlin.math.abs(rubles - 1_000_000 / 26000.0 * 92.10) < 0.001, "got $rubles")
+    }
+
+    @Test
     fun goingToBackgroundStopsTheAppAskingForRates() = runAppTest(
         ConverterApp(),
         prepare = { it.network.respond(url, payload) },
@@ -117,7 +131,7 @@ class ConverterSettingsTest {
 
     private val url = ConverterConfig.DEFAULT_RATES_URL
     private val payload =
-        """{"amount":1.0,"base":"USD","date":"2026-09-19","rates":{"EUR":0.92,"RUB":92.10}}"""
+        """{"result":"success","base_code":"USD","time_last_update_unix":1789776151,"rates":{"EUR":0.92,"RUB":92.10}}"""
 
     @Test
     fun theStoredPreferenceDecidesWhatTheConverterOpensOn() = runAppTest(
