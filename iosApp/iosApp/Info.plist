@@ -48,6 +48,16 @@
 			</array>
 		</dict>
 	</array>
+	<!--
+	  Export compliance, the owner's answer (2026-10-05): yes, the app encrypts — the 2FA export's own
+	  age (X25519, ChaCha20-Poly1305, RSA-OAEP), standard algorithms in addition to iOS's — nothing
+	  proprietary, not on the French store. Not false as in base_layouts: that app only has HTTPS.
+	  The rest of Apple's questions are answered per build by scripts/testflight-distribute.py
+	  (BUILD-IOS.md). Should App Store Connect ever show a key for the declaration, it goes here as
+	  ITSEncryptionExportComplianceCode, and the script has nothing left to do.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!--

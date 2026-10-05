@@ -92,7 +92,9 @@ and a third lane, a Debug build for the simulator, only on a push to `ios-simula
   putting the label `testflight` on the pull request — one upload per label added. The job after
   it, on Linux, waits for Apple to process the build and adds it to the TestFlight group (the
   repository variable `TESTFLIGHT_GROUP`, `dev` when unset; `scripts/testflight-distribute.py`).
-  Export compliance is still answered in App Store Connect; the job warns while it is not.
+  Export compliance answers itself from the second build on: Info.plist says the app encrypts
+  (`ITSAppUsesNonExemptEncryption`), and the job hands each new build the declaration given once by
+  hand in App Store Connect. It warns when there is none to hand, or Apple refused it.
   `iosApp/Configuration/ExportOptions.plist` is the export recipe; it holds no secret.
 
 ## Push (FCM)
@@ -135,6 +137,11 @@ How a message travels:
 - **The vault** sealing is ECIES under a Secure Enclave P-256 key; the simulator has no enclave and
   uses a software key in the Keychain with the same access class (`WhenUnlockedThisDeviceOnly`).
   Neither travels in a backup, so — as on Android — the 2FA export is the way to a new phone.
-- **Export compliance** (`ITSAppUsesNonExemptEncryption`) is deliberately not set in Info.plist: the
-  2FA export encrypts with its own age implementation, and whether that is exempt is a declaration
-  for the owner to make in App Store Connect, not a default to ship.
+- **Export compliance** is the owner's answer (2026-10-05): the app encrypts — the 2FA export's own
+  age (X25519, ChaCha20-Poly1305, RSA-OAEP), standard algorithms in addition to iOS's — nothing
+  proprietary, not on the French store. `ITSAppUsesNonExemptEncryption` is `true` in Info.plist,
+  not `false` as in base_layouts (HTTPS only there). Apple asks the rest once: TestFlight → the
+  build → standard algorithms in addition to iOS → not France. That answer becomes an app encryption
+  declaration, and `scripts/testflight-distribute.py` attaches it to every later build through the
+  App Store Connect API, with the key the upload uses. If App Store Connect ever shows a key for the
+  declaration, it goes into Info.plist as `ITSEncryptionExportComplianceCode` instead.

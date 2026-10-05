@@ -7,8 +7,8 @@ Waits for App Store Connect to process an upload, then gives the build to a Test
 The testflight lane of ios.yml uploads, and an upload alone reaches nobody: Apple processes it for
 minutes first, and only a processed build can be put in a group. This waits — on a Linux runner,
 where waiting costs a tenth of what it costs on the Mac — adds the build to the group, and says
-what still stands between it and the testers. An unanswered export-compliance question is the
-usual thing.
+what still stands between it and the testers. Export compliance it answers itself, by repeating
+the answer the owner gave once in App Store Connect (see answer_export_compliance).
 
 The App Store Connect key comes from ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8_BASE64, the secrets
 the upload uses; the bundle id from Config.xcconfig. Needs nothing beyond Python and openssl.
@@ -112,6 +112,85 @@ def wait_for_processing(asc, app_id, build_number):
         time.sleep(POLL_SECONDS)
 
 
+def owners_answer(declaration):
+    """
+    The owner's export-compliance answer (2026-10-05): the app uses encryption — standard algorithms
+    in addition to iOS's own, the 2FA export's age — nothing proprietary, not on the French store.
+    A declaration that says anything else is not theirs to repeat.
+    """
+    a = declaration["attributes"]
+    return (a.get("appEncryptionDeclarationState") == "APPROVED"
+            and a.get("usesEncryption") is not False
+            and a.get("exempt") is not True
+            and a.get("containsProprietaryCryptography") is not True
+            and a.get("availableOnFrenchStore") is not True)
+
+
+def beta_state(asc, build_id):
+    """MISSING_EXPORT_COMPLIANCE while Apple waits for the answer; READY_FOR_BETA_TESTING once it has it."""
+    detail = asc.call("GET", f"/builds/{build_id}/buildBetaDetail")["data"]
+    return detail["attributes"].get("internalBuildState")
+
+
+def answer_export_compliance(asc, app_id, build, build_number):
+    """
+    Gives the build the answer App Store Connect keeps from the last time it was given by hand (an
+    app encryption declaration), so a new build does not wait for someone to open the console. The
+    first answer is a person's: this only repeats it, and says so when there is none to repeat.
+
+    Info.plist says yes to "uses encryption" (ITSAppUsesNonExemptEncryption), so the build's own
+    flag is set from the start; what Apple still waits for is which kind — the declaration.
+    """
+    state = beta_state(asc, build["id"])
+    if state != "MISSING_EXPORT_COMPLIANCE":
+        print(f"export compliance: nothing to answer for build {build_number} ({state})")
+        return
+    declarations = [d for d in asc.call("GET", "/appEncryptionDeclarations",
+                                        {"filter[app]": app_id, "limit": "200"})["data"] if owners_answer(d)]
+    if not declarations:
+        print(f"::warning::Export compliance is unanswered for build {build_number}, and App Store Connect "
+              "has no answer to repeat yet. Answer it once there (TestFlight → the build): standard "
+              "algorithms in addition to iOS → not available in France. Later builds get it from this job.",
+              flush=True)
+        return
+    declaration = max(declarations, key=lambda d: d["attributes"].get("createdDate")
+                      or d["attributes"].get("uploadedDate") or "")
+    errors = []
+    # The build's own relationship is the newer endpoint; the declaration's list of builds the older.
+    for method, path, body in (
+        ("PATCH", f"/builds/{build['id']}/relationships/appEncryptionDeclaration",
+         {"data": {"type": "appEncryptionDeclarations", "id": declaration["id"]}}),
+        ("POST", f"/appEncryptionDeclarations/{declaration['id']}/relationships/builds",
+         {"data": [{"type": "builds", "id": build["id"]}]}),
+    ):
+        try:
+            asc.call(method, path, body=body)
+            break
+        except AscError as e:
+            errors.append(f"{method} {path}: {e}")
+    if build["attributes"].get("usesNonExemptEncryption") is None:
+        # A build from before Info.plist said so.
+        try:
+            asc.call("PATCH", f"/builds/{build['id']}", body={"data": {
+                "type": "builds", "id": build["id"], "attributes": {"usesNonExemptEncryption": True}}})
+        except AscError as e:
+            errors.append(f"PATCH /builds/{build['id']}: {e}")
+
+    # What Apple holds now, not what was sent: the testers get the build only once this moves on.
+    for _ in range(6):
+        state = beta_state(asc, build["id"])
+        if state != "MISSING_EXPORT_COMPLIANCE":
+            break
+        time.sleep(10)
+    if state == "MISSING_EXPORT_COMPLIANCE":
+        print(f"::warning::Export compliance for build {build_number} could not be answered from here; "
+              "answer it in App Store Connect (TestFlight → the build). " + " | ".join(errors), flush=True)
+    else:
+        print(f"export compliance: build {build_number} answered with declaration {declaration['id']} ({state})")
+        for error in errors:
+            print(f"  (on the way: {error})")
+
+
 def main(build_number, group_name):
     bundle = xcconfig("BUNDLE_ID")
     with tempfile.NamedTemporaryFile("wb", suffix=".p8") as key:
@@ -142,9 +221,11 @@ def main(build_number, group_name):
                 fail(f"could not add build {build_number} to «{group_name}»: {e}")
             print(f"build {build_number} is in «{group_name}»")
 
-        if build["attributes"].get("usesNonExemptEncryption") is None:
-            print("::warning::Export compliance is unanswered for this build: the testers get it once "
-                  "it is answered in App Store Connect (TestFlight → the build).", flush=True)
+        try:
+            answer_export_compliance(asc, app["id"], build, build_number)
+        except AscError as e:
+            # The build is in the group either way; only the answer is left to give by hand.
+            print(f"::warning::Export compliance for build {build_number} was not answered: {e}", flush=True)
 
 
 if __name__ == "__main__":

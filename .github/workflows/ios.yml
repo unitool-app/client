@@ -193,8 +193,8 @@ jobs:
             archive
 
       # `destination: upload` in the export options sends the build straight to App Store Connect;
-      # it appears under TestFlight once Apple has processed it. The first upload will ask about
-      # export compliance in the console (BUILD-IOS.md, Push / export compliance).
+      # it appears under TestFlight once Apple has processed it. Export compliance is answered by the
+      # distribute job, from the declaration given once in the console (BUILD-IOS.md).
       - name: Upload to TestFlight
         id: upload
         if: steps.gate.outputs.ready == 'true'
