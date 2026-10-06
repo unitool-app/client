@@ -62,6 +62,7 @@ class KeyLevelChoiceTest : UnitoolTest() {
         // SSH keys are not in Settings: their promo code opens them (idea/09).
         onNodeWithContentDescription("Premium").performClick()
         waitForIdle()
+        tap("activate:have-code")
         onNodeWithTag("activate:promo").performTextInput("{ssh-keys}")
         tap("activate:apply")
         tap("keys:add")

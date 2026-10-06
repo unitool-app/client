@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import cx.m42.unitool.i18n.premiumStrings
 import cx.m42.unitool.premium.PremiumCard
@@ -39,9 +40,12 @@ class PremiumOfferTest : UnitoolTest() {
         onNodeWithContentDescription("Активировать").assertDoesNotExist()
         onNodeWithText("Премиум").assertIsDisplayed()
 
+        // The offer first; the code and the QR field fold behind one link under it.
         val card = onNodeWithTag("premium:card").assertIsDisplayed().getUnclippedBoundsInRoot()
-        val promo = onNodeWithTag("activate:promo").getUnclippedBoundsInRoot()
-        assertTrue(card.bottom <= promo.top, "the offer is above the promo code")
+        onNodeWithTag("activate:promo").assertDoesNotExist()
+        onNodeWithTag("activate:qr").assertDoesNotExist()
+        val link = onNodeWithTag("activate:have-code").assertExists().getUnclippedBoundsInRoot()
+        assertTrue(card.bottom <= link.top, "the offer is above the promo code")
 
         // A year is chosen first, and the button names what it would charge.
         onNodeWithTag("premium:plan-year").assertIsSelected()
@@ -60,6 +64,11 @@ class PremiumOfferTest : UnitoolTest() {
         onNodeWithTag("premium:subscribe").performClick()
         waitForIdle()
         onNodeWithTag("premium:not-yet").assertExists()
+
+        onNodeWithTag("activate:have-code").performScrollTo().performClick()
+        waitForIdle()
+        onNodeWithTag("activate:have-code").assertDoesNotExist()
+        onNodeWithTag("activate:promo").assertExists()
     }
 
     @Test

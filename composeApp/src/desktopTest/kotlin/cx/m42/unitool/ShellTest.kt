@@ -258,6 +258,8 @@ class ShellTest : UnitoolTest() {
         waitForIdle()
         onNodeWithContentDescription("Премиум").performClick()
         waitForIdle()
+        onNodeWithTag("activate:have-code").performScrollTo().performClick()
+        waitForIdle()
         onNodeWithTag("activate:promo").performTextInput(TestApp.PROMO_CODE)
         onNodeWithTag("activate:apply").performScrollTo().performClick()
         waitForIdle()

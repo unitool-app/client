@@ -223,6 +223,7 @@ class Screenshots {
         Screen("04-calculator-scientific") {
             tapIcon("Открыть меню")
             tapIcon("Премиум")
+            tapTag("activate:have-code")
             typeInto("activate:promo", "SCI")
             tapTag("activate:apply")
         },
@@ -243,12 +244,14 @@ class Screenshots {
         Screen("10-service-menu") {
             tapIcon("Открыть меню")
             tapIcon("Премиум")
+            tapTag("activate:have-code")
             typeInto("activate:promo", SERVICE_CODE)
             tapTag("activate:apply")
         },
         Screen("11-test-app") {
             tapIcon("Открыть меню")
             tapIcon("Премиум")
+            tapTag("activate:have-code")
             typeInto("activate:promo", cx.m42.apps.testapp.TestApp.PROMO_CODE)
             tapTag("activate:apply")
         },
@@ -364,6 +367,7 @@ class Screenshots {
         Screen("41-ssh-keys-en", lang = "en", kind = HostKind.Phone(PhoneKeys)) {
             tapIcon("Open menu")
             tapIcon("Premium")
+            tapTag("activate:have-code")
             typeInto("activate:promo", "{ssh-keys}")
             tapTag("activate:apply")
         },
@@ -371,6 +375,7 @@ class Screenshots {
         Screen("43-secret-app") {
             tapIcon("Открыть меню")
             tapIcon("Премиум")
+            tapTag("activate:have-code")
             typeInto("activate:promo", cx.m42.apps.testapp.SecretTestApp.PROMO_CODE)
             tapTag("activate:apply")
         },
@@ -385,6 +390,7 @@ class Screenshots {
     private fun DriveScope.openKeys() {
         tapIcon("Открыть меню")
         tapIcon("Премиум")
+        tapTag("activate:have-code")
         typeInto("activate:promo", "{ssh-keys}")
         tapTag("activate:apply")
     }

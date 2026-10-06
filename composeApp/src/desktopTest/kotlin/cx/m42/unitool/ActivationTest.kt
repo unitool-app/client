@@ -234,5 +234,8 @@ class ActivationTest : UnitoolTest() {
         waitForIdle()
         onNodeWithContentDescription("Премиум").performClick()
         waitForIdle()
+        // The offer comes first; the code is one link under it.
+        onNodeWithTag("activate:have-code").performScrollTo().performClick()
+        waitForIdle()
     }
 }

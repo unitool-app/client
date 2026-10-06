@@ -96,6 +96,7 @@ class KeysScreensTest : UnitoolTest() {
         waitForIdle()
         onNodeWithContentDescription("Premium").performClick()
         waitForIdle()
+        tap("activate:have-code")
         type("activate:promo", "{ssh-keys}")
         tap("activate:apply")
     }
