@@ -2,7 +2,8 @@ package cx.m42.unitool.i18n
 
 /**
  * The words of the Premium offer on Activate (`PremiumOffer`). English first, Russian as its
- * translation. The small print follows what each store's own subscription screens say.
+ * translation. The small print follows what each store's own subscription screens say, and the
+ * button what each store's buttons say: Apple's names the price, Google's leaves it to the rows.
  */
 internal interface PremiumStrings {
     /** Activate's name in the drawer and on its bar: the door is the offer now. */
@@ -15,8 +16,13 @@ internal interface PremiumStrings {
     fun perMonth(price: String): String
     fun subscribeMonthly(price: String): String
     fun subscribeYearly(price: String): String
+    /** Google Play's button: the price is on the chosen row, and Play's own sheet names it again. */
+    val subscribe: String
     val restore: String
-    val notYet: String
+    /** What a tap on any purchase button says while there is nothing behind it. */
+    val failedTitle: String
+    val failedMessage: String
+    val ok: String
     val appStorePrint: String
     val googlePlayPrint: String
     val terms: String
@@ -33,8 +39,11 @@ internal object PremiumStringsEn : PremiumStrings {
     override fun perMonth(price: String) = "≈ $price a month"
     override fun subscribeMonthly(price: String) = "Subscribe for $price a month"
     override fun subscribeYearly(price: String) = "Subscribe for $price a year"
+    override val subscribe = "Subscribe"
     override val restore = "Restore Purchases"
-    override val notYet = "Purchases are coming in a later version."
+    override val failedTitle = "Something went wrong"
+    override val failedMessage = "Please try again later."
+    override val ok = "OK"
     override val appStorePrint =
         "Payment will be charged to your Apple ID account at confirmation of purchase. " +
             "The subscription automatically renews unless auto-renew is turned off at least 24 hours " +
@@ -59,8 +68,11 @@ internal object PremiumStringsRu : PremiumStrings {
     override fun perMonth(price: String) = "≈ $price в месяц"
     override fun subscribeMonthly(price: String) = "Оформить за $price в месяц"
     override fun subscribeYearly(price: String) = "Оформить за $price в год"
+    override val subscribe = "Подписаться"
     override val restore = "Восстановить покупки"
-    override val notYet = "Покупки появятся в одной из следующих версий."
+    override val failedTitle = "Что-то пошло не так"
+    override val failedMessage = "Повторите попытку позже."
+    override val ok = "ОК"
     override val appStorePrint =
         "Оплата спишется с вашего Apple ID при подтверждении покупки. Подписка продлевается " +
             "автоматически, если автопродление не отключено как минимум за 24 часа до конца текущего " +
