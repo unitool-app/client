@@ -4,12 +4,12 @@
 # One lane in use, two kept for when they are wanted again (ssh-new/06 §4.1):
 #
 #   testflight  Release, archived, signed and uploaded to App Store Connect. Runs only when the
-#               signing secrets are present; otherwise it says so and stops, green. Started by the
-#               label `testflight` on a pull request into main — what the branch holds at that
-#               moment, once; every upload reaches the testers, so each is asked for, and taking
-#               the label off and putting it back asks for the next — or by hand once this file is
-#               on the default branch (GitHub dispatches nothing before that). Then `distribute`
-#               waits for Apple to process the build and puts it in the TestFlight group.
+#               signing secrets are present; otherwise it says so and stops, green. Started by a
+#               push to main, as android-play.yml ships every push to Play — main is what the
+#               testers get, on both phones. Also by the label `testflight` on a pull request into
+#               main — what the branch holds at that moment, once; taking the label off and putting
+#               it back asks for the next — or by hand. Then `distribute` waits for Apple to
+#               process the build and puts it in the TestFlight group.
 #   simulator   Debug for the Apple-silicon simulator, unsigned. Only on a push to `ios-simulator`.
 #   device      Release for a real iPhone, UNSIGNED, for scripts/ios-sign-and-install.sh on the
 #               owner's Mac — the agentiz pattern. Only on a push to `ios-device`.
@@ -23,13 +23,16 @@ on:
     branches: [main]
     types: [labeled]
   push:
-    branches: [ios-simulator, ios-device]
+    branches: [main, ios-simulator, ios-device]
+    # A commit that touches only the console tool changes nothing on the phone (.ai-notes/cli D284).
+    paths-ignore: ['unitool-cli/**']
   workflow_dispatch:
 
-# An upload is never cancelled; a newer push to one of the two branches stops the older build.
+# An upload is never cancelled: a push to main waits for the build before it. A newer push to
+# `ios-simulator` or `ios-device` stops the older build there.
 concurrency:
   group: ios-${{ github.ref }}-${{ github.event.label.name || github.event_name }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
 
 env:
   # Compose Multiplatform 1.11.1 references UIViewLayoutRegion, an iOS 26 class, behind an
@@ -97,7 +100,10 @@ jobs:
           if-no-files-found: error
 
   testflight:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'testflight'
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.event.label.name == 'testflight'
+      || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: macos-26
     outputs:
       uploaded: ${{ steps.upload.outputs.uploaded }}

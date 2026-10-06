@@ -88,8 +88,9 @@ and a third lane, a Debug build for the simulator, only on a push to `ios-simula
 
   The App ID, the app record in App Store Connect and a TestFlight internal group are made in the
   console first. `CFBundleVersion` is the workflow run number, so every upload is a new build.
-  Started by hand once `ios.yml` is on the default branch; before that, by
-  putting the label `testflight` on the pull request — one upload per label added. The job after
+  Started by every push to `main` (as Android ships to Play; a push that touches only
+  `unitool-cli/` builds nothing), by hand, or by putting the label `testflight` on a pull request
+  into `main` — one upload per label added. The job after
   it, on Linux, waits for Apple to process the build and adds it to the TestFlight group (the
   repository variable `TESTFLIGHT_GROUP`, `dev` when unset; `scripts/testflight-distribute.py`).
   Export compliance answers itself from the second build on: Info.plist says the app encrypts
