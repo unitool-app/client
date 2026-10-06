@@ -188,10 +188,10 @@ jobs:
           mkdir -p "$HOME/private_keys"
           printf '%s' "$P8" | base64 --decode > "$HOME/private_keys/AuthKey_$KEY_ID.p8"
 
-      # Once export compliance has been answered in App Store Connect, Apple refuses an upload that
-      # says "uses encryption" without the answer's key (ITMS-90592, 2026-10-06). The key is read
-      # from Apple on every build rather than kept in Info.plist, so a new answer brings its own.
-      # No key yet (a new app, or no answer so far): the build goes without one, as build 14 did.
+      # An upload whose Info.plist says "uses encryption" must carry the key of approved encryption
+      # documentation, or Apple refuses it (ITMS-90592, 2026-10-06). So Info.plist says nothing, and
+      # the distribute job hands each build the answer given in App Store Connect. Should Apple ever
+      # issue a key, it is read here on every build and written in together with the "yes".
       - name: Export compliance key
         if: steps.gate.outputs.ready == 'true'
         env:
@@ -202,10 +202,11 @@ jobs:
           set -euo pipefail
           CODE=$(python3 scripts/testflight-distribute.py --compliance-code)
           if [ -n "$CODE" ]; then
+            plutil -replace ITSAppUsesNonExemptEncryption -bool YES iosApp/iosApp/Info.plist
             plutil -replace ITSEncryptionExportComplianceCode -string "$CODE" iosApp/iosApp/Info.plist
-            echo "ITSEncryptionExportComplianceCode is in Info.plist"
+            echo "Info.plist declares the encryption, with its key"
           else
-            echo "::notice::App Store Connect has no export compliance key for this app yet; the build goes without one"
+            echo "No encryption documentation key; export compliance is answered after the upload"
           fi
 
       - name: Archive
@@ -219,8 +220,8 @@ jobs:
             archive
 
       # `destination: upload` in the export options sends the build straight to App Store Connect;
-      # it appears under TestFlight once Apple has processed it. Export compliance travels in
-      # Info.plist (the step before the archive); the distribute job answers it for a build without.
+      # it appears under TestFlight once Apple has processed it. The distribute job answers export
+      # compliance for it, unless the step before the archive put a key in Info.plist.
       - name: Upload to TestFlight
         id: upload
         if: steps.gate.outputs.ready == 'true'

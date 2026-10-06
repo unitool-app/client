@@ -11,8 +11,9 @@ where waiting costs a tenth of what it costs on the Mac — adds the build to th
 what still stands between it and the testers. Export compliance it answers itself, by repeating
 the answer the owner gave once in App Store Connect (see answer_export_compliance).
 
-With --compliance-code it prints the key of that answer instead, for the testflight lane to write
-into Info.plist before the archive (see compliance_code), and prints nothing when there is none.
+With --compliance-code it prints the key of approved encryption documentation instead, for the
+testflight lane to write into Info.plist before the archive (see compliance_code), and prints
+nothing when there is none.
 
 The App Store Connect key comes from ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8_BASE64, the secrets
 the upload uses; the bundle id from Config.xcconfig. Needs nothing beyond Python and openssl.
@@ -143,8 +144,8 @@ def answer_export_compliance(asc, app_id, build, build_number):
     app encryption declaration), so a new build does not wait for someone to open the console. The
     first answer is a person's: this only repeats it, and says so when there is none to repeat.
 
-    Info.plist says yes to "uses encryption" (ITSAppUsesNonExemptEncryption), so the build's own
-    flag is set from the start; what Apple still waits for is which kind — the declaration.
+    Info.plist says nothing about encryption unless Apple has issued a documentation key (see
+    compliance_code), so the build's own flag is set here, along with which kind: the declaration.
     """
     state = beta_state(asc, build["id"])
     if state != "MISSING_EXPORT_COMPLIANCE":
@@ -174,7 +175,7 @@ def answer_export_compliance(asc, app_id, build, build_number):
         except AscError as e:
             errors.append(f"{method} {path}: {e}")
     if build["attributes"].get("usesNonExemptEncryption") is None:
-        # A build from before Info.plist said so.
+        # Info.plist left it unsaid (see compliance_code).
         try:
             asc.call("PATCH", f"/builds/{build['id']}", body={"data": {
                 "type": "builds", "id": build["id"], "attributes": {"usesNonExemptEncryption": True}}})
@@ -198,16 +199,17 @@ def answer_export_compliance(asc, app_id, build, build_number):
 
 def compliance_code(asc, app_id):
     """
-    The key of the app's export compliance answer, or None while it has none.
+    The key of the app's approved encryption documentation, or None while it has none.
 
-    Once the owner had answered in App Store Connect, Apple refused an upload whose Info.plist said
-    "uses encryption" without that key (ITMS-90592, 2026-10-06): the build has to carry it as
-    ITSEncryptionExportComplianceCode. It is read here on every build rather than kept in the repo,
-    so a new answer brings its own key. The owner's answer is preferred; any other one Apple has not
-    turned down is used with a warning, because without a key there is no upload at all.
+    Apple refuses an upload whose Info.plist says "uses encryption" without that key (ITMS-90592,
+    2026-10-06). So Info.plist says nothing until there is a key, and then the lane writes both. The
+    key is read here on every build rather than kept in the repo, so new documentation brings its
+    own. The owner's answer is preferred; any other one Apple has not turned down is used with a
+    warning.
     """
     declarations = asc.call("GET", "/appEncryptionDeclarations",
                             {"filter[app]": app_id, "limit": "200"})["data"]
+    print(f"App Store Connect holds {len(declarations)} export compliance answer(s)", file=sys.stderr)
     for d in declarations:
         a = d["attributes"]
         print(f"declaration {d['id']}: {a.get('appEncryptionDeclarationState')}, "
