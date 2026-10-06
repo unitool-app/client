@@ -144,8 +144,8 @@ def answer_export_compliance(asc, app_id, build, build_number):
     app encryption declaration), so a new build does not wait for someone to open the console. The
     first answer is a person's: this only repeats it, and says so when there is none to repeat.
 
-    Info.plist says nothing about encryption unless Apple has issued a documentation key (see
-    compliance_code), so the build's own flag is set here, along with which kind: the declaration.
+    Info.plist answers it (NO, see compliance_code), so a build normally never waits here. This is
+    for one that still does, from before the answer was in Info.plist or after Apple asked anyway.
     """
     state = beta_state(asc, build["id"])
     if state != "MISSING_EXPORT_COMPLIANCE":
@@ -175,7 +175,7 @@ def answer_export_compliance(asc, app_id, build, build_number):
         except AscError as e:
             errors.append(f"{method} {path}: {e}")
     if build["attributes"].get("usesNonExemptEncryption") is None:
-        # Info.plist left it unsaid (see compliance_code).
+        # A build whose Info.plist did not say.
         try:
             asc.call("PATCH", f"/builds/{build['id']}", body={"data": {
                 "type": "builds", "id": build["id"], "attributes": {"usesNonExemptEncryption": True}}})
@@ -201,10 +201,10 @@ def compliance_code(asc, app_id):
     """
     The key of the app's approved encryption documentation, or None while it has none.
 
-    Apple refuses an upload whose Info.plist says "uses encryption" without that key (ITMS-90592,
-    2026-10-06). So Info.plist says nothing until there is a key, and then the lane writes both. The
-    key is read here on every build rather than kept in the repo, so new documentation brings its
-    own. The owner's answer is preferred; any other one Apple has not turned down is used with a
+    Apple refuses an upload whose Info.plist says "uses non-exempt encryption" without that key
+    (ITMS-90592, 2026-10-06). So Info.plist says NO, which is right while the app is not on the
+    French store, and the lane writes YES with the key once there is one. The key is read here on
+    every build rather than kept in the repo, so new documentation brings its own. The owner's answer is preferred; any other one Apple has not turned down is used with a
     warning.
     """
     declarations = asc.call("GET", "/appEncryptionDeclarations",

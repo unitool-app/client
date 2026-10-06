@@ -51,13 +51,18 @@
 	<!--
 	  Export compliance, the owner's answer (2026-10-05): yes, the app encrypts. The 2FA export uses
 	  its own age (X25519, ChaCha20-Poly1305, RSA-OAEP): standard algorithms, in addition to iOS's.
-	  Nothing is proprietary, and the app is not on the French store. Not false as in base_layouts:
-	  that app only has HTTPS.
-	  The key is absent, not true: with true, Apple refuses any upload that lacks the key of approved
-	  encryption documentation (ITMS-90592, 2026-10-06), and the app has none. The answer is given in
-	  App Store Connect instead, and the CI passes it on to each build (BUILD-IOS.md). Should Apple
-	  ever issue a key, the testflight lane writes true and the key in here before the archive.
+	  Nothing is proprietary, and the app is not on the French store.
+	  That is the case Apple's NO is for. The key's documentation says: "Set the value for this key
+	  to NO … to indicate that your app … either uses no encryption, or only uses encryption that's
+	  exempt from export compliance requirements". App Store Connect's table asks standard algorithms
+	  only for the French declaration, and only when the app is on the French store. So nothing is
+	  owed, and NO means App Store Connect stops asking at every upload (2026-10-06).
+	  On the French store it would be YES, with ITSEncryptionExportComplianceCode from the approved
+	  declaration. The testflight lane writes both in by itself once Apple issues that code.
+	  YES without the code is refused at upload (ITMS-90592). Without the key, every build asks again.
 	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!--
