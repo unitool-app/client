@@ -6,6 +6,8 @@ import cx.m42.superizer.testing.AppContractTest
 class ConverterContractTest : AppContractTest(ConverterApp()) {
 
     override val configFixtures: List<String> = listOf(
+        """{"schemaVersion":1,"base":"USD","favorites":["EUR","RUB","VND"],"ratesUrl":"https://open.er-api.com/v6/latest/USD"}""",
+        // A config from before the source changed: still a config, and still points at the ECB.
         """{"schemaVersion":1,"base":"USD","favorites":["EUR","RUB"],"ratesUrl":"https://api.frankfurter.app/latest?from=USD"}""",
         // What a deep link produces, and what an older QR without the newer fields carries.
         """{"from":"EUR","to":"RUB"}""",

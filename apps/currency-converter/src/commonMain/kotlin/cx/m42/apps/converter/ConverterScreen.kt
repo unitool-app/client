@@ -126,7 +126,7 @@ internal fun ConverterScreen(instance: ConverterInstance) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = strings.source(current.rates.date, current.fromCache || !online),
+                    text = strings.source(current.rates.date, current.fromCache || !online, current.rates.credit),
                     style = tokens.footnote,
                     color = tokens.muted,
                     modifier = Modifier.testTag("currency-converter:source"),

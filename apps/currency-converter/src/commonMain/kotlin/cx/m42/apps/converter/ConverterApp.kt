@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class ConverterConfig(
     val base: String = "USD",
-    val favorites: List<String> = listOf("EUR", "RUB", "GBP"),
+    val favorites: List<String> = listOf("EUR", "RUB", "GBP", "VND"),
     val ratesUrl: String = DEFAULT_RATES_URL,
     /** Which currency a deep link asked to start on, if any. */
     val from: String? = null,
@@ -30,10 +30,13 @@ public data class ConverterConfig(
 ) {
     public companion object {
         /**
-         * ECB rates, no key, and — the part that decides it — CORS open, which the wasm build
-         * needs (07). `open.er-api.com` is the documented fallback for anyone who needs a live RUB.
+         * ExchangeRate-API's open endpoint: no key, CORS open — which the wasm build needs (07) —
+         * and over 160 currencies, RUB and VND among them. The ECB, behind `api.frankfurter.app`,
+         * was the first choice and publishes neither, so a ruble or a dong had no answer at all;
+         * it still parses, and stays one config payload away. The price is a credit under the
+         * answer (their terms), and a table that changes once a day.
          */
-        public const val DEFAULT_RATES_URL: String = "https://api.frankfurter.app/latest?from=USD"
+        public const val DEFAULT_RATES_URL: String = "https://open.er-api.com/v6/latest/USD"
     }
 }
 
@@ -52,8 +55,8 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
         metadata = AppMetadata(
             title = localized("ru" to "Конвертер валют", "en" to "Currency converter"),
             description = localized(
-                "ru" to "Курсы ЕЦБ, работает офлайн по кэшу",
-                "en" to "ECB rates, works offline from cache",
+                "ru" to "Курсы более 160 валют, работает офлайн по кэшу",
+                "en" to "Rates for 160+ currencies, works offline from cache",
             ),
             // Its own glyph, as an SVG path the host has never seen (D29). The calculator uses a
             // name from the host's pack; between them the two halves of "an app can look like
@@ -67,7 +70,7 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
         ),
         deepLinks = setOf("rate"),
         pushTopics = setOf("rates"),
-        networkHosts = setOf("api.frankfurter.app", "open.er-api.com"),
+        networkHosts = setOf("open.er-api.com", "api.frankfurter.app"),
     )
 
     override val configSpec: AppConfigSpec<ConverterConfig> =

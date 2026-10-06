@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 
 /**
  * A table of rates against one base currency, as of one day.
@@ -27,6 +28,12 @@ public data class Rates(
     val rates: Map<String, Double>,
     /** When this table was fetched, so "is it stale" is a subtraction rather than a guess (D30). */
     val fetchedAt: Long = 0,
+    /**
+     * Who has to be named under the answer, when the publisher asks to be. Kept with the table
+     * rather than worked out from the config's URL, because a cached table is shown long after the
+     * request that brought it, and possibly under a different config.
+     */
+    val credit: String? = null,
 ) {
     /**
      * Converts through the base, because that is the only currency every rate is quoted against.
@@ -96,11 +103,16 @@ public class RatesRepository(
 
     public companion object {
         /**
-         * Frankfurter's shape: `{"amount":1,"base":"USD","date":"2026-09-19","rates":{…}}`.
+         * Two envelopes, one function:
+         *
+         *  - ExchangeRate-API: `{"result":"success","provider":"https://www.exchangerate-api.com",
+         *    "time_last_update_unix":1789776151,"base_code":"USD","rates":{…}}`;
+         *  - Frankfurter: `{"amount":1,"base":"USD","date":"2026-09-19","rates":{…}}`.
          *
          * Parsed by hand out of a `JsonObject` rather than into a mirror data class, because the
-         * app should survive the endpoint growing a field, and because the *fallback* endpoint in
-         * the config has a different envelope — one function, adjusted, beats two response types.
+         * app should survive an endpoint growing a field, and because the difference between the
+         * two is three field names — one function, adjusted, beats two response types. An error
+         * from either has no `rates`, and fails here rather than as a table with nothing in it.
          */
         public fun parse(body: String, fallbackBase: String, fetchedAt: Long, json: Json = Json): Rates {
             val root = json.parseToJsonElement(body).jsonObject
@@ -109,11 +121,37 @@ public class RatesRepository(
             }.orEmpty()
             require(rates.isNotEmpty()) { "no rates in the response" }
             return Rates(
-                base = root["base"]?.jsonPrimitive?.content ?: fallbackBase,
-                date = root["date"]?.jsonPrimitive?.content ?: "",
+                base = (root["base"] ?: root["base_code"])?.jsonPrimitive?.content ?: fallbackBase,
+                date = root["date"]?.jsonPrimitive?.content
+                    ?: root["time_last_update_unix"]?.jsonPrimitive?.longOrNull?.let(::isoDate)
+                    ?: "",
                 rates = rates,
                 fetchedAt = fetchedAt,
+                // Their terms ask for this name wherever the rates are shown.
+                credit = "Exchange Rate API".takeIf {
+                    root["provider"]?.jsonPrimitive?.content.orEmpty().contains("exchangerate-api.com")
+                },
             )
         }
     }
+}
+
+/**
+ * `YYYY-MM-DD` of a Unix time, in UTC — the day ExchangeRate-API's table is for, written the way
+ * Frankfurter writes it, so the line under the answer reads the same whichever one answered.
+ *
+ * `commonMain` has no calendar, and one conversion is not worth a dependency: this is Howard
+ * Hinnant's `civil_from_days`, which is exact for every day either side of 1970.
+ */
+internal fun isoDate(epochSeconds: Long): String {
+    val days = epochSeconds.floorDiv(86_400L) + 719_468
+    val era = days.floorDiv(146_097L)
+    val dayOfEra = days - era * 146_097
+    val yearOfEra = (dayOfEra - dayOfEra / 1_460 + dayOfEra / 36_524 - dayOfEra / 146_096) / 365
+    val dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+    val shiftedMonth = (5 * dayOfYear + 2) / 153
+    val day = dayOfYear - (153 * shiftedMonth + 2) / 5 + 1
+    val month = if (shiftedMonth < 10) shiftedMonth + 3 else shiftedMonth - 9
+    val year = yearOfEra + era * 400 + if (month <= 2) 1 else 0
+    return "$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
 }
