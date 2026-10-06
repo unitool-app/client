@@ -63,6 +63,12 @@ node_modules/
 __pycache__/
 *.pyc
 
+# What the console Unitool writes when it is tried out from the repository root: the README's
+# `unitool qr … -o code.png` lands here, and `--split` adds export-1.png, export-2.png, … Only the
+# root, so pictures that belong to the app (docs/, play/, the modules' resources) stay tracked.
+/*.png
+/*.svg
+
 # A symlink to an unrelated checkout on one machine, used as reference material. It would be
 # committed as a dangling symlink for everyone else.
 /example-app

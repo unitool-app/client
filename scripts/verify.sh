@@ -37,12 +37,12 @@ fi
 # ---------------------------------------------------------------- 1. static
 step "1. Static"
 if ./gradlew --quiet checkDependencyRules > "$out/static.log" 2>&1; then
-  ok "app modules reach neither the host nor each other (02)"
+  ok "app modules reach neither the host nor each other (02); the CLI reaches no phone module (cli D283)"
 else
   bad "dependency rules — see $out/static.log"
 fi
 
-if grep -rn --include='*.kt' -E '@Ignore|\.skip\(' composeApp/src apps > "$out/ignored.txt" 2>/dev/null; then
+if grep -rn --include='*.kt' -E '@Ignore|\.skip\(' composeApp/src apps unitool-cli unitool-kit --exclude-dir=build > "$out/ignored.txt" 2>/dev/null; then
   bad "disabled tests found — see $out/ignored.txt"
 else
   ok "no @Ignore and no .skip("
@@ -83,6 +83,71 @@ say "  ($(ls "$out/junit" 2>/dev/null | wc -l) result files)"
 for tool in ssh-keygen ssh-add age; do
   command -v "$tool" > /dev/null || skip "interop tests that need $tool: not installed here"
 done
+
+# ---------------------------------------------------------------- 2b. console tool
+# .ai-notes/cli: the terminal half of the codebase. Its unit tests first, then the real binary called
+# from the shell the way a person calls it, so the wrapper, the start script and the exit codes are
+# part of the check. Every call has its stdin redirected: at a terminal, a bare call opens the menu.
+step "2b. Console tool (unitool-cli)"
+# The native binary first: NativeBinaryTest (jvmTest) runs it as a process and reads it with ZXing.
+if ./gradlew --quiet :unitool-cli:app:install > "$out/cli.log" 2>&1; then
+  touch unitool-cli/app/build/dist/unitool
+  if file unitool-cli/app/build/dist/unitool | grep -q 'ELF 64-bit'; then
+    ok "native binary linked: unitool-cli/app/build/dist/unitool ($(( $(wc -c < unitool-cli/app/build/dist/unitool) / 1024 )) KB, no JVM)"
+  else
+    bad "unitool-cli/app/build/dist/unitool is not a native executable"
+  fi
+else
+  bad "native binary — see $out/cli.log"
+fi
+# unitool-kit: the services the phone and the CLI share. Tested on the desktop JVM and natively; built
+# for Android and the web here, and for iOS in step 4b with every other module.
+if ./gradlew --quiet :unitool-kit:desktopTest :unitool-kit:linuxX64Test \
+    :unitool-kit:compileDebugKotlinAndroid :unitool-kit:compileKotlinWasmJs --continue >> "$out/cli.log" 2>&1; then
+  ok "unitool-kit: QR encoder against ZXing, deflate against java.util.zip; builds for Android and wasm"
+else
+  bad "unitool-kit — see $out/cli.log"
+fi
+if ./gradlew --quiet :unitool-cli:core:allTests :unitool-cli:apps:qr:allTests :unitool-cli:app:allTests \
+    --continue >> "$out/cli.log" 2>&1; then
+  ok "framework, qr and binary tests, on the JVM and natively (linuxX64); the binary's output is the kit's"
+else
+  bad "console tool tests — see $out/cli.log"
+fi
+find unitool-cli unitool-kit -path '*/build/test-results/*' -name '*.xml' -exec cp {} "$out/junit/" \; 2>/dev/null
+if grep -qs '<skipped' unitool-cli/apps/qr/build/test-results/jvmTest/TEST-cx.m42.unitool.cli.qr.NativeBinaryTest.xml; then
+  skip "NativeBinaryTest: the binary was not built"
+fi
+cli=unitool-cli/bin/unitool
+smoke="$out/cli-smoke"
+mkdir -p "$smoke"
+case "$("$cli" --version < /dev/null 2>> "$out/cli.log")" in
+  "unitool "[0-9]*) ok "bin/unitool --version names a release version" ;;
+  *) bad "bin/unitool --version — see $out/cli.log" ;;
+esac
+if "$cli" qr encode -o "$smoke/code.svg" 'https://m42.cx' < /dev/null 2>> "$out/cli.log" &&
+  grep -q '<path fill="#000000" d="M' "$smoke/code.svg"; then
+  ok "qr encode writes an SVG file"
+else
+  bad "qr encode to SVG — see $out/cli.log"
+fi
+if printf 'hello' | "$cli" qr > "$smoke/code.ansi" 2>> "$out/cli.log" && grep -q '▀' "$smoke/code.ansi"; then
+  ok "qr reads a pipe and prints the code to stdout"
+else
+  bad "qr from a pipe — see $out/cli.log"
+fi
+if "$cli" qr hello -f png < /dev/null > "$smoke/code.png" 2>> "$out/cli.log" && [ "$(head -c 4 "$smoke/code.png" | tail -c 3)" = "PNG" ]; then
+  ok "qr sends a PNG down a pipe"
+else
+  bad "qr PNG to a pipe — see $out/cli.log"
+fi
+"$cli" nope < /dev/null > /dev/null 2>&1; usage=$?
+head -c 2954 /dev/zero | tr '\0' a | "$cli" qr > /dev/null 2>&1; toolong=$?
+if [ "$usage" -eq 2 ] && [ "$toolong" -eq 1 ]; then
+  ok "exit codes: 2 for a wrong call, 1 for text too long for one code (D270)"
+else
+  bad "exit codes: wrong call gave $usage (want 2), too long gave $toolong (want 1)"
+fi
 
 # ---------------------------------------------------------------- 3. screenshots
 step "3. Screenshots"

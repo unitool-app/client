@@ -1,0 +1,111 @@
+# unitool-cli — Unitool in the terminal
+
+A console tool in Kotlin. Like the phone, it is a set of apps; here an app is a word on the command
+line with commands under it: `unitool qr encode …`. It lives in this repository on purpose: the phone
+and the terminal are one codebase and cannot drift apart. The design is in
+[`.ai-notes/cli`](../.ai-notes/cli/README.md).
+
+Today there is one app, `qr`.
+
+## Running it
+
+```sh
+unitool-cli/bin/unitool --help                 # builds itself on first run (or when a source changed)
+ln -s "$PWD/unitool-cli/bin/unitool" ~/bin/     # optional: `unitool` from anywhere
+
+./gradlew :unitool-cli:app:install             # or build by hand: unitool-cli/app/build/dist/unitool
+```
+
+`unitool` is a native Linux executable (Kotlin/Native, `linuxX64`). It is one file of about 1.4 MB,
+needs no JVM and starts in about 30 ms. Copy `build/dist/unitool` anywhere and it runs. It links only
+glibc 2.19 or newer, which every Linux has, so it is not *statically* linked: a fully static glibc
+build from Kotlin/Native's toolchain crashes at start (`.ai-notes/cli`, D291).
+
+Building it needs the same setup as the phone build (a JDK for Gradle, the Android SDK in
+`local.properties`), because Gradle configures the whole project. The first build downloads
+Kotlin/Native's Linux toolchain once. A release link takes about a minute.
+
+## Shared services: `unitool-kit`
+
+What a command does that is not about the command line lives in the shared module `:unitool-kit`
+(`/unitool-kit`), which the phone can use too. The CLI apps only parse parameters, pick where the
+result goes and word the messages. Today the kit has the QR service:
+
+```kotlin
+val code = Qr.encode("https://m42.cx", ErrorCorrection.L) ?: error("too long")
+QrImage.png(code)        // a picture: PNG bytes (deflate included, no zlib needed)
+QrImage.svg(code)        // a picture: SVG text
+QrTerminal.ansi(code)    // terminal output
+Qr.split(text)           // text too long for one code, cut on line breaks
+```
+
+Terminal services every command can use are in `core`: `Io.showScreens(...)` shows several screens
+one at a time (Enter between them, read from `/dev/tty` even behind a pipe), and `CLEAR_SCREEN`.
+
+## Tests
+
+```sh
+./gradlew :unitool-kit:desktopTest :unitool-kit:linuxX64Test \
+    :unitool-cli:core:allTests :unitool-cli:apps:qr:allTests :unitool-cli:app:allTests
+```
+
+The CLI's tests run twice, on the JVM and natively (`linuxX64Test`); the kit's on the desktop JVM and
+natively. The JVM adds three checks:
+- `QrZxingTest` (kit) compares the hand-written encoder with ZXing module for module, for every
+  version and level, and reads every rendering back;
+- `DeflateTest` (kit) reads the hand-written deflate back with `java.util.zip.Inflater`;
+- `NativeBinaryTest` (qr) runs the shipped binary and compares its output with the kit's, byte for
+  byte (build it first with `:unitool-cli:app:install`; without it the test is skipped).
+
+Step 2b of `./scripts/verify.sh` does all of this and also calls the binary from the shell.
+
+## `unitool qr` — QR codes from text
+
+```sh
+unitool qr 'https://m42.cx'                    # to the terminal, black on white whatever the theme
+echo 'from a pipe' | unitool qr                # no TEXT: stdin, minus the final line break
+unitool qr 'hello' -o code.png                 # the format follows the extension: .png, .svg
+unitool qr 'hello' -f svg > code.svg           # or is named; PNG is refused on a terminal
+unitool qr 'hello' --ec H --scale 12 -o big.png
+
+# Text longer than one code (2953 bytes at --ec L) is cut on line breaks with --split. At a terminal
+# the codes come one at a time, with Enter in between (the keyboard is read from /dev/tty, so the text
+# can come from a pipe). With -o they become export-1.png, export-2.png, …
+age -d -i ~/.ssh/id_ed25519 2fa-export.age | unitool qr --split
+```
+
+`unitool` with no arguments at a terminal opens a menu: pick an app, a command, answer the questions.
+At the end it prints the same call as one command line.
+
+## Conventions
+
+- **Everything the tool says is in English**: help, menu, messages. (The design notes in `.ai-notes/cli`
+  stay in Russian, as all notes in this repository do.)
+- **stdout carries only the result** (the code, the PNG bytes); every message goes to stderr. Pipes and
+  redirects therefore just work.
+- **Exit codes:** 0 for success, 1 when the command could not do it (text too long, a file that will not
+  write), 2 for a wrong call (unknown option, bad value), 130 when you leave the menu with Ctrl-D,
+  141 (silently) when the reader of stdout goes away, as in `unitool qr … | head`.
+- `UNITOOL_DEBUG=1` adds the stack trace to an internal error.
+
+## Adding an app
+
+1. Create a module `unitool-cli/apps/<id>`, Kotlin Multiplatform with `jvm()` and `linuxX64()`,
+   depending on `:unitool-cli:core` (and `:unitool-kit` for shared services). See
+   `apps/qr/build.gradle.kts`. The code goes in `commonMain`; a JVM-only library can only be used in
+   tests, because the binary is native. Logic that is not about the command line goes to the kit.
+2. Write a `CliApp` with its `Command`s. Parameters are properties:
+
+   ```kotlin
+   private val text by argument("TEXT", "the text; without it, stdin is read")
+   private val ec by option("--ec", help = "error correction", metavar = "LEVEL").choice("L", "M", "Q", "H").default("L")
+   private val split by flag("--split", help = "cut on line breaks").advanced()   // not asked in the menu
+   ```
+
+   That one declaration is the parser, `--help` and the menu.
+3. Add it to `listOf(...)` in `app/src/commonMain/kotlin/.../Unitool.kt`, and its `allTests` to `verify` in the root
+   `build.gradle.kts` and step 2b of `scripts/verify.sh`.
+4. Test with `FakeIo` and `cli.exec(...)` from `:unitool-cli:testing`. See `apps/qr/src/commonTest`.
+
+A CLI module may not depend on an app, a service, Superizer or Compose. If it needs code the phone
+already has, that code moves to `:unitool-kit`, which depends on nothing (`checkDependencyRules`).

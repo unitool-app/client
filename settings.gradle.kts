@@ -61,3 +61,13 @@ include(":services:vault")
 include(":services:ssh")
 include(":services:file-picker")
 include(":services:backup")
+
+// Code the phone and the console tool share (.ai-notes/cli D273): one copy, used by both.
+include(":unitool-kit")
+
+// The console tool (.ai-notes/cli). It lives here rather than in a repository of its own so the phone
+// and the terminal are one codebase (D280): code both need moves to a shared module, never a copy.
+include(":unitool-cli:core")
+include(":unitool-cli:testing")
+include(":unitool-cli:apps:qr")
+include(":unitool-cli:app")

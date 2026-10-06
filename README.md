@@ -132,7 +132,23 @@ services/qr-scanner/          an optional service (D19): the contract apps ask f
 services/share/               another: hand a file to the person — Android's share sheet
 services/vault/               another: encryption at rest — AES-GCM under a key that never leaves
                               Android's Keystore (its tests run on a device: connectedAndroidTest)
+
+unitool-kit/                  code the phone and the console tool share, one copy for both; plain
+                              Kotlin on every target, no dependencies. Today: QR codes (encoder,
+                              PNG/SVG pictures, terminal output), checked against ZXing
+unitool-cli/                  the console tool, same codebase (.ai-notes/cli): `unitool qr …`, a
+                              native Linux binary (Kotlin/Native), no JVM
+  core/                       apps, commands, parameters → argv parser, help and menu; no deps
+  testing/                    FakeIo: a scripted process for the CLI's tests
+  apps/qr/                    the `qr` command over the kit's QR service: terminal, PNG, SVG,
+                              `--split` by lines
+  app/  bin/unitool           the binary and the wrapper that builds and runs it
 ```
+
+The console tool shares this repository so the two can never drift apart. It may not depend on an app,
+a service, Superizer or Compose (`checkDependencyRules`). Code that both the phone and the terminal need
+moves to `unitool-kit`, never a copy, and the kit depends on nothing. A commit that touches only `unitool-cli/` ships nothing to Play.
+See [unitool-cli/README.md](unitool-cli/README.md).
 
 Everything the two directories *share* — the drawer, All Apps, Settings, the activation screens, the
 design tokens, the icon pack, the storage and network implementations — lives in Superizer, not

@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# The console Unitool (.ai-notes/cli). Builds the native binary first when there is none yet or a
+# source file is newer than it, then runs it with the arguments as given.
+#
+# The binary itself is unitool-cli/app/build/dist/unitool: one file with no JVM, which can be copied
+# anywhere. This script exists only to rebuild it after a change.
+#
+# Symlinking it into ~/bin works: it finds the repository through the link.
+set -eu
+
+here=$(dirname "$(readlink -f "$0")")
+root=$(cd "$here/../.." && pwd)
+binary="$root/unitool-cli/app/build/dist/unitool"
+
+stale() {
+  [ ! -x "$binary" ] && return 0
+  [ -n "$(find "$root/unitool-cli" "$root/gradle/libs.versions.toml" -newer "$binary" \
+      \( -name '*.kt' -o -name '*.kts' -o -name '*.toml' \) \
+      -not -path '*/build/*' -not -path '*/src/*Test/*' -print -quit)" ]
+}
+
+if stale; then
+  echo "unitool: building…" >&2
+  # stdin belongs to unitool (the text, the menu's answers), not to Gradle.
+  (cd "$root" && ./gradlew --quiet :unitool-cli:app:install) < /dev/null >&2
+  touch "$binary"
+fi
+
+exec "$binary" "$@"
