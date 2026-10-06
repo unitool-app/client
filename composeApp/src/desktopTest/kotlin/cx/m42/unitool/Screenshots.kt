@@ -5,7 +5,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +20,8 @@ import cx.m42.services.share.FileSharer
 import cx.m42.superizer.diagnostics.SelfTestResult
 import cx.m42.superizer.host.storage.HostKeys
 import cx.m42.superizer.host.storage.SafePrefs
+import cx.m42.unitool.premium.LocalPremiumStore
+import cx.m42.unitool.premium.Store
 import cx.m42.unitool.settings.HostTools
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +67,9 @@ class Screenshots {
      *    its own render rather than a letterboxed copy.
      *  - [AppStoreListing] is Apple's 6.5-inch portrait slot: 414×896 dp at 3×, exactly
      *    1242×2688 px. It is rendered at its native aspect ratio rather than resized from Play.
+     *
+     * Each also names the store whose Premium offer it draws: the phone and Play frames are
+     * Android's, so they show Google Play's.
      */
     private data class Viewport(
         val name: String,
@@ -73,14 +77,16 @@ class Screenshots {
         val heightDp: Int,
         val scale: Float,
         val directory: String,
+        val store: Store,
     ) {
         val widthPx: Int get() = (widthDp * scale).toInt()
         val heightPx: Int get() = (heightDp * scale).toInt()
     }
 
-    private val Phone = Viewport("phone", 412, 915, 2f, "build/screenshots/phone")
-    private val PlayListing = Viewport("play", 360, 640, 3f, "build/screenshots/play")
-    private val AppStoreListing = Viewport("appstore-6.5", 414, 896, 3f, "build/screenshots/appstore-6.5")
+    private val Phone = Viewport("phone", 412, 915, 2f, "build/screenshots/phone", Store.GooglePlay)
+    private val PlayListing = Viewport("play", 360, 640, 3f, "build/screenshots/play", Store.GooglePlay)
+    private val AppStoreListing =
+        Viewport("appstore-6.5", 414, 896, 3f, "build/screenshots/appstore-6.5", Store.AppStore)
 
     private fun labelFor(lang: String, label: String): String = if (lang == "en") {
         mapOf(
@@ -139,7 +145,10 @@ class Screenshots {
             setContent {
                 // The window is in pixels; the app is laid out in dp. Providing the density here is
                 // what makes an 824 px capture a 412 dp phone rather than a small tablet.
-                CompositionLocalProvider(LocalDensity provides Density(viewport.scale)) {
+                CompositionLocalProvider(
+                    LocalDensity provides Density(viewport.scale),
+                    LocalPremiumStore provides viewport.store,
+                ) {
                     UnitoolApp(superizer, security)
                 }
             }
@@ -171,8 +180,9 @@ class Screenshots {
             waitForIdle()
 
             val directory = File(viewport.directory).apply { mkdirs() }
+            // The whole scene rather than the root node: an alert is a layer of its own, above the root.
             ImageIO.write(
-                onRoot().captureToImage().toAwtImage().withoutAlpha(),
+                captureToImage().toAwtImage().withoutAlpha(),
                 "png",
                 File(directory, "$name.png"),
             )
@@ -378,6 +388,12 @@ class Screenshots {
             tapTag("activate:have-code")
             typeInto("activate:promo", cx.m42.apps.testapp.SecretTestApp.PROMO_CODE)
             tapTag("activate:apply")
+        },
+        // A purchase on the Premium mock-up: the store's kind of alert, since nothing is sold yet.
+        Screen("44-premium-failed") {
+            tapIcon("Открыть меню")
+            tapIcon("Премиум")
+            tapTag("premium:subscribe")
         },
     )
 

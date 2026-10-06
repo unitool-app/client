@@ -1,5 +1,9 @@
 package cx.m42.unitool
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -22,8 +26,8 @@ import kotlin.test.assertTrue
 
 /**
  * The Premium offer on Activate, a mock-up: it sits above the promo code, shows two periods priced in
- * the region's currency with the store's small print, and its buttons only say that purchases come
- * later.
+ * the region's currency with the store's small print, and each store's own look. Its buttons open the
+ * store's kind of alert: something went wrong, try again later.
  */
 @OptIn(ExperimentalTestApi::class)
 class PremiumOfferTest : UnitoolTest() {
@@ -60,10 +64,21 @@ class PremiumOfferTest : UnitoolTest() {
         onNodeWithTag("premium:terms").assertExists()
         onNodeWithTag("premium:privacy").assertExists()
 
-        onNodeWithTag("premium:not-yet").assertDoesNotExist()
+        // Nothing is sold yet: a purchase fails, in the current language, and OK closes the alert.
+        onNodeWithTag("premium:alert").assertDoesNotExist()
         onNodeWithTag("premium:subscribe").performClick()
         waitForIdle()
-        onNodeWithTag("premium:not-yet").assertExists()
+        onNodeWithTag("premium:alert").assertIsDisplayed()
+        onNodeWithText("Что-то пошло не так").assertIsDisplayed()
+        onNodeWithText("Повторите попытку позже.").assertIsDisplayed()
+        onNodeWithTag("premium:alert-ok").performClick()
+        waitForIdle()
+        onNodeWithTag("premium:alert").assertDoesNotExist()
+        onNodeWithTag("premium:restore").performScrollTo().performClick()
+        waitForIdle()
+        onNodeWithTag("premium:alert").assertIsDisplayed()
+        onNodeWithTag("premium:alert-ok").performClick()
+        waitForIdle()
 
         onNodeWithTag("activate:have-code").performScrollTo().performClick()
         waitForIdle()
@@ -72,12 +87,35 @@ class PremiumOfferTest : UnitoolTest() {
     }
 
     @Test
-    fun androidGetsGooglePlaysSmallPrintAndNoAppleLicence() = runComposeUiTest {
-        setContent { PremiumCard(premiumStrings("en"), PremiumPrices.forRegion("US"), Store.GooglePlay) }
+    fun androidGetsAGooglePlayOfferAndAMaterialAlert() = runComposeUiTest {
+        // Scrollable, as Activate is: under CI's fonts the button can fall below a test window's fold.
+        setContent {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                PremiumCard(premiumStrings("en"), PremiumPrices.forRegion("US"), Store.GooglePlay)
+            }
+        }
         waitForIdle()
+        // The periods are a list, the better one on top and chosen; the button leaves the price to it.
+        val year = onNodeWithTag("premium:plan-year").assertIsSelected().getUnclippedBoundsInRoot()
+        val month = onNodeWithTag("premium:plan-month").getUnclippedBoundsInRoot()
+        assertTrue(year.bottom <= month.top, "the year is listed above the month")
+        onNodeWithTag("premium:subscribe").assert(hasText("Subscribe"))
+
+        // Google Play's small print; no Apple licence, and no Restore: Play brings a subscription back itself.
         onNodeWithTag("premium:small-print").assert(hasText("Google Play", substring = true))
         onNodeWithTag("premium:terms").assertDoesNotExist()
+        onNodeWithTag("premium:restore").assertDoesNotExist()
         onNodeWithTag("premium:privacy").assertExists()
+
+        onNodeWithTag("premium:plan-month").performClick()
+        onNodeWithTag("premium:subscribe").performScrollTo().performClick()
+        waitForIdle()
+        onNodeWithText("Something went wrong").assertIsDisplayed()
+        onNodeWithText("Please try again later.").assertIsDisplayed()
+        onNodeWithTag("premium:alert-ok").assert(hasText("OK")).performClick()
+        waitForIdle()
+        onNodeWithTag("premium:alert").assertDoesNotExist()
+        onNodeWithTag("premium:plan-month").assertIsSelected()
     }
 
     @Test
