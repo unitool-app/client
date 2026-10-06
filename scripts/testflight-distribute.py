@@ -3,12 +3,16 @@
 Waits for App Store Connect to process an upload, then gives the build to a TestFlight group.
 
     python3 scripts/testflight-distribute.py <build number> <group name>
+    python3 scripts/testflight-distribute.py --compliance-code
 
 The testflight lane of ios.yml uploads, and an upload alone reaches nobody: Apple processes it for
 minutes first, and only a processed build can be put in a group. This waits — on a Linux runner,
 where waiting costs a tenth of what it costs on the Mac — adds the build to the group, and says
 what still stands between it and the testers. Export compliance it answers itself, by repeating
 the answer the owner gave once in App Store Connect (see answer_export_compliance).
+
+With --compliance-code it prints the key of that answer instead, for the testflight lane to write
+into Info.plist before the archive (see compliance_code), and prints nothing when there is none.
 
 The App Store Connect key comes from ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_P8_BASE64, the secrets
 the upload uses; the bundle id from Config.xcconfig. Needs nothing beyond Python and openssl.
@@ -30,7 +34,8 @@ POLL_SECONDS = 30
 
 
 def fail(message):
-    print(f"::error::{message}", flush=True)
+    # To stderr: with --compliance-code, stdout is the key and nothing else.
+    print(f"::error::{message}", file=sys.stderr, flush=True)
     sys.exit(1)
 
 
@@ -191,44 +196,86 @@ def answer_export_compliance(asc, app_id, build, build_number):
             print(f"  (on the way: {error})")
 
 
-def main(build_number, group_name):
+def compliance_code(asc, app_id):
+    """
+    The key of the app's export compliance answer, or None while it has none.
+
+    Once the owner had answered in App Store Connect, Apple refused an upload whose Info.plist said
+    "uses encryption" without that key (ITMS-90592, 2026-10-06): the build has to carry it as
+    ITSEncryptionExportComplianceCode. It is read here on every build rather than kept in the repo,
+    so a new answer brings its own key. The owner's answer is preferred; any other one Apple has not
+    turned down is used with a warning, because without a key there is no upload at all.
+    """
+    declarations = asc.call("GET", "/appEncryptionDeclarations",
+                            {"filter[app]": app_id, "limit": "200"})["data"]
+    for d in declarations:
+        a = d["attributes"]
+        print(f"declaration {d['id']}: {a.get('appEncryptionDeclarationState')}, "
+              f"key {'present' if a.get('codeValue') else 'absent'}, exempt={a.get('exempt')}, "
+              f"proprietary={a.get('containsProprietaryCryptography')}, "
+              f"france={a.get('availableOnFrenchStore')}, created {a.get('createdDate')}", file=sys.stderr)
+    keyed = [d for d in declarations if d["attributes"].get("codeValue")
+             and d["attributes"].get("appEncryptionDeclarationState") not in ("REJECTED", "INVALID", "EXPIRED")]
+    if not keyed:
+        return None
+    theirs = [d for d in keyed if owners_answer(d)]
+    if not theirs:
+        print("::warning::No approved export compliance answer is the owner's (BUILD-IOS.md); the newest "
+              "other one's key is used so that the upload goes through", file=sys.stderr, flush=True)
+    newest = max(theirs or keyed, key=lambda d: d["attributes"].get("createdDate") or "")
+    return newest["attributes"]["codeValue"]
+
+
+def connect():
+    """The upload's own key, from the secrets; the temporary .p8 is gone when the process is."""
+    key = tempfile.NamedTemporaryFile("wb", suffix=".p8")
+    key.write(base64.b64decode(os.environ["ASC_KEY_P8_BASE64"]))
+    key.flush()
+    asc = Asc(os.environ["ASC_KEY_ID"].strip(), os.environ["ASC_ISSUER_ID"].strip(), key.name)
+    asc.key_file = key
     bundle = xcconfig("BUNDLE_ID")
-    with tempfile.NamedTemporaryFile("wb", suffix=".p8") as key:
-        key.write(base64.b64decode(os.environ["ASC_KEY_P8_BASE64"]))
-        key.flush()
-        asc = Asc(os.environ["ASC_KEY_ID"].strip(), os.environ["ASC_ISSUER_ID"].strip(), key.name)
+    apps = asc.call("GET", "/apps", {"filter[bundleId]": bundle})["data"]
+    app = next((a for a in apps if a["attributes"]["bundleId"] == bundle), None)
+    if app is None:
+        fail(f"App Store Connect has no app with the bundle id {bundle}")
+    return asc, app
 
-        apps = asc.call("GET", "/apps", {"filter[bundleId]": bundle})["data"]
-        app = next((a for a in apps if a["attributes"]["bundleId"] == bundle), None)
-        if app is None:
-            fail(f"App Store Connect has no app with the bundle id {bundle}")
 
-        groups = asc.call("GET", "/betaGroups", {"filter[app]": app["id"], "limit": "200"})["data"]
-        group = next((g for g in groups if g["attributes"]["name"] == group_name), None)
-        if group is None:
-            names = ", ".join(f"«{g['attributes']['name']}»" for g in groups) or "none"
-            fail(f"«{app['attributes']['name']}» has no TestFlight group «{group_name}» (it has: {names})")
+def main(build_number, group_name):
+    asc, app = connect()
+    groups = asc.call("GET", "/betaGroups", {"filter[app]": app["id"], "limit": "200"})["data"]
+    group = next((g for g in groups if g["attributes"]["name"] == group_name), None)
+    if group is None:
+        names = ", ".join(f"«{g['attributes']['name']}»" for g in groups) or "none"
+        fail(f"«{app['attributes']['name']}» has no TestFlight group «{group_name}» (it has: {names})")
 
-        build = wait_for_processing(asc, app["id"], build_number)
+    build = wait_for_processing(asc, app["id"], build_number)
 
-        if group["attributes"].get("hasAccessToAllBuilds"):
-            print(f"«{group_name}» takes every build by itself (automatic distribution); nothing to add")
-        else:
-            try:
-                asc.call("POST", f"/betaGroups/{group['id']}/relationships/builds",
-                         body={"data": [{"type": "builds", "id": build["id"]}]})
-            except AscError as e:
-                fail(f"could not add build {build_number} to «{group_name}»: {e}")
-            print(f"build {build_number} is in «{group_name}»")
-
+    if group["attributes"].get("hasAccessToAllBuilds"):
+        print(f"«{group_name}» takes every build by itself (automatic distribution); nothing to add")
+    else:
         try:
-            answer_export_compliance(asc, app["id"], build, build_number)
+            asc.call("POST", f"/betaGroups/{group['id']}/relationships/builds",
+                     body={"data": [{"type": "builds", "id": build["id"]}]})
         except AscError as e:
-            # The build is in the group either way; only the answer is left to give by hand.
-            print(f"::warning::Export compliance for build {build_number} was not answered: {e}", flush=True)
+            fail(f"could not add build {build_number} to «{group_name}»: {e}")
+        print(f"build {build_number} is in «{group_name}»")
+
+    try:
+        answer_export_compliance(asc, app["id"], build, build_number)
+    except AscError as e:
+        # The build is in the group either way; only the answer is left to give by hand.
+        print(f"::warning::Export compliance for build {build_number} was not answered: {e}", flush=True)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if sys.argv[1:] == ["--compliance-code"]:
+        try:
+            asc, app = connect()
+            print(compliance_code(asc, app["id"]) or "")
+        except AscError as e:
+            fail(f"could not read the export compliance key: {e}")
+    elif len(sys.argv) == 3:
+        main(*sys.argv[1:])
+    else:
         sys.exit(__doc__)
-    main(*sys.argv[1:])

@@ -188,6 +188,26 @@ jobs:
           mkdir -p "$HOME/private_keys"
           printf '%s' "$P8" | base64 --decode > "$HOME/private_keys/AuthKey_$KEY_ID.p8"
 
+      # Once export compliance has been answered in App Store Connect, Apple refuses an upload that
+      # says "uses encryption" without the answer's key (ITMS-90592, 2026-10-06). The key is read
+      # from Apple on every build rather than kept in Info.plist, so a new answer brings its own.
+      # No key yet (a new app, or no answer so far): the build goes without one, as build 14 did.
+      - name: Export compliance key
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          CODE=$(python3 scripts/testflight-distribute.py --compliance-code)
+          if [ -n "$CODE" ]; then
+            plutil -replace ITSEncryptionExportComplianceCode -string "$CODE" iosApp/iosApp/Info.plist
+            echo "ITSEncryptionExportComplianceCode is in Info.plist"
+          else
+            echo "::notice::App Store Connect has no export compliance key for this app yet; the build goes without one"
+          fi
+
       - name: Archive
         if: steps.gate.outputs.ready == 'true'
         run: |
@@ -199,8 +219,8 @@ jobs:
             archive
 
       # `destination: upload` in the export options sends the build straight to App Store Connect;
-      # it appears under TestFlight once Apple has processed it. Export compliance is answered by the
-      # distribute job, from the declaration given once in the console (BUILD-IOS.md).
+      # it appears under TestFlight once Apple has processed it. Export compliance travels in
+      # Info.plist (the step before the archive); the distribute job answers it for a build without.
       - name: Upload to TestFlight
         id: upload
         if: steps.gate.outputs.ready == 'true'

@@ -94,8 +94,10 @@ and a third lane, a Debug build for the simulator, only on a push to `ios-simula
   it, on Linux, waits for Apple to process the build and adds it to the TestFlight group (the
   repository variable `TESTFLIGHT_GROUP`, `dev` when unset; `scripts/testflight-distribute.py`).
   Export compliance answers itself from the second build on: Info.plist says the app encrypts
-  (`ITSAppUsesNonExemptEncryption`), and the job hands each new build the declaration given once by
-  hand in App Store Connect. It warns when there is none to hand, or Apple refused it.
+  (`ITSAppUsesNonExemptEncryption`), and the lane writes in the key of the declaration given once by
+  hand in App Store Connect before the archive. Without that key Apple refuses the upload (90592).
+  The distribute job hands the declaration to a build that still lacks one, and warns when there is
+  none to hand, or when Apple refused it.
   `iosApp/Configuration/ExportOptions.plist` is the export recipe; it holds no secret.
 
 ## Push (FCM)
@@ -143,6 +145,10 @@ How a message travels:
   proprietary, not on the French store. `ITSAppUsesNonExemptEncryption` is `true` in Info.plist,
   not `false` as in base_layouts (HTTPS only there). Apple asks the rest once: TestFlight → the
   build → standard algorithms in addition to iOS → not France. That answer becomes an app encryption
-  declaration, and `scripts/testflight-distribute.py` attaches it to every later build through the
-  App Store Connect API, with the key the upload uses. If App Store Connect ever shows a key for the
-  declaration, it goes into Info.plist as `ITSEncryptionExportComplianceCode` instead.
+  declaration with a key of its own. From then on Apple refuses an upload that says "uses
+  encryption" without that key (ITMS-90592, first seen 2026-10-06). So the testflight lane reads the
+  key through the App Store Connect API before the archive
+  (`scripts/testflight-distribute.py --compliance-code`), and writes it into Info.plist as
+  `ITSEncryptionExportComplianceCode`. It is not committed, so a new declaration brings its own key.
+  For a build that still arrives without an answer, the distribute job attaches the declaration
+  through the same API.
