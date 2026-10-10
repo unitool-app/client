@@ -1,5 +1,8 @@
 # 02 — Private docs: signing in to the website with the app
 
+> **Superseded in part by [03](03-inertia.md)** (2026-10-10): the site is now a server layer on
+> Inertia.js; the decisions 03 lists as replaced are history here.
+
 v1.0, 2026-10-10. Built the same day, at the owner's request ("do the whole cycle at once: backend,
 server and app, a button in Settings, test it, build it"). English, like 01.
 

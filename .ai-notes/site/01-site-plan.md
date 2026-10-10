@@ -1,5 +1,8 @@
 # 01 — The Unitool website: plan
 
+> **Superseded in part by [03](03-inertia.md)** (2026-10-10): the site is now a server layer on
+> Inertia.js; the decisions 03 lists as replaced are history here.
+
 v1.0, 2026-10-10. Written in English at the owner's request ("everything in English").
 
 ## 1. What was asked
