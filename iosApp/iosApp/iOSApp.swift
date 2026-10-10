@@ -29,11 +29,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
             FirebaseApp.configure()
             Messaging.messaging().delegate = self
+            // No APNs registration and no token here (push-opt-in D421): Info.plist turns Firebase's
+            // auto-init off, and Superizer's PushTransport.activate() registers with APNs and calls
+            // `activate()` below once the person uses an app that takes pushes.
             UnitoolIos.shared.installMessaging(bridge: FirebaseTopics())
-            // Asks for no permission: an APNs token for silent delivery is always granted, and it is
-            // what Firebase mints the FCM token from — so the token exists before any dialog, as on
-            // Android. Showing notifications is the separate question `requestPermission` asks.
-            application.registerForRemoteNotifications()
         }
         // Launched *by* a notification: the tap has no callback of its own then, only this.
         if let userInfo = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
@@ -116,6 +115,10 @@ final class FirebaseTopics: NSObject, FirebaseMessagingBridge {
 
     func unsubscribe(topic: String) {
         Messaging.messaging().unsubscribe(fromTopic: topic)
+    }
+
+    func activate() {
+        Messaging.messaging().isAutoInitEnabled = true
     }
 }
 

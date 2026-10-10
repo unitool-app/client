@@ -69,7 +69,6 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
             category = "Finance",
         ),
         deepLinks = setOf("rate"),
-        pushTopics = setOf("rates"),
         networkHosts = setOf("open.er-api.com", "api.frankfurter.app"),
     )
 
@@ -83,9 +82,9 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
             ConverterSettingsSection(runtime, configSpec.default.favorites)
         }
 
-        // `unitool://app/currency-converter/rate?pair=USD-RUB` — the path a push carries in its
-        // `link` (13 §2), and the same one a QR code or a pasted URL would. The app turns the
-        // query into a config and never learns which of those it was.
+        // `unitool://app/currency-converter/rate?pair=USD-RUB` — the path a QR code or a pasted URL
+        // carries. The converter takes no pushes (push-opt-in D428), so it is never a push's `link`.
+        // The app turns the query into a config and never learns where it came from.
         ctx.deepLink("rate") { params ->
             val pair = params["pair"].orEmpty().split('-')
             configSpec.encode(

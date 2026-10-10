@@ -79,6 +79,8 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>The 2FA app opens only after Face ID confirms it is you. Unitool learns only yes or no.</string>
 	<!-- Data messages: a push that updates an app without drawing anything (13 §1). -->
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<false/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

@@ -16,8 +16,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
-      Android 13+. Asked for at runtime, by PushTransport.requestPermission(), and refusable: the
-      calculator and the converter do not need it and do not change when it is denied.
+      Android 13+. Asked for at runtime, and only when the person starts using an app that shows
+      notifications (Superizer's push gate, .ai-notes/done/push-opt-in D419–D420) — never at first start.
+      Refusable: nothing else in the app changes when it is denied.
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -44,6 +45,15 @@
         android:localeConfig="@xml/locales_config"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules">
+
+        <!--
+          FCM does not start by itself (push-opt-in D421): no token is minted and Google hears nothing
+          from this install until the person uses an app that takes pushes. Superizer's
+          PushTransport.activate() turns it on then, and Firebase remembers that.
+        -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
 
         <activity
             android:name=".MainActivity"

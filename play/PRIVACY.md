@@ -1,6 +1,6 @@
 # Privacy Policy — Unitool
 
-**Last updated: 5 October 2026**
+**Last updated: 10 October 2026**
 
 ## The short version
 
@@ -13,6 +13,10 @@ network for exactly three things: the currency converter downloads published exc
 app can receive push notifications, and the 2FA app's export — only when you use it — looks up the
 public keys it encrypts to. All three are described below, because they are the only parts of this
 policy with anything in them.
+
+Notifications start only when you start using a tool that sends them. Until then the app does not
+ask for the notification permission, Firebase is not started, and nothing about notifications
+leaves the phone. Today the only such tool is a diagnostic one, opened by a code.
 
 ## What the app stores
 
@@ -27,6 +31,8 @@ On your device only, in the app's private storage, which on Android only this ap
 | The two-factor accounts you add: service, account name, secret key — encrypted, see below | so the 2FA app can show their codes |
 | The GitHub username your last 2FA export was encrypted for | so the next export offers it |
 | How long the 2FA lock waits before asking again, and any lock switches you changed | so Settings → Protection remembers them |
+| Which tools that send notifications you have started using | so notifications reach those tools and no others |
+| This installation's registration with our notification server: the id the server gave it and a random secret key, encrypted | so the app can keep that registration current |
 
 The two-factor accounts are never written in readable form. Before they reach storage they are
 encrypted (AES-256-GCM) with a key that Android's Keystore generates for this app and keeps: the key
@@ -65,7 +71,8 @@ says, above its screen, that it is not protected.
 
 ## What leaves the device
 
-Four things, and this is all of them.
+Five things, and this is all of them. The last three only once you have started using a tool that
+sends notifications.
 
 **Exchange rates.** When you open the currency converter it requests a rate table published by
 ExchangeRate-API, from `open.er-api.com` (or the European Central Bank's, from `api.frankfurter.app`,
@@ -76,16 +83,29 @@ from. The answer is cached on your device, and a cached table is used without as
 offline.
 
 **A push registration token.** The app uses Firebase Cloud Messaging so that notifications can
-reach it. To make that possible, Firebase creates a registration token and a Firebase installation
-ID and sends them to Google. These identify this installation of this app on this device — they are
+reach it. Firebase is not started until you begin using a tool that sends notifications. Then, to
+make delivery possible, Firebase creates a registration token and a Firebase installation ID and
+sends them to Google. These identify this installation of this app on this device — they are
 not a name, an email or an account, and they are not tied to you. Both are regenerated if you
 reinstall the app or clear its data. Google's handling of them is covered by the
 [Firebase privacy documentation](https://firebase.google.com/support/privacy) and the
 [Google Privacy Policy](https://policies.google.com/privacy).
 
-**A topic subscription.** So that a message about, say, exchange rates reaches the phones that want
-it, the app tells Firebase which topics this installation is subscribed to. A topic is a word, not
-a profile.
+**A topic subscription.** So that a message on a subject reaches the phones that want it, the app
+tells Firebase which topics this installation is subscribed to — only for tools you use. A topic is
+a word, not a profile.
+
+**A registration with our notification server.** So that a notification can be addressed to this
+installation, the app registers it with our server at `unitool.m42.cx`. The registration carries:
+the push registration token above; whether the phone runs Android or iOS; the app's version; the
+interface language; and the internal names of the tools on this phone that send notifications and
+that you use. The server gives the installation a random id. To prove later updates come from the
+same installation, the app makes a random secret key on the phone and sends only a one-way hash of
+it; the key itself never leaves the phone. Nothing else is sent: no name, no account, nothing you
+type. The registration is updated when the app starts and when the token or the list of tools
+changes. When you stop using the last such tool, the app tells the server the list is now empty and
+the server sends this installation nothing. Clearing the app's data or reinstalling it makes a new
+registration; the old one receives nothing again.
 
 **A 2FA export, if you make one.** The 2FA app can export your two-factor accounts for moving them
 to a computer. You type a GitHub username and tap "Find keys"; the app then requests that account's
@@ -101,8 +121,9 @@ transmitted.
 
 ## What the app collects
 
-For itself: nothing. There is no analytics SDK and no crash reporter in the app, and there is no
-server of ours for anything to arrive at.
+For itself: only the notification registration described above, and only once you use a tool that
+sends notifications. There is no analytics SDK and no crash reporter in the app, and our server
+receives nothing else.
 
 In the terms Google Play's Data safety form uses:
 
@@ -113,7 +134,8 @@ In the terms Google Play's Data safety form uses:
 - **No contacts, photos, files, messages, calendar or call logs.**
 - **No advertising ID**, and no profiling or advertising of any kind.
 - **Device or other IDs — yes, one kind**: the Firebase Cloud Messaging registration token and the
-  Firebase installation ID described above, used only to deliver notifications.
+  Firebase installation ID described above, and the random id our server gives the installation,
+  used only to deliver notifications — and only once you use a tool that sends them.
 - **No app activity, diagnostics, crash logs or analytics.**
 
 Nothing is sold, and nothing is shared with anyone beyond what delivering a notification requires
@@ -129,7 +151,8 @@ exactly the way nobody checks.
 Asked for, and refusable:
 
 - `android.permission.POST_NOTIFICATIONS` — on Android 13 and later, as a dialog rather than
-  silently. You can refuse it. The app works exactly as before if you do; you simply do not see
+  silently, and only when you start using a tool that shows notifications — never when the app
+  first opens. You can refuse it, and Settings → Notifications can ask again later. The app works exactly as before if you do; you simply do not see
   notifications.
 - `android.permission.CAMERA` — only when you tap "Scan QR code" in the 2FA app, to read the setup
   code a site shows you, or "Scan a QR code" on the Activate screen, to read an activation code.
@@ -140,8 +163,9 @@ Asked for, and refusable:
 
 Granted at install time, never prompted for:
 
-- `android.permission.INTERNET` — to fetch exchange rates, to receive notifications and, when you
-  export 2FA accounts, to fetch the public keys of the GitHub account you name.
+- `android.permission.INTERNET` — to fetch exchange rates, to receive notifications and register
+  for them with our server and, when you export 2FA accounts, to fetch the public keys of the GitHub
+  account you name.
 - `android.permission.VIBRATE` — the short tap you feel when a key is pressed. It cannot read
   anything, and the vibration itself can be turned off in Settings.
 - `android.permission.ACCESS_NETWORK_STATE` — added by Firebase, to tell whether there is a
@@ -164,7 +188,8 @@ Granted at install time, never prompted for:
 
 A push message carries two things: the text you see, and routing data saying which screen in the
 app a tap should open. It carries nothing about you, and the app sends nothing back when one
-arrives. You can turn notifications off in Android's own settings for the app at any time, and the
+arrives. Messages go only to tools you use: the server does not send them for any other, and the
+app drops one that arrives anyway. You can turn notifications off in Android's own settings for the app at any time, and the
 rest of the app is unaffected.
 
 ## Backup

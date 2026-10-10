@@ -40,6 +40,9 @@ import platform.UserNotifications.UNUserNotificationCenter
 interface FirebaseMessagingBridge {
     fun subscribe(topic: String)
     fun unsubscribe(topic: String)
+
+    /** `Messaging.messaging().isAutoInitEnabled = true`, once a push app is in use (push-opt-in D421). */
+    fun activate()
 }
 
 /**
@@ -143,6 +146,7 @@ object UnitoolIos {
         PushTransport.messaging = object : IosMessaging {
             override fun subscribe(topic: String) = bridge.subscribe(topic)
             override fun unsubscribe(topic: String) = bridge.unsubscribe(topic)
+            override fun activate() = bridge.activate()
         }
     }
 }

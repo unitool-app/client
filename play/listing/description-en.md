@@ -61,11 +61,13 @@ ID and no account.
 
 The app does use the network, for two things and no others. The converter downloads published
 exchange rates — a whole table, asked for without telling anyone which currency you are looking
-at. And notifications are delivered through Firebase Cloud Messaging, which gives this
-installation an identifier so that a message can find it; the identifier is new again if you
-reinstall the app or clear its data.
+at. And notifications are delivered through Firebase Cloud Messaging and our own server, which give
+this installation an identifier so that a message can find it — but only once you use a tool that
+sends notifications; until then nothing is registered anywhere. The identifier is new again if
+you reinstall the app or clear its data.
 
-On Android 13 and later the app asks whether you want notifications at all. Refuse, and everything
+On Android 13 and later the app asks whether you want notifications when you start using such a
+tool, not before. Refuse, and everything
 else works exactly the same.
 
 Permissions: internet, vibration (switchable off in Settings), notifications on Android 13 and

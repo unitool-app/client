@@ -97,6 +97,10 @@ private fun buildHost(
     // manifest's intent filters have to agree with.
     scheme(SCHEME)
 
+    // Where this device registers for push (push-opt-in D422): only once the person uses an app
+    // that takes pushes, never at first start. Desktop and the web have no token and send nothing.
+    pushServer(PUSH_SERVER)
+
     languages(
         LanguageOption("ru", "Русский"),
         LanguageOption("en", "English"),
@@ -200,6 +204,9 @@ public fun SuperizerBuilder.registerExtra(app: SuperizerApp<*>) {
 }
 
 public const val SCHEME: String = "unitool"
+
+/** The Unitool server (`/prj/layers-fw/unitool-server`): device registry and push. */
+public const val PUSH_SERVER: String = "https://unitool.m42.cx"
 
 /**
  * What `HashedPromoCodes` mixes into every code before hashing it, and what `scripts/promo-hash.sh`
