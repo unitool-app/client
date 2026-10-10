@@ -5,8 +5,8 @@ description: How a code or a QR code opens a tool or changes how it starts.
 
 # Promo codes and QR activation
 
-Some tools, or some ways of starting a tool, are not in the catalogue. An organisation or a tool's
-author can give you a **code** — typed, or carried by a QR code — that opens them.
+Some tools, and some ways of starting a tool, are **Premium**. An organisation or a tool's author
+can give you a **code** — typed, or carried by a QR code — that opens them.
 
 ## Using a code
 
@@ -31,6 +31,6 @@ account, for instance — but it never saves anything on its own: saving is alwa
 
 ## What a code cannot do
 
-A notification can never open a hidden tool; only a code can. The app keeps codes only as one-way
+A notification can never open a Premium tool; only a code can. The app keeps codes only as one-way
 hashes, so the list of valid codes cannot be read out of it. A code can also expire, and then the
 app says so.

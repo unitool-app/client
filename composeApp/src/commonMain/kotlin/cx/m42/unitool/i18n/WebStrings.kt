@@ -39,7 +39,7 @@ internal interface WebStrings {
 internal object WebStringsEn : WebStrings {
     override val website = "Website"
     override fun websiteHint(host: String) =
-        "Sign in on $host with this app to read the docs of the hidden parts you have opened. " +
+        "Sign in on $host with this app. " +
             "The site learns only that it is this installation of Unitool — no name, no account."
     override val scan = "Scan QR code to sign in"
     override fun scanHint(host: String) = "Open $host$SIGN_IN_PATH on the computer and scan the code it shows"
@@ -78,7 +78,7 @@ internal object WebStringsEn : WebStrings {
 internal object WebStringsRu : WebStrings {
     override val website = "Сайт"
     override fun websiteHint(host: String) =
-        "Войдите на $host через это приложение, чтобы читать документацию скрытых разделов, которые вы открыли. " +
+        "Вход на $host через это приложение. " +
             "Сайт узнаёт только, что это ваша установка Unitool — без имени и без аккаунта."
     override val scan = "Сканировать QR-код для входа"
     override fun scanHint(host: String) = "Откройте $host$SIGN_IN_PATH на компьютере и наведите камеру на код"

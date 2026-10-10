@@ -69,7 +69,7 @@ Until you use a tool that sends notifications, Unitool does not ask for the noti
 permission, does not start Firebase and registers nothing anywhere. When you do, it registers this
 installation — a random id, the push token, the platform, the app version, the language and the
 names of the tools that may notify you — and nothing else. Refuse the permission and everything else
-works the same. A notification can open a screen in a tool you use; it can never open a hidden one.
+works the same. A notification can open a screen in a tool you use; it can never open one you have not activated.
 
 ## Reporting a security problem
 

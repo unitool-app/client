@@ -34,7 +34,7 @@ On your device only, in the app's private storage, which on Android only this ap
 | How long the 2FA lock waits before asking again, and any lock switches you changed | so Settings → Protection remembers them |
 | Which tools that send notifications you have started using | so notifications reach those tools and no others |
 | This installation's registration with our notification server: the id the server gave it and a random secret key, encrypted | so the app can keep that registration current |
-| If you signed a browser in to our website: a second such registration — the id and a random secret key, encrypted — and which hidden parts of the app you have opened | so the app can sign browsers in and out, and keep the website's list of your parts current |
+| If you signed a browser in to our website: a second such registration — the id and a random secret key, encrypted — and which Premium features are active in the app | so the app can sign browsers in and out, and keep the website's list of them current |
 
 The two-factor accounts are never written in readable form. Before they reach storage they are
 encrypted (AES-256-GCM) with a key that Android's Keystore generates for this app and keeps: the key
@@ -119,11 +119,10 @@ them. The encrypted file goes only where you send it — through Android's share
 clipboard if you copy it — and we never receive it. The unencrypted keys never leave the phone.
 
 **A website sign-in, if you make one.** Settings → Website signs a browser in to
-`unitool.m42.cx`, so that it can show you the documentation of the hidden parts of the app you have
-opened. You start it by scanning the code the website shows, and the app asks before it does
-anything. The first time, the app registers this installation with our server: a random id, a
+`unitool.m42.cx`, so that it can show you documentation for your Premium features. You start it by
+scanning the code the website shows, and the app asks before it does anything. The first time, the app registers this installation with our server: a random id, a
 one-way hash of a secret key that stays on the phone, whether it is Android or iOS, the app's
-version, and the internal names of the hidden parts you have opened — nothing else, and no name or
+version, and the internal names of the Premium features active on it — nothing else, and no name or
 account. It sends that list again when it changes. For each browser you sign in, the server keeps
 the browser's own description of itself (its user-agent), the address it signed in from, when it
 signed in and was last seen, and which pages of the website it opened and when. Page visits are

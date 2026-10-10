@@ -29,7 +29,7 @@ Yes. Everything in Unitool today is free, and there are no ads.
 <details>
 <summary>Do I need an account?</summary>
 
-No. There is no sign-in of any kind, and nothing to register before the app works.
+No. There is nothing to register before the app works.
 
 </details>
 
