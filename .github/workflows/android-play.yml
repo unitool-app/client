@@ -16,7 +16,7 @@ on:
   push:
     branches: [main, master]
     # A commit that touches only the console tool changes nothing on the phone, so it ships nothing
-    # (.ai-notes/cli D284). A change to code the phone shares with it does ship.
+    # (.ai-notes/done/cli D284). A change to code the phone shares with it does ship.
     paths-ignore: ['unitool-cli/**']
   workflow_dispatch:
     inputs:

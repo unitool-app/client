@@ -1,10 +1,6 @@
 package cx.m42.services.ssh.agent
 
-import cx.m42.services.ssh.SecretBytes
 import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.ssh.crypto.Hash
-import cx.m42.services.ssh.crypto.hmac
-import cx.m42.services.ssh.crypto.secureRandomBytes
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
 import cx.m42.services.ssh.keyring.Keyring
@@ -23,6 +19,10 @@ import cx.m42.superizer.ssh.SshAgent
 import cx.m42.superizer.ssh.SshKeyInfo
 import cx.m42.superizer.ssh.SshOutcome
 import cx.m42.superizer.ssh.UsePolicy
+import cx.m42.unitool.kit.crypto.Hash
+import cx.m42.unitool.kit.crypto.SecretBytes
+import cx.m42.unitool.kit.crypto.hmac
+import cx.m42.unitool.kit.crypto.secureRandomBytes
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 

@@ -1,11 +1,10 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.crypto.ChaCha20Poly1305
-import cx.m42.services.ssh.crypto.Curve25519
-import cx.m42.services.ssh.crypto.Montgomery
-import cx.m42.services.ssh.crypto.Rsa
-import cx.m42.services.ssh.crypto.hkdfSha256
-
+import cx.m42.unitool.kit.crypto.ChaCha20Poly1305
+import cx.m42.unitool.kit.crypto.Curve25519
+import cx.m42.unitool.kit.crypto.Montgomery
+import cx.m42.unitool.kit.crypto.Rsa
+import cx.m42.unitool.kit.crypto.hkdfSha256
 import java.io.File
 import java.math.BigInteger
 import java.nio.file.Files
@@ -24,7 +23,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-
 
 /**
  * The export's cryptography, primitive by primitive and then as a whole file.
@@ -66,25 +64,7 @@ class AgeTest {
     }
 
     // ------------------------------------------------------------ ChaCha20-Poly1305
-
-    @Test
-    fun poly1305MatchesRfc8439Section252() {
-        val key = hex("85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b")
-        val tag = ChaCha20Poly1305.poly1305(key, "Cryptographic Forum Research Group".toByteArray())
-        assertEquals("a8061dc1305136c6c22b8baf0c0127a9", tag.hex())
-    }
-
-    @Test
-    fun chachaBlockMatchesRfc8439Section232() {
-        val key = ByteArray(32) { it.toByte() }
-        val nonce = hex("000000090000004a00000000")
-        val block = ChaCha20Poly1305.block(key, 1, nonce)
-        assertEquals(
-            "10f1e7e4d13b5915500fdd1fa32071c4c7d1f4c733c068030422aa9ac3d46c4e" +
-                "d2826446079faa0914c2d705d98b02a2b5129cd1de164eb9cbd083e8a2503c4e",
-            block.hex(),
-        )
-    }
+    // The block function and Poly1305 alone are checked against RFC 8439 in the kit (CryptoVectorsTest).
 
     @Test
     fun aeadMatchesRfc8439Section282() {

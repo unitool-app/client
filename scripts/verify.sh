@@ -85,7 +85,7 @@ for tool in ssh-keygen ssh-add age; do
 done
 
 # ---------------------------------------------------------------- 2b. console tool
-# .ai-notes/cli: the terminal half of the codebase. Its unit tests first, then the real binary called
+# .ai-notes/done/cli: the terminal half of the codebase. Its unit tests first, then the real binary called
 # from the shell the way a person calls it, so the wrapper, the start script and the exit codes are
 # part of the check. Every call has its stdin redirected: at a terminal, a bare call opens the menu.
 step "2b. Console tool (unitool-cli)"
@@ -104,20 +104,22 @@ fi
 # for Android and the web here, and for iOS in step 4b with every other module.
 if ./gradlew --quiet :unitool-kit:desktopTest :unitool-kit:linuxX64Test \
     :unitool-kit:compileDebugKotlinAndroid :unitool-kit:compileKotlinWasmJs --continue >> "$out/cli.log" 2>&1; then
-  ok "unitool-kit: QR encoder against ZXing, deflate against java.util.zip; builds for Android and wasm"
+  ok "unitool-kit: QR encoder against ZXing, deflate against java.util.zip, crypto vectors, Shamir, ucrypt; builds for Android and wasm"
 else
   bad "unitool-kit — see $out/cli.log"
 fi
-if ./gradlew --quiet :unitool-cli:core:allTests :unitool-cli:apps:qr:allTests :unitool-cli:app:allTests \
-    --continue >> "$out/cli.log" 2>&1; then
-  ok "framework, qr and binary tests, on the JVM and natively (linuxX64); the binary's output is the kit's"
+if ./gradlew --quiet :unitool-cli:core:allTests :unitool-cli:apps:qr:allTests :unitool-cli:apps:split:allTests \
+    :unitool-cli:app:allTests --continue >> "$out/cli.log" 2>&1; then
+  ok "framework, qr, split and binary tests, on the JVM and natively (linuxX64); the binary's output is the kit's"
 else
   bad "console tool tests — see $out/cli.log"
 fi
 find unitool-cli unitool-kit -path '*/build/test-results/*' -name '*.xml' -exec cp {} "$out/junit/" \; 2>/dev/null
-if grep -qs '<skipped' unitool-cli/apps/qr/build/test-results/jvmTest/TEST-cx.m42.unitool.cli.qr.NativeBinaryTest.xml; then
-  skip "NativeBinaryTest: the binary was not built"
-fi
+for app in qr split; do
+  if grep -qs '<skipped' "unitool-cli/apps/$app/build/test-results/jvmTest/TEST-cx.m42.unitool.cli.$app.NativeBinaryTest.xml"; then
+    skip "NativeBinaryTest ($app): the binary was not built"
+  fi
+done
 cli=unitool-cli/bin/unitool
 smoke="$out/cli-smoke"
 mkdir -p "$smoke"
@@ -140,6 +142,14 @@ if "$cli" qr hello -f png < /dev/null > "$smoke/code.png" 2>> "$out/cli.log" && 
   ok "qr sends a PNG down a pipe"
 else
   bad "qr PNG to a pipe — see $out/cli.log"
+fi
+# split (.ai-notes/done/split): a secret through files and back, and the container readable by its owner only.
+if printf 'smoke secret' | "$cli" split make -n 3 -k 2 --base https://example.com/p -o "$smoke/s.ucrypt" --show txt -d "$smoke" 2>> "$out/cli.log" &&
+  [ "$("$cli" split join "$smoke/s.ucrypt" -p "$smoke/part-1-of-3.txt" -p "$smoke/part-3-of-3.txt" < /dev/null 2>> "$out/cli.log")" = "smoke secret" ] &&
+  [ "$(stat -c %a "$smoke/s.ucrypt")" = "600" ]; then
+  ok "split make and join through files; the container is 0600"
+else
+  bad "split make and join — see $out/cli.log"
 fi
 "$cli" nope < /dev/null > /dev/null 2>&1; usage=$?
 head -c 2954 /dev/zero | tr '\0' a | "$cli" qr > /dev/null 2>&1; toolong=$?

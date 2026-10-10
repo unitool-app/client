@@ -3,9 +3,9 @@
 A console tool in Kotlin. Like the phone, it is a set of apps; here an app is a word on the command
 line with commands under it: `unitool qr encode …`. It lives in this repository on purpose: the phone
 and the terminal are one codebase and cannot drift apart. The design is in
-[`.ai-notes/cli`](../.ai-notes/cli/README.md).
+[`.ai-notes/done/cli`](../.ai-notes/done/cli/README.md).
 
-Today there is one app, `qr`.
+Today there are two apps: `qr` and `split`.
 
 ## Running it
 
@@ -19,7 +19,7 @@ ln -s "$PWD/unitool-cli/bin/unitool" ~/bin/     # optional: `unitool` from anywh
 `unitool` is a native Linux executable (Kotlin/Native, `linuxX64`). It is one file of about 1.4 MB,
 needs no JVM and starts in about 30 ms. Copy `build/dist/unitool` anywhere and it runs. It links only
 glibc 2.19 or newer, which every Linux has, so it is not *statically* linked: a fully static glibc
-build from Kotlin/Native's toolchain crashes at start (`.ai-notes/cli`, D291).
+build from Kotlin/Native's toolchain crashes at start (`.ai-notes/done/cli`, D291).
 
 Building it needs the same setup as the phone build (a JDK for Gradle, the Android SDK in
 `local.properties`), because Gradle configures the whole project. The first build downloads
@@ -39,6 +39,9 @@ QrTerminal.ansi(code)    // terminal output
 Qr.split(text)           // text too long for one code, cut on line breaks
 ```
 
+It also has the cryptography the phone's SSH keyring stands on (`kit.crypto`), the `ucrypt` file
+format (`kit.crypt`) and secret sharing (`kit.split`).
+
 Terminal services every command can use are in `core`: `Io.showScreens(...)` shows several screens
 one at a time (Enter between them, read from `/dev/tty` even behind a pipe), and `CLEAR_SCREEN`.
 
@@ -46,16 +49,18 @@ one at a time (Enter between them, read from `/dev/tty` even behind a pipe), and
 
 ```sh
 ./gradlew :unitool-kit:desktopTest :unitool-kit:linuxX64Test \
-    :unitool-cli:core:allTests :unitool-cli:apps:qr:allTests :unitool-cli:app:allTests
+    :unitool-cli:core:allTests :unitool-cli:apps:qr:allTests :unitool-cli:apps:split:allTests :unitool-cli:app:allTests
 ```
 
 The CLI's tests run twice, on the JVM and natively (`linuxX64Test`); the kit's on the desktop JVM and
-natively. The JVM adds three checks:
+natively. The JVM adds four checks:
 - `QrZxingTest` (kit) compares the hand-written encoder with ZXing module for module, for every
   version and level, and reads every rendering back;
 - `DeflateTest` (kit) reads the hand-written deflate back with `java.util.zip.Inflater`;
 - `NativeBinaryTest` (qr) runs the shipped binary and compares its output with the kit's, byte for
-  byte (build it first with `:unitool-cli:app:install`; without it the test is skipped).
+  byte (build it first with `:unitool-cli:app:install`; without it the test is skipped);
+- `NativeBinaryTest` (split) runs it with real files: 0600, nothing replaced, PNG parts that ZXing
+  scans and that open the container.
 
 Step 2b of `./scripts/verify.sh` does all of this and also calls the binary from the shell.
 
@@ -77,9 +82,31 @@ age -d -i ~/.ssh/id_ed25519 2fa-export.age | unitool qr --split
 `unitool` with no arguments at a terminal opens a menu: pick an app, a command, answer the questions.
 At the end it prints the same call as one command line.
 
+## `unitool split` — a secret in parts
+
+The secret is encrypted into a container (`ucrypt`, a file of its own) under a random key, and the key
+is split so that any K of N parts open it and fewer tell nothing at all (Shamir's secret sharing). Each
+part is a QR code of an ordinary-looking link with the part after `#`, which browsers never send to
+a server. The design is in [`.ai-notes/done/split`](../.ai-notes/done/split/README.md).
+
+```sh
+unitool split                    # at a terminal: a wizard, step by step, ending with the command below
+printf 'my secret' | unitool split make -n 3 -k 2 --base https://example.com/p -o secret.ucrypt --show png
+unitool split join secret.ucrypt -p part-1-of-3.txt -p part-3-of-3.txt
+unitool split join secret.ucrypt     # asks for the parts one at a time, hidden as you type
+unitool split inspect secret.ucrypt  # what a container or a part is, without opening it
+```
+
+- From 2 to 5 parts; the link address is yours to choose, and the page there must not run scripts.
+- Parts go to the screen one at a time (the screen and its scrollback are cleared after each), or to
+  one file per part: `png`, `svg` or `txt`.
+- Every file it writes is readable by its owner only (0600), and a container or a part is never
+  replaced: it may be the only copy.
+- Secrets never come from argv: stdin, files, or a question that does not echo.
+
 ## Conventions
 
-- **Everything the tool says is in English**: help, menu, messages. (The design notes in `.ai-notes/cli`
+- **Everything the tool says is in English**: help, menu, messages. (The design notes in `.ai-notes/done/cli`
   stay in Russian, as all notes in this repository do.)
 - **stdout carries only the result** (the code, the PNG bytes); every message goes to stderr. Pipes and
   redirects therefore just work.
@@ -102,7 +129,13 @@ At the end it prints the same call as one command line.
    private val split by flag("--split", help = "cut on line breaks").advanced()   // not asked in the menu
    ```
 
-   That one declaration is the parser, `--help` and the menu.
+   That one declaration is the parser, `--help` and the menu. An option given several times is
+   `.repeated()`, a `List<String>`.
+
+   When the choices depend on each other, the app can also have a `wizard`: then `unitool <id>`
+   alone at a terminal runs it instead of the generic menu. It asks with `answer`, `hidden` (no
+   echo), `number`, `pick` and `yes` from `core`, does its work through the same code as the
+   commands, and ends with the command line that repeats it (`shellLine`). See `apps/split`.
 3. Add it to `listOf(...)` in `app/src/commonMain/kotlin/.../Unitool.kt`, and its `allTests` to `verify` in the root
    `build.gradle.kts` and step 2b of `scripts/verify.sh`.
 4. Test with `FakeIo` and `cli.exec(...)` from `:unitool-cli:testing`. See `apps/qr/src/commonTest`.

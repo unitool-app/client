@@ -53,7 +53,7 @@ CLI с этой минуты может слать на этот телефон 
 | `/prj/unitool/apps/twofa/` | образец мини-аппа: манифест, deep link, `runtime.secrets`, сканер |
 | `/prj/unitool/services/qr-scanner/` | образец сервиса с `ServiceKey` |
 | `/prj/unitool/composeApp/src/desktopTest/.../KeysScreensTest.kt`, `Screenshots.kt` | образец UI-тестов и скриншотов |
-| `/prj/unitool/.ai-notes/superizer/13-push-and-routing.md` | формат пуша схемы 1, D27 (приложение не рисует уведомления) |
+| `/prj/unitool/.ai-notes/done/superizer/13-push-and-routing.md` | формат пуша схемы 1, D27 (приложение не рисует уведомления) |
 
 ## 3. Репозитории и ветки
 

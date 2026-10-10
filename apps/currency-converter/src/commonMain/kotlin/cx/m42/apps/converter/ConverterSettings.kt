@@ -21,8 +21,14 @@ import cx.m42.superizer.ui.components.ChoiceRow
 import cx.m42.superizer.ui.components.RowDivider
 import kotlinx.coroutines.launch
 
-/** Where the converter keeps the currency a person chose to start from. */
+/**
+ * Where the converter keeps the currency a person chose to start from — in Settings or, last time,
+ * on the screen itself. One key for both, so Settings always shows what the next launch opens on.
+ */
 internal const val KEY_BASE = "base"
+
+/** The other half of the last pair; Settings has no say in it. */
+internal const val KEY_TO = "to"
 
 /**
  * The converter's block on the host's Settings screen.
@@ -52,7 +58,9 @@ internal fun ConverterSettingsSection(runtime: AppRuntime, favorites: List<Strin
             color = tokens.muted,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
-        (listOf(DEFAULT_BASE) + favorites).distinct().forEachIndexed { index, code ->
+        // The stored one too, when it was picked on the screen from beyond the favourites: a list
+        // with nothing ticked would say the converter starts nowhere.
+        (listOf(DEFAULT_BASE) + favorites + listOfNotNull(base)).distinct().forEachIndexed { index, code ->
             if (index > 0) RowDivider()
             ChoiceRow(
                 label = code,

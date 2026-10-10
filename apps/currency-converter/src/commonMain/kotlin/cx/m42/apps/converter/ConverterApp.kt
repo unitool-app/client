@@ -9,6 +9,7 @@ import cx.m42.superizer.app.AppMetadata
 import cx.m42.superizer.app.AppSetupContext
 import cx.m42.superizer.app.SuperizerApp
 import cx.m42.superizer.app.localized
+import cx.m42.superizer.backup.BackupPolicy
 import cx.m42.superizer.runtime.InstanceRuntime
 import kotlinx.serialization.Serializable
 
@@ -52,6 +53,8 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
     override val manifest: AppManifest = AppManifest(
         id = AppId("currency-converter"),
         version = "1.0.0",
+        // Contract 3 brought `backup`; a host of contract 1 or 2 would carry the pair regardless.
+        minHostContract = 3,
         metadata = AppMetadata(
             title = localized("ru" to "Конвертер валют", "en" to "Currency converter"),
             description = localized(
@@ -70,6 +73,9 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
         ),
         deepLinks = setOf("rate"),
         networkHosts = setOf("open.er-api.com", "api.frankfurter.app"),
+        // The last pair is this device's habit, not the person's data: a new phone opens on the
+        // default rather than on whatever the old one was converting last.
+        backup = BackupPolicy.Except(setOf(KEY_BASE, KEY_TO)),
     )
 
     override val configSpec: AppConfigSpec<ConverterConfig> =

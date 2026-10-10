@@ -59,7 +59,7 @@ class KeyLevelChoiceTest : UnitoolTest() {
         waitForIdle()
         onNodeWithContentDescription("Open menu").performClick()
         waitForIdle()
-        // SSH keys are not in Settings: their promo code opens them (idea/09).
+        // SSH keys are not in Settings: their promo code opens them (done/idea/09).
         onNodeWithContentDescription("Premium").performClick()
         waitForIdle()
         tap("activate:have-code")

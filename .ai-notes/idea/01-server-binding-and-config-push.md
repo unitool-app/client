@@ -15,11 +15,11 @@
 
 Предыдущие заметки, на которые всё опирается и которые надо читать до этой:
 
-- `.ai-notes/superizer/13-push-and-routing.md` — как пуш находит приложение и экран (D24–D28).
+- `.ai-notes/done/superizer/13-push-and-routing.md` — как пуш находит приложение и экран (D24–D28).
   **Реализовано**: `PushRouter`, `TopicStore`, `RoutedPush`, `PendingRoute`, `DeviceRegistrar`.
-- `.ai-notes/push/01-fcm-implementation.md` — FCM живёт в `superizer:host`, Unitool даёт
+- `.ai-notes/done/push/01-fcm-implementation.md` — FCM живёт в `superizer:host`, Unitool даёт
   `google-services.json` и `AndroidNotifier`. **Реализовано** (библиотека 0.2.0).
-- `.ai-notes/superizer/16-app-config-store-and-bundle.md` — провижининг приложения конфигом из QR,
+- `.ai-notes/done/superizer/16-app-config-store-and-bundle.md` — провижининг приложения конфигом из QR,
   экспорт/импорт файлом, https-ссылки, `audience` (D49–D61). **Спланировано, не написано.**
 
 Эта заметка — следующий слой над 16, и она меняет его центр тяжести: стыковка теперь не с
@@ -778,7 +778,7 @@ DeviceIdentity             // installId: читает/создаёт host.device
 ### 12.3. Приватность и Play
 
 Тут уже был урок, и он дорогой: описание в Play и `play/PRIVACY.md` писались под «ничего не уходит
-с телефона», и добавление Firebase сделало их ложными (см. `.ai-notes/push/01-fcm-implementation.md`).
+с телефона», и добавление Firebase сделало их ложными (см. `.ai-notes/done/push/01-fcm-implementation.md`).
 Привязка делает это ещё раз и сильнее:
 
 - появляется **постоянный идентификатор устройства** (`installId`, `deviceId`) и передача его на

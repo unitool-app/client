@@ -1,5 +1,5 @@
 /**
- * The `unitool` binary: the list of apps and `main` (.ai-notes/cli 01 §2.2). A native Linux
+ * The `unitool` binary: the list of apps and `main` (.ai-notes/done/cli 01 §2.2). A native Linux
  * executable (D291): no JVM, one file, libc and libz from the system.
  *
  * `./gradlew :unitool-cli:app:install` links the release build and puts it at
@@ -21,6 +21,7 @@ kotlin {
         commonMain.dependencies {
             implementation(project(":unitool-cli:core"))
             implementation(project(":unitool-cli:apps:qr"))
+            implementation(project(":unitool-cli:apps:split"))
         }
         commonTest.dependencies {
             implementation(project(":unitool-cli:testing"))

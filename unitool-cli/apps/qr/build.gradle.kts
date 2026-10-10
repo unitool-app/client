@@ -1,5 +1,5 @@
 /**
- * `unitool qr` — QR codes from text, to the terminal, PNG or SVG (.ai-notes/cli 01 §3).
+ * `unitool qr` — QR codes from text, to the terminal, PNG or SVG (.ai-notes/done/cli 01 §3).
  *
  * Only the command lives here. The encoder and the renderings are the kit's shared QR service
  * (`:unitool-kit`, `cx.m42.unitool.kit.qr`). ZXing is in `jvmTest` only, where NativeBinaryTest reads

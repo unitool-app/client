@@ -155,7 +155,7 @@ class ActivationTest : UnitoolTest() {
     }
 
     /**
-     * idea/09, as the owner put it: the code opens the secret app; out of it, and it is gone — not
+     * done/idea/09, as the owner put it: the code opens the secret app; out of it, and it is gone — not
      * on Home, in the menu or in "+"; the code again, and it is back with what it kept.
      */
     @Test

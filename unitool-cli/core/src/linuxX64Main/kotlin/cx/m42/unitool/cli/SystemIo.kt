@@ -3,17 +3,40 @@ package cx.m42.unitool.cli
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
+import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.set
+import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
+import platform.posix.ECHO
+import platform.posix.EEXIST
 import platform.posix.EINTR
+import platform.posix.ENOENT
 import platform.posix.EPIPE
+import platform.posix.F_OK
+import platform.posix.ICANON
+import platform.posix.ISIG
+import platform.posix.O_CREAT
+import platform.posix.O_EXCL
+import platform.posix.O_RDONLY
+import platform.posix.O_RDWR
+import platform.posix.O_TRUNC
+import platform.posix.O_WRONLY
 import platform.posix.STDERR_FILENO
 import platform.posix.STDIN_FILENO
 import platform.posix.STDOUT_FILENO
+import platform.posix.TCSAFLUSH
+import platform.posix.VMIN
+import platform.posix.VTIME
+import platform.posix.access
+import platform.posix.close
 import platform.posix.errno
+import platform.posix.fchmod
 import platform.posix.fclose
 import platform.posix.fflush
 import platform.posix.fgets
@@ -22,10 +45,15 @@ import platform.posix.fputs
 import platform.posix.fwrite
 import platform.posix.getenv
 import platform.posix.isatty
+import platform.posix.memcpy
+import platform.posix.open
 import platform.posix.read
 import platform.posix.stderr
 import platform.posix.stdout
 import platform.posix.strerror
+import platform.posix.tcgetattr
+import platform.posix.tcsetattr
+import platform.posix.termios
 
 /**
  * The process's own streams, through libc. `isatty` answers for each of the three on its own, so the
@@ -101,13 +129,125 @@ public class SystemIo : Io {
         }
     }
 
-    override fun writeFile(path: String, bytes: ByteArray) {
-        val file = fopen(path, "wb") ?: fail("cannot write $path: ${reason()}")
+    override fun secret(prompt: String): String? {
+        flush()
+        // The terminal itself, as `ssh` and `sudo` do: stdin may be the container coming down a pipe.
+        val fd = open("/dev/tty", O_RDWR)
+        if (fd < 0) return null
         try {
-            val written = if (bytes.isEmpty()) 0uL else bytes.usePinned { fwrite(it.addressOf(0), 1u, bytes.size.convert(), file) }
-            if (written.toInt() < bytes.size) fail("cannot write $path: ${reason()}")
+            fputs(prompt, stderr)
+            fflush(stderr)
+            val typed = hiddenInput(fd, lines = false) ?: return null
+            return typed.decodeToString()
         } finally {
-            if (fclose(file) != 0) fail("cannot write $path: ${reason()}")
+            close(fd)
+            fputs("\n", stderr)
+            fflush(stderr)
+        }
+    }
+
+    override fun readStdinHidden(): ByteArray {
+        if (!stdinIsTerminal) return readStdin()
+        flush()
+        try {
+            return hiddenInput(STDIN_FILENO, lines = true) ?: ByteArray(0)
+        } finally {
+            fputs("\n", stderr)
+            fflush(stderr)
+        }
+    }
+
+    /**
+     * Reads [fd], a terminal, with echo, line editing and signals off, and does the little editing
+     * itself: Backspace takes back a character, Ctrl-U the line, Ctrl-C cancels (with the terminal
+     * put back first — a signal would leave it without echo), Ctrl-D ends. One line, or with
+     * [lines] everything up to Ctrl-D. Null at Ctrl-D before anything was typed in one-line mode.
+     */
+    private fun hiddenInput(fd: Int, lines: Boolean): ByteArray? = memScoped {
+        val saved = alloc<termios>()
+        if (tcgetattr(fd, saved.ptr) != 0) fail("cannot read the terminal: ${reason()}")
+        val raw = alloc<termios>()
+        memcpy(raw.ptr, saved.ptr, sizeOf<termios>().convert())
+        raw.c_lflag = saved.c_lflag and (ECHO or ICANON or ISIG).inv().convert()
+        raw.c_cc[VMIN] = 1u
+        raw.c_cc[VTIME] = 0u
+        if (tcsetattr(fd, TCSAFLUSH, raw.ptr) != 0) fail("cannot set the terminal: ${reason()}")
+        val typed = ArrayList<Byte>()
+        try {
+            val one = allocArray<ByteVar>(1)
+            while (true) {
+                val count = read(fd, one, 1u)
+                if (count < 0L && errno == EINTR) continue
+                if (count <= 0L) break
+                when (val byte = one[0].toInt() and 0xff) {
+                    0x03 -> throw Cancelled()
+                    0x04 -> return@memScoped if (!lines && typed.isEmpty()) null else typed.toByteArray()
+                    0x0d, 0x0a -> if (lines) typed += 0x0a else return@memScoped typed.toByteArray()
+                    0x7f, 0x08 -> {
+                        // A whole UTF-8 character: its continuation bytes, then its first byte.
+                        while (typed.isNotEmpty() && typed.last().toInt() and 0xc0 == 0x80) typed.removeAt(typed.size - 1)
+                        if (typed.isNotEmpty() && (!lines || typed.last() != 0x0a.toByte())) typed.removeAt(typed.size - 1)
+                    }
+                    0x15 -> while (typed.isNotEmpty() && typed.last() != 0x0a.toByte()) typed.removeAt(typed.size - 1)
+                    else -> typed += byte.toByte()
+                }
+            }
+            typed.toByteArray()
+        } finally {
+            tcsetattr(fd, TCSAFLUSH, saved.ptr)
+        }
+    }
+
+    override fun readFile(path: String): ByteArray {
+        val fd = open(path, O_RDONLY)
+        if (fd < 0) fail("cannot read $path: ${reason()}")
+        try {
+            val chunks = ArrayList<ByteArray>()
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val count = buffer.usePinned { read(fd, it.addressOf(0), buffer.size.convert()) }
+                when {
+                    count > 0 -> chunks += buffer.copyOf(count.toInt())
+                    count == 0L -> break
+                    errno == EINTR -> continue
+                    else -> fail("cannot read $path: ${reason()}")
+                }
+            }
+            val all = ByteArray(chunks.sumOf { it.size })
+            var offset = 0
+            for (chunk in chunks) {
+                chunk.copyInto(all, offset)
+                offset += chunk.size
+            }
+            return all
+        } finally {
+            close(fd)
+        }
+    }
+
+    override fun exists(path: String): Boolean = access(path, F_OK) == 0 || errno != ENOENT
+
+    override fun writeFile(path: String, bytes: ByteArray, private: Boolean, replace: Boolean) {
+        val flags = O_WRONLY or O_CREAT or (if (replace) O_TRUNC else O_EXCL)
+        val fd = open(path, flags, if (private) 0x180 else 0x1b6)
+        if (fd < 0) {
+            if (errno == EEXIST) fail("$path exists; it was left as it was")
+            fail("cannot write $path: ${reason()}")
+        }
+        try {
+            // A file that was there before keeps its mode through O_TRUNC; a private one must not.
+            if (private && fchmod(fd, 0x180u) != 0) fail("cannot make $path private: ${reason()}")
+            var written = 0
+            while (written < bytes.size) {
+                val count = bytes.usePinned { platform.posix.write(fd, it.addressOf(written), (bytes.size - written).convert()) }
+                when {
+                    count > 0 -> written += count.toInt()
+                    errno == EINTR -> continue
+                    else -> fail("cannot write $path: ${reason()}")
+                }
+            }
+        } finally {
+            if (close(fd) != 0) fail("cannot write $path: ${reason()}")
         }
     }
 

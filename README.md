@@ -76,7 +76,7 @@ does not list. A code in brackets must be typed exactly as written; the others i
 and dashes. Seven taps on the build stamp in Settings do the same, but only in
 a debug build — in a release the promo code is the only door.
 
-The build holds the codes only as hashes (`HashedPromoCodes`, idea/09). A new code:
+The build holds the codes only as hashes (`HashedPromoCodes`, done/idea/09). A new code:
 `./scripts/promo-hash.sh <code>` gives the key for the table in `UnitoolHost.kt`; the codes and
 what they open are listed in `.secrets/promo-codes.md`, outside git.
 
@@ -136,7 +136,7 @@ services/vault/               another: encryption at rest — AES-GCM under a ke
 unitool-kit/                  code the phone and the console tool share, one copy for both; plain
                               Kotlin on every target, no dependencies. Today: QR codes (encoder,
                               PNG/SVG pictures, terminal output), checked against ZXing
-unitool-cli/                  the console tool, same codebase (.ai-notes/cli): `unitool qr …`, a
+unitool-cli/                  the console tool, same codebase (.ai-notes/done/cli): `unitool qr …`, a
                               native Linux binary (Kotlin/Native), no JVM
   core/                       apps, commands, parameters → argv parser, help and menu; no deps
   testing/                    FakeIo: a scripted process for the CLI's tests

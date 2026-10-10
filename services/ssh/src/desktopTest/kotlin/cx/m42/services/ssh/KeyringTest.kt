@@ -1,8 +1,7 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.crypto.secureRandomBytes
-import cx.m42.services.ssh.key.OpenSshKeyFile
 import cx.m42.services.ssh.diagnostics.KeyFindings
+import cx.m42.services.ssh.key.OpenSshKeyFile
 import cx.m42.superizer.app.AppId
 import cx.m42.superizer.diagnostics.DiagnosticsCode
 import cx.m42.superizer.ssh.Chip
@@ -20,6 +19,12 @@ import cx.m42.superizer.ssh.SshOutcome
 import cx.m42.superizer.ssh.UsePolicy
 import cx.m42.superizer.testing.Canary
 import cx.m42.superizer.testing.LeakScanner
+import cx.m42.unitool.kit.crypto.SecretBytes
+import cx.m42.unitool.kit.crypto.secureRandomBytes
+import cx.m42.unitool.kit.crypto.wiped
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -27,9 +32,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runTest
 
 /**
  * The keyring's invariants on the JVM (03 §1, §5): I1 nothing at rest, I4 no method hands out a

@@ -1,5 +1,5 @@
 /**
- * The command framework of the console tool (.ai-notes/cli 01 §2). An app is a word on the command
+ * The command framework of the console tool (.ai-notes/done/cli 01 §2). An app is a word on the command
  * line with commands under it; a command declares its parameters once, and that one declaration is
  * the argv parser, the help and the menu. It knows nothing about what any command does.
  *

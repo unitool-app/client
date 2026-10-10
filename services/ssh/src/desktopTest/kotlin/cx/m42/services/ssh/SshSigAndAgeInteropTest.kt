@@ -3,6 +3,7 @@ package cx.m42.services.ssh
 import cx.m42.services.ssh.key.OpenSshKeyFile
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
+import cx.m42.unitool.kit.crypto.SecretBytes
 import java.io.File
 import java.security.SecureRandom
 import kotlin.test.Test
@@ -73,7 +74,7 @@ class SshSigAndAgeInteropTest {
     @Test
     fun theSignedDataCanNeverBeALogin() {
         // 02 §3.1: an SSH userauth request starts with uint32 length; SSHSIG with the six bytes "SSHSIG".
-        val data = SshSig.signedData("git", cx.m42.services.ssh.crypto.Hash.SHA512, "x".toByteArray())
+        val data = SshSig.signedData("git", cx.m42.unitool.kit.crypto.Hash.SHA512, "x".toByteArray())
         assertEquals("SSHSIG", data.copyOf(6).decodeToString())
     }
 

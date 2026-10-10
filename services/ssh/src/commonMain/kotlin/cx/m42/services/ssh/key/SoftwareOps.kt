@@ -4,13 +4,13 @@ import cx.m42.services.ssh.AgeIdentity
 import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.StanzaUnwrapper
-import cx.m42.services.ssh.crypto.Curve25519
-import cx.m42.services.ssh.crypto.Ed25519
-import cx.m42.services.ssh.crypto.Hash
 import cx.m42.services.ssh.crypto.PlatformEcdsa
-import cx.m42.services.ssh.crypto.Rsa
-import cx.m42.services.ssh.crypto.Sha512
 import cx.m42.services.ssh.wire.wire
+import cx.m42.unitool.kit.crypto.Curve25519
+import cx.m42.unitool.kit.crypto.Ed25519
+import cx.m42.unitool.kit.crypto.Hash
+import cx.m42.unitool.kit.crypto.Rsa
+import cx.m42.unitool.kit.crypto.Sha512
 
 /**
  * The private operations on a key this module holds in memory — levels 2 and 3, for the length of

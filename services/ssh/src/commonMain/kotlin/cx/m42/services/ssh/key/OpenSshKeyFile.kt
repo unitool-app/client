@@ -1,14 +1,14 @@
 package cx.m42.services.ssh.key
 
-import cx.m42.services.ssh.SecretBytes
 import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.ssh.crypto.AesCtr
-import cx.m42.services.ssh.crypto.AesGcm
-import cx.m42.services.ssh.crypto.BcryptPbkdf
-import cx.m42.services.ssh.crypto.secureRandomBytes
 import cx.m42.services.ssh.wire.WireReader
 import cx.m42.services.ssh.wire.WireWriter
 import cx.m42.superizer.ssh.ImportRefusal
+import cx.m42.unitool.kit.crypto.AesCtr
+import cx.m42.unitool.kit.crypto.AesGcm
+import cx.m42.unitool.kit.crypto.BcryptPbkdf
+import cx.m42.unitool.kit.crypto.SecretBytes
+import cx.m42.unitool.kit.crypto.secureRandomBytes
 import kotlin.io.encoding.Base64
 
 /**
@@ -368,7 +368,7 @@ internal class PrivateKey(
     companion object {
         /** An Ed25519 key from its seed — how a key made on the device, or a test's canary, becomes one. */
         fun ed25519(seed: ByteArray, comment: String): PrivateKey {
-            val point = cx.m42.services.ssh.crypto.Ed25519.publicKey(seed)
+            val point = cx.m42.unitool.kit.crypto.Ed25519.publicKey(seed)
             val private = seed + point
             val fields = WireWriter().string(point).string(private)
             private.fill(0)

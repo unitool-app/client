@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 /**
- * unitool-kit: code the phone and the console tool share (.ai-notes/cli D273), so neither keeps a
+ * unitool-kit: code the phone and the console tool share (.ai-notes/done/cli D273), so neither keeps a
  * copy. Plain Kotlin in `commonMain` with no dependencies: no Superizer, no Compose, no network,
  * no coroutines (D275, checked by `checkDependencyRules`).
  *
@@ -10,7 +10,13 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  * `linuxX64`. Consumers write `project(":unitool-kit")`: it is part of this repository, not a published
  * package (D281).
  *
- * Today: `qr`, the encoder plus the code as a picture (PNG, SVG) and as terminal output (ANSI).
+ * Today:
+ * - `qr`: the encoder plus the code as a picture (PNG, SVG) and as terminal output (ANSI);
+ * - `crypto`: the hand-written primitives (hashes, HMAC, HKDF, ChaCha20-Poly1305, AES, X25519,
+ *   Ed25519, RSA, bcrypt), `SecretBytes` and the CSPRNG, moved from `services/ssh` (.ai-notes/done/cli
+ *   02 §3.1);
+ * - `split`: Shamir's secret sharing, a part's 48-byte form and its link (.ai-notes/done/split);
+ * - `crypt`: the core of the `ucrypt` file format with the split recipient (.ai-notes/crypt 01).
  */
 plugins {
     alias(libs.plugins.kotlinMultiplatform)

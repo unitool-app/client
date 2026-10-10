@@ -52,7 +52,7 @@ class SecureWindowTest {
     fun theImportWizardCannotBeCapturedAndTheKeyListCan() = runAndroidComposeUiTest<MainActivity> {
         waitForIdle()
         // Whatever the emulator's language, Unitool speaks one of its two. SSH keys are not in
-        // Settings: their promo code opens them (idea/09).
+        // Settings: their promo code opens them (done/idea/09).
         onNode(hasContentDescription("Open menu").or(hasContentDescription("Открыть меню"))).performClick()
         waitForIdle()
         onNode(hasContentDescription("Premium").or(hasContentDescription("Премиум"))).performClick()

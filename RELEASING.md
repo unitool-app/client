@@ -238,7 +238,7 @@ opens the Service Menu. Changing the Service Menu's code before a public release
 remember: a new code through `./scripts/promo-hash.sh`, its hash in place of the old row in
 `UnitoolHost.kt`, and `SERVICE_CODE` in `composeApp/src/desktopTest/.../TestSupport.kt` to match.
 
-**Every promo code goes to the stores' reviewers** (idea/09 §6, question 124). Both stores forbid
+**Every promo code goes to the stores' reviewers** (done/idea/09 §6, question 124). Both stores forbid
 "hidden, dormant, or undocumented features": Apple's guideline 2.3.1, Google Play's Deceptive
 Behavior policy. A tool only a code opens counts as one unless the reviewers are told about it.
 The listing already says that some tools open by promo code. Before each upload that adds a code

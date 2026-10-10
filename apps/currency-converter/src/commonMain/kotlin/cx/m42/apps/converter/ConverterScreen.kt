@@ -166,7 +166,7 @@ internal fun ConverterScreen(instance: ConverterInstance) {
                 codes = instance.currencies(),
                 selected = if (side == Side.From) from else to,
                 onPick = { code ->
-                    if (side == Side.From) instance.from.value = code else instance.to.value = code
+                    if (side == Side.From) instance.pickFrom(code) else instance.pickTo(code)
                     picking = null
                 },
             )

@@ -87,7 +87,7 @@ internal fun offlineNetwork(): FakeNetwork = FakeNetwork().apply {
 }
 
 /**
- * The Service Menu's code. Plain here, in the tests, and only a hash in the build (idea/09, D256);
+ * The Service Menu's code. Plain here, in the tests, and only a hash in the build (done/idea/09, D256);
  * `PromoCodesTest` is what proves the two still agree.
  */
 internal const val SERVICE_CODE = "SERVICE"

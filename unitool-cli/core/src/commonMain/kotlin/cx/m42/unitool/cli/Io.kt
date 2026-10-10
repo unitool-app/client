@@ -39,10 +39,27 @@ public interface Io {
     public fun pause(prompt: String): Boolean
 
     /**
-     * Replaces the file at [path] (relative to the working directory) with [bytes]. On failure it
-     * throws [CommandFailure] carrying the system's reason.
+     * Like [ask], but nothing typed shows on the screen: for a secret, a line at a time (D272). It
+     * reads the terminal itself (`/dev/tty`), so stdin may be a pipe. Null at Ctrl-D, or when there
+     * is no terminal to read.
      */
-    public fun writeFile(path: String, bytes: ByteArray)
+    public fun secret(prompt: String): String? = ask(prompt)
+
+    /** [readStdin], with the typing hidden when stdin is a terminal: secret text up to Ctrl-D. */
+    public fun readStdinHidden(): ByteArray = readStdin()
+
+    /** The whole file at [path]. On failure it throws [CommandFailure] carrying the system's reason. */
+    public fun readFile(path: String): ByteArray
+
+    public fun exists(path: String): Boolean
+
+    /**
+     * Writes [bytes] to the file at [path] (relative to the working directory). [private] makes it
+     * readable by its owner only (0600) even when it existed before; without [replace] an existing
+     * file is a failure and stays as it was. On failure it throws [CommandFailure] carrying the
+     * system's reason.
+     */
+    public fun writeFile(path: String, bytes: ByteArray, private: Boolean = false, replace: Boolean = true)
 }
 
 /** Someone is there to answer: the menu runs only then (D271). */

@@ -6,9 +6,10 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  * in the chip or under its passphrase, and the agent — everything that implements the contracts
  * Superizer declares. Unitool's, not the library's (D181).
  *
- * `commonMain` is the formats and the primitives, by hand and checked against the JDK and the real
- * `ssh-keygen` and `age` in `desktopTest` (03 §4); the platforms add only what they alone have: the
- * CSPRNG, ECDSA, and the chips.
+ * `commonMain` is the formats, by hand and checked against the JDK and the real `ssh-keygen` and `age`
+ * in `desktopTest` (03 §4). The primitives they stand on (hashes, ciphers, curves, RSA, the CSPRNG)
+ * are in `:unitool-kit`, shared with the console tool. The platforms add only what they alone have:
+ * ECDSA and the chips.
  *
  * No network, ever (I-net): a module with no way to send anything cannot send a key.
  * `scripts/verify.sh` checks that nothing here depends on Ktor.
@@ -38,6 +39,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // The primitives and SecretBytes live in the shared kit (.ai-notes/done/cli 02 §3.1). `api`:
+            // keyring users see SecretBytes in this module's public types.
+            api(project(":unitool-kit"))
             api(libs.superizer.core)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# The console Unitool (.ai-notes/cli). Builds the native binary first when there is none yet or a
+# The console Unitool (.ai-notes/done/cli). Builds the native binary first when there is none yet or a
 # source file is newer than it, then runs it with the arguments as given.
 #
 # The binary itself is unitool-cli/app/build/dist/unitool: one file with no JVM, which can be copied

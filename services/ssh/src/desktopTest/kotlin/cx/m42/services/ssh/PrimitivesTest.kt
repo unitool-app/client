@@ -1,15 +1,15 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.crypto.Aes
-import cx.m42.services.ssh.crypto.AesCtr
-import cx.m42.services.ssh.crypto.AesGcm
-import cx.m42.services.ssh.crypto.BcryptPbkdf
 import cx.m42.services.ssh.crypto.EcdsaDer
-import cx.m42.services.ssh.crypto.Ed25519
-import cx.m42.services.ssh.crypto.Hash
 import cx.m42.services.ssh.crypto.PlatformEcdsa
-import cx.m42.services.ssh.crypto.Rsa
-import cx.m42.services.ssh.crypto.hmac
+import cx.m42.unitool.kit.crypto.Aes
+import cx.m42.unitool.kit.crypto.AesCtr
+import cx.m42.unitool.kit.crypto.AesGcm
+import cx.m42.unitool.kit.crypto.BcryptPbkdf
+import cx.m42.unitool.kit.crypto.Ed25519
+import cx.m42.unitool.kit.crypto.Hash
+import cx.m42.unitool.kit.crypto.Rsa
+import cx.m42.unitool.kit.crypto.hmac
 import java.math.BigInteger
 import java.security.KeyPair
 import java.security.KeyPairGenerator

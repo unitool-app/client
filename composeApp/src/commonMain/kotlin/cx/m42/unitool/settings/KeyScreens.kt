@@ -53,7 +53,7 @@ import kotlinx.coroutines.launch
  * SSH keys (02 §5): every key with where it lives, a card per key, and the way to add one. The words
  * for *where* are the catalogue's (D179); everything else is [SecurityStrings].
  *
- * Not in Settings: only the promo code `{ssh-keys}` opens it (idea/09, the owner, 2026-10-05). Most
+ * Not in Settings: only the promo code `{ssh-keys}` opens it (done/idea/09, the owner, 2026-10-05). Most
  * people never need a key of their own, and whoever does is given the code. What Storage & security
  * offers as the fix for a finding — "add an SSH key" where nothing seals the secrets — still leads
  * to the wizard: that is a problem on screen, not a way into this list.

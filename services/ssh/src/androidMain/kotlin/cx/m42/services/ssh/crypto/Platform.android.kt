@@ -3,17 +3,12 @@ package cx.m42.services.ssh.crypto
 import java.math.BigInteger
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
-import java.security.SecureRandom
 import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPrivateKeySpec
 import java.security.spec.ECPublicKeySpec
-
-private val random = SecureRandom()
-
-internal actual fun secureRandomBytes(size: Int): ByteArray = ByteArray(size).also { random.nextBytes(it) }
 
 /**
  * The JCA's ECDSA. The private scalar becomes a `BigInteger` here, which cannot be wiped — the

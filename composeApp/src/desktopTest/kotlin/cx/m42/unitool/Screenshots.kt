@@ -57,7 +57,7 @@ class Screenshots {
     /**
      * A viewport to render at, and the density that makes it one.
      *
-     * Three of them, because the store audiences want different pictures and none can be cropped
+     * Four of them, because the store audiences want different pictures and none can be cropped
      * out of another:
      *
      *  - [Phone] is the shape of a phone people actually hold — 412×915 dp, 20:9, what a Pixel
@@ -67,9 +67,12 @@ class Screenshots {
      *    its own render rather than a letterboxed copy.
      *  - [AppStoreListing] is Apple's 6.5-inch portrait slot: 414×896 dp at 3×, exactly
      *    1242×2688 px. It is rendered at its native aspect ratio rather than resized from Play.
+     *  - [AppStoreIpad] is Apple's 13-inch iPad slot: 1032×1376 dp at 2×, exactly 2064×2752 px,
+     *    what an iPad Pro 13-inch (M4) reports. A build that runs on iPad is not submitted without it.
      *
      * Each also names the store whose Premium offer it draws: the phone and Play frames are
-     * Android's, so they show Google Play's.
+     * Android's, so they show Google Play's. The App Store frames are all in English, whatever
+     * language a screen is declared in.
      */
     private data class Viewport(
         val name: String,
@@ -87,6 +90,8 @@ class Screenshots {
     private val PlayListing = Viewport("play", 360, 640, 3f, "build/screenshots/play", Store.GooglePlay)
     private val AppStoreListing =
         Viewport("appstore-6.5", 414, 896, 3f, "build/screenshots/appstore-6.5", Store.AppStore)
+    private val AppStoreIpad =
+        Viewport("appstore-ipad-13", 1032, 1376, 2f, "build/screenshots/appstore-ipad-13", Store.AppStore)
 
     private fun labelFor(lang: String, label: String): String = if (lang == "en") {
         mapOf(
@@ -342,7 +347,7 @@ class Screenshots {
             tapTag("2fa:read-link")
         },
         // ssh-new step 6: the host's keys, on a phone with a chip — three keys at three levels.
-        // SSH keys are not in Settings: their promo code opens them (idea/09).
+        // SSH keys are not in Settings: their promo code opens them (done/idea/09).
         Screen("26-ssh-keys", kind = HostKind.Phone(PhoneKeys)) { openKeys() },
         Screen("27-key-card", kind = HostKind.Phone(PhoneKeys)) { openKeys(); tapTag("keys:row-0") },
         Screen("28-key-card-session", kind = HostKind.Phone(PhoneKeys)) { openKeys(); tapTag("keys:row-2") },
@@ -381,7 +386,7 @@ class Screenshots {
             typeInto("activate:promo", "{ssh-keys}")
             tapTag("activate:apply")
         },
-        // idea/09: the secret app, opened by its code — and the Activate screen with the camera button.
+        // done/idea/09: the secret app, opened by its code — and the Activate screen with the camera button.
         Screen("43-secret-app") {
             tapIcon("Открыть меню")
             tapIcon("Премиум")
@@ -402,7 +407,7 @@ class Screenshots {
         tapIcon("Настройки")
     }
 
-    /** The SSH keys screen, which only its promo code opens (idea/09). */
+    /** The SSH keys screen, which only its promo code opens (done/idea/09). */
     private fun DriveScope.openKeys() {
         tapIcon("Открыть меню")
         tapIcon("Премиум")
@@ -446,7 +451,7 @@ class Screenshots {
     @Test
     fun captureEveryScreen() {
         val requestedViewport = System.getenv("UNITOOL_SCREENSHOT_VIEWPORT")
-        val viewports = listOf(Phone, PlayListing, AppStoreListing).filter {
+        val viewports = listOf(Phone, PlayListing, AppStoreListing, AppStoreIpad).filter {
             requestedViewport == null || it.name == requestedViewport
         }
         require(viewports.isNotEmpty()) { "Unknown screenshot viewport: $requestedViewport" }
@@ -456,7 +461,7 @@ class Screenshots {
             File(viewport.directory).listFiles()?.forEach { if (it.name.endsWith(".png")) it.delete() }
             for (screen in screens) {
                 val device = FakeDeviceAuthenticator(screen.lock, screen.answer)
-                val language = if (viewport == AppStoreListing) "en" else screen.lang
+                val language = if (viewport.store == Store.AppStore) "en" else screen.lang
                 shot(viewport, screen.name, language, screen.offline, screen.clock, device, screen.kind, screen.drive)
             }
         }

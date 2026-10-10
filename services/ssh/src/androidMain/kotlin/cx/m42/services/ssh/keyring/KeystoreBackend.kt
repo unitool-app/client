@@ -17,8 +17,6 @@ import android.security.keystore.KeyProtection
 import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.crypto.EcdsaDer
-import cx.m42.services.ssh.crypto.Hash
-import cx.m42.services.ssh.crypto.Sha512
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.services.ssh.probe.HandMadeCertificate
 import cx.m42.services.ssh.probe.RawPrivateKey
@@ -30,6 +28,11 @@ import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.KeyStorage
 import cx.m42.superizer.ssh.KeyringDevice
 import cx.m42.superizer.ssh.UsePolicy
+import cx.m42.unitool.kit.crypto.Hash
+import cx.m42.unitool.kit.crypto.Sha512
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
@@ -48,9 +51,6 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import kotlin.coroutines.resume
 import kotlin.io.encoding.Base64
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 
 /**
  * Android's Keystore as the keyring's chip (01 §4, §5; step 0's answers in 04 §2).
@@ -177,7 +177,7 @@ internal class KeystoreBackend(
                 val scalar = h.copyOf(32)
                 val agreeing = RawPrivateKey("XDH", X25519_PKCS8 + scalar)
                 scalar.fill(0)
-                val twin = cx.m42.services.ssh.crypto.Curve25519.edwardsToMontgomery(kind.point)
+                val twin = cx.m42.unitool.kit.crypto.Curve25519.edwardsToMontgomery(kind.point)
                 keystore.setEntry(
                     "$alias.agree",
                     KeyStore.PrivateKeyEntry(agreeing, arrayOf(HandMadeCertificate(X25519_SPKI + twin, ED25519_OID, "XDH"))),

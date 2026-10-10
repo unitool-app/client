@@ -3,7 +3,6 @@ package cx.m42.services.ssh.keyring
 import android.os.ParcelFileDescriptor
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import cx.m42.services.ssh.SecretBytes
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.android
 import cx.m42.services.ssh.key.OpenSshKeyFile
@@ -18,9 +17,7 @@ import cx.m42.superizer.ssh.SshKeyInfo
 import cx.m42.superizer.ssh.SshOutcome
 import cx.m42.superizer.ssh.UsePolicy
 import cx.m42.superizer.testing.Canary
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
+import cx.m42.unitool.kit.crypto.SecretBytes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +25,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * I15 on Android (04 step 5): a session ends when the screen goes off, as `ssh-agent -t` would

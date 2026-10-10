@@ -3,7 +3,6 @@ package cx.m42.services.ssh.keyring
 import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.crypto.EcdsaDer
-import cx.m42.services.ssh.crypto.Hash
 import cx.m42.services.ssh.ios.cfDictionary
 import cx.m42.services.ssh.ios.toByteArray
 import cx.m42.services.ssh.ios.toCFData
@@ -15,13 +14,16 @@ import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.KeyStorage
 import cx.m42.superizer.ssh.KeyringDevice
 import cx.m42.superizer.ssh.UsePolicy
-import kotlin.io.encoding.Base64
+import cx.m42.unitool.kit.crypto.Hash
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.IntVar
+import kotlinx.cinterop.ObjCObjectVar
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -36,14 +38,10 @@ import platform.CoreFoundation.kCFBooleanFalse
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreFoundation.kCFNumberSInt32Type
 import platform.Foundation.CFBridgingRetain
-import kotlinx.cinterop.ObjCObjectVar
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.usePinned
 import platform.Foundation.NSError
 import platform.Foundation.NSUserDefaults
 import platform.LocalAuthentication.LAContext
 import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
-import platform.posix.memcpy
 import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthentication
 import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
 import platform.Security.SecAccessControlCreateWithFlags
@@ -77,6 +75,8 @@ import platform.Security.kSecKeyAlgorithmECIESEncryptionCofactorVariableIVX963SH
 import platform.Security.kSecPrivateKeyAttrs
 import platform.Security.kSecReturnRef
 import platform.Security.kSecUseAuthenticationContext
+import platform.posix.memcpy
+import kotlin.io.encoding.Base64
 
 /**
  * The Secure Enclave as the keyring's chip (05 §4, D165). The enclave takes no imported key: an

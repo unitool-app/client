@@ -90,7 +90,7 @@ class KeysScreensTest : UnitoolTest() {
         waitForIdle()
     }
 
-    /** SSH keys are not in Settings: their promo code opens them (idea/09). */
+    /** SSH keys are not in Settings: their promo code opens them (done/idea/09). */
     private fun ComposeUiTest.openKeys() {
         onNodeWithContentDescription("Open menu").performClick()
         waitForIdle()
@@ -122,7 +122,7 @@ class KeysScreensTest : UnitoolTest() {
 
         openSettings()
         onNodeWithTag("settings:host:storage").performScrollTo().assertIsDisplayed()
-        // Not in Settings (idea/09): the keys are behind their code, and the list says there are none.
+        // Not in Settings (done/idea/09): the keys are behind their code, and the list says there are none.
         onNodeWithTag("settings:host:ssh-keys").assertDoesNotExist()
         onNodeWithTag("keys:add").assertDoesNotExist()
         openKeys()

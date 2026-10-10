@@ -1,6 +1,6 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.crypto.BcryptPbkdf
+import cx.m42.unitool.kit.crypto.BcryptPbkdf
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

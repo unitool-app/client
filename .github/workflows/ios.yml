@@ -24,7 +24,7 @@ on:
     types: [labeled]
   push:
     branches: [main, ios-simulator, ios-device]
-    # A commit that touches only the console tool changes nothing on the phone (.ai-notes/cli D284).
+    # A commit that touches only the console tool changes nothing on the phone (.ai-notes/done/cli D284).
     paths-ignore: ['unitool-cli/**']
   workflow_dispatch:
 

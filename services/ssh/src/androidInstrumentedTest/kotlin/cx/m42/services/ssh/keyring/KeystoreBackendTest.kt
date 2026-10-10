@@ -8,9 +8,8 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import cx.m42.services.ssh.SecretBytes
-import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.ssh.key.OpenSshKeyFile
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.superizer.runtime.Clock
@@ -26,6 +25,15 @@ import cx.m42.superizer.ssh.SshKeyInfo
 import cx.m42.superizer.ssh.UsePolicy
 import cx.m42.superizer.testing.Canary
 import cx.m42.superizer.testing.LeakScanner
+import cx.m42.unitool.kit.crypto.SecretBytes
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
 import java.io.File
 import java.security.KeyFactory
 import java.security.KeyStore
@@ -37,14 +45,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.runBlocking
-import org.junit.After
-import org.junit.Before
-import org.junit.Test
-import org.junit.runner.RunWith
 
 /**
  * The Keystore backend against a real Keystore (03 §6.2): I2 a resident key has no private half

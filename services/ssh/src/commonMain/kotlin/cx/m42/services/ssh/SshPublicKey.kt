@@ -1,9 +1,9 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.crypto.Hash
 import cx.m42.services.ssh.wire.WireReader
 import cx.m42.services.ssh.wire.wire
 import cx.m42.superizer.ssh.KeyId
+import cx.m42.unitool.kit.crypto.Hash
 import kotlin.io.encoding.Base64
 
 /**
@@ -56,7 +56,7 @@ public class SshPublicKey private constructor(
     internal sealed class Kind {
         class Ed25519(val point: ByteArray) : Kind()
         class Rsa(val exponent: ByteArray, val modulus: ByteArray) : Kind() {
-            val bits: Int = cx.m42.services.ssh.crypto.Rsa.bits(modulus)
+            val bits: Int = cx.m42.unitool.kit.crypto.Rsa.bits(modulus)
         }
         class Ecdsa(val curve: Curve, val point: ByteArray) : Kind()
         data object Other : Kind()

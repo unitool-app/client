@@ -1,9 +1,7 @@
 package cx.m42.services.ssh.diagnostics
 
 import cx.m42.services.ssh.Age
-import cx.m42.services.ssh.SecretBytes
 import cx.m42.services.ssh.SshSig
-import cx.m42.services.ssh.crypto.secureRandomBytes
 import cx.m42.services.ssh.key.OpenSshKeyFile
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
@@ -13,6 +11,8 @@ import cx.m42.superizer.diagnostics.SelfTestResult
 import cx.m42.superizer.diagnostics.SelfTestRunner
 import cx.m42.superizer.diagnostics.SelfTestStep
 import cx.m42.superizer.runtime.Clock
+import cx.m42.unitool.kit.crypto.SecretBytes
+import cx.m42.unitool.kit.crypto.secureRandomBytes
 import kotlin.io.encoding.Base64
 
 /**

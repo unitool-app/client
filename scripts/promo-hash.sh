@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Prints the key a promo code gets in the hashed table in UnitoolHost.kt (idea/09, D256).
+# Prints the key a promo code gets in the hashed table in UnitoolHost.kt (done/idea/09, D256).
 #
 #   ./scripts/promo-hash.sh <code> [<code> …]      # one line per code: hash, then the normalised code
 #   PROMO_SALT=other: ./scripts/promo-hash.sh <code>

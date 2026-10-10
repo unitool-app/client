@@ -24,6 +24,18 @@ public abstract class CliApp(
      * write `unitool qr encode encode`.
      */
     public open val default: Command? get() = null
+
+    /**
+     * What `unitool APP` alone does at a terminal, instead of the generic menu of commands (D271):
+     * an app whose choices depend on each other walks the person through them itself
+     * (.ai-notes/done/split D370). It must not do anything its commands cannot.
+     */
+    public open val wizard: Wizard? get() = null
+}
+
+/** A guided run of an app. [command] is how the app is called, `unitool split`, for the closing "same as one command" line. */
+public fun interface Wizard {
+    public fun run(io: Io, command: String): Int
 }
 
 /** What an app id and a command name may look like: they are typed, so lower case and dashes. */

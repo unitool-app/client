@@ -3,6 +3,7 @@ package cx.m42.services.ssh
 import cx.m42.services.ssh.key.OpenSshKeyFile
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.superizer.ssh.ImportRefusal
+import cx.m42.unitool.kit.crypto.SecretBytes
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,8 +1,5 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.crypto.AesGcm
-import cx.m42.services.ssh.crypto.Hash
-import cx.m42.services.ssh.crypto.secureRandomBytes
 import cx.m42.services.ssh.key.OpenSshKeyFile
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
@@ -25,8 +22,12 @@ import cx.m42.superizer.ssh.UsePolicy
 import cx.m42.superizer.testing.Canary
 import cx.m42.superizer.testing.FakeClock
 import cx.m42.superizer.testing.RecordingLogger
-import kotlin.io.encoding.Base64
+import cx.m42.unitool.kit.crypto.AesGcm
+import cx.m42.unitool.kit.crypto.Hash
+import cx.m42.unitool.kit.crypto.SecretBytes
+import cx.m42.unitool.kit.crypto.secureRandomBytes
 import kotlinx.coroutines.CoroutineScope
+import kotlin.io.encoding.Base64
 
 /**
  * The person, scripted (03 §5): each question answered by what the test queued, and every question
@@ -125,8 +126,8 @@ internal class SoftwareChip(
     override suspend fun agree(alias: String, peer: ByteArray, reason: UseReason): ChipResult<ByteArray> {
         val inside = resident[alias] ?: return ChipResult.Unusable
         if (!prompt()) return ChipResult.Cancelled
-        val h = cx.m42.services.ssh.crypto.Sha512.digest(inside.ed25519Seed().use { it.bytes.copyOf() })
-        return ChipResult.Ok(cx.m42.services.ssh.crypto.Curve25519.x25519(h.copyOf(32), peer))
+        val h = cx.m42.unitool.kit.crypto.Sha512.digest(inside.ed25519Seed().use { it.bytes.copyOf() })
+        return ChipResult.Ok(cx.m42.unitool.kit.crypto.Curve25519.x25519(h.copyOf(32), peer))
     }
 
     override suspend fun rsaDecrypt(alias: String, ciphertext: ByteArray, reason: UseReason): ChipResult<ByteArray> = ChipResult.Failed("not in this fake")

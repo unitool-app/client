@@ -84,3 +84,12 @@ __pycache__/
 # OS droppings.
 .DS_Store
 Thumbs.db
+
+# Local secrets (MCP key of unitool-server, …) — never committed.
+.env
+
+# Release credentials kept next to the notes (App Store Connect key, Firebase admin keys, provisioning
+# profile). Never in git.
+.ai-notes/keys/
+# A link to the server checkout (/prj/layers-fw/unitool-server), its own repository.
+/unitool-server

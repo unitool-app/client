@@ -28,6 +28,8 @@ public class Param<T> internal constructor(
     public val advanced: Boolean = false,
     internal val convert: (String) -> Any? = { it },
     internal val absent: Any? = null,
+    /** Given more than once, every value counts, in order: `-p a -p b`. Otherwise the last one wins. */
+    public val repeated: Boolean = false,
 ) {
     internal var value: Any? = absent
         private set
@@ -45,7 +47,9 @@ public class Param<T> internal constructor(
     }
 
     internal fun accept(raw: String) {
-        value = convert(raw)
+        val converted = convert(raw)
+        @Suppress("UNCHECKED_CAST")
+        value = if (repeated) (value as List<Any?>) + converted else converted
         given = true
     }
 
@@ -63,7 +67,8 @@ public class Param<T> internal constructor(
         advanced: Boolean = this.advanced,
         convert: (String) -> Any? = this.convert,
         absent: Any? = this.absent,
-    ): Param<R> = Param(kind, names, help, metavar, choices, required, defaultText, advanced, convert, absent)
+        repeated: Boolean = this.repeated,
+    ): Param<R> = Param(kind, names, help, metavar, choices, required, defaultText, advanced, convert, absent, repeated)
 }
 
 /**
@@ -93,6 +98,12 @@ public fun Param<String?>.int(range: IntRange? = null): Param<Int?> {
 /** The value when argv does not name it. [shown] is how the help and the menu print it. */
 public fun <T : Any> Param<T?>.default(value: T, shown: String = value.toString()): Param<T> =
     copy(defaultText = shown, absent = value)
+
+/** An option that may be given several times; the command gets every value, in order (D305). */
+public fun Param<String?>.repeated(): Param<List<String>> {
+    require(kind == ParamKind.Option) { "$displayName: only an option repeats" }
+    return copy(absent = emptyList<String>(), repeated = true)
+}
 
 /** A run without it is a usage error (exit code 2). */
 public fun <T : Any> Param<T?>.required(): Param<T> = copy(required = true)

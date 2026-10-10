@@ -1,12 +1,12 @@
 package cx.m42.services.ssh.keyring
 
 import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.ssh.crypto.Hash
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.KeyStorage
 import cx.m42.superizer.ssh.KeyringDevice
 import cx.m42.superizer.ssh.UsePolicy
+import cx.m42.unitool.kit.crypto.Hash
 
 /**
  * What a chip adds to the keyring — levels 1 and 2 (05 §2): Android's Keystore, iOS's Secure

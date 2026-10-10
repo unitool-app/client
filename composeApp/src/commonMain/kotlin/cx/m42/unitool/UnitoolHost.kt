@@ -116,7 +116,7 @@ private fun buildHost(
     // Hidden (D8). It is a diagnostic instrument, and it stays invisible until someone types the
     // code below — which is also the only way the Service Menu opens in a release.
     register(TestApp())
-    // Secret (idea/09): never listed anywhere, opened by its code for one visit at a time. A test
+    // Secret (done/idea/09): never listed anywhere, opened by its code for one visit at a time. A test
     // piece, to see what the type looks like; its code goes to the stores' reviewers with the rest.
     register(SecretTestApp())
 
@@ -124,7 +124,7 @@ private fun buildHost(
     // The converter is one tap away in the catalog; the bench app gets there by its promo code.
     home("calculator")
 
-    // Codes as hashes (idea/09, D256): the APK carries none that `strings` would print. A key is
+    // Codes as hashes (done/idea/09, D256): the APK carries none that `strings` would print. A key is
     // the output of `scripts/promo-hash.sh <code>`; the codes themselves, and what each opens, are
     // in `.secrets/promo-codes.md` — the list that goes to the stores' reviewers (RELEASING.md).
     promoCodes(
@@ -142,7 +142,7 @@ private fun buildHost(
                 "b63a66698da50056b59749499b4d1d2ba6b7f99c8f17e50f8a8ab23b0196080c" to ActivationResult.Success(
                     Activation(AppId("test-app"), TestApp.promoConfig()),
                 ),
-                // The secret test app, for one visit (idea/09).
+                // The secret test app, for one visit (done/idea/09).
                 "601ada16eec56caa326c645b27c9d66cf9fc81ccde4aae82875625796e615037" to ActivationResult.Success(
                     Activation(AppId("secret-test"), SecretTestApp.promoConfig()),
                 ),
@@ -150,7 +150,7 @@ private fun buildHost(
                 // not a reserved app id (D20), and a row like any other so its code is hashed too.
                 "5fbc3d115453b3a3426b4c6dc14737226136dec4c71526dc7a9c4aab3c3f8bdc" to
                     ActivationResult.HostCommand(ActivationResult.Command.OpenServiceMenu),
-                // SSH keys, which Settings does not list (idea/09). Bracketed, so exact: only the
+                // SSH keys, which Settings does not list (done/idea/09). Bracketed, so exact: only the
                 // code as written opens them, and a near miss opens nothing. Both brackets — the
                 // owner wrote it with each. A build without the security layer has no such screen,
                 // and there the code is simply unknown.

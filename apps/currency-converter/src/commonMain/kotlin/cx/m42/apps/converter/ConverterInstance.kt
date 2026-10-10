@@ -51,10 +51,14 @@ internal class ConverterInstance(
         runtime.analytics.screen("currency-converter")
 
         // A currency named by the config wins: that is a deep link or a QR code saying what this
-        // *launch* is about. Otherwise the preference from Settings, and only then the default —
-        // the config is an instruction, the preference is a standing wish.
+        // *launch* is about. Otherwise the last choice — made on this screen or in Settings, they
+        // share the key — and only then the default: the config is an instruction, the last
+        // choice is a standing wish.
         if (config.from == null) {
             runtime.storage.get(KEY_BASE)?.let { stored -> from.value = stored }
+        }
+        if (config.to == null) {
+            runtime.storage.get(KEY_TO)?.let { stored -> to.value = stored }
         }
 
         // Only the cache, and only if it is already there: reading it is cheap, and it means the
@@ -104,11 +108,35 @@ internal class ConverterInstance(
         amount.value = cleaned
     }
 
+    fun pickFrom(code: String) {
+        from.value = code
+        rememberPair()
+    }
+
+    fun pickTo(code: String) {
+        to.value = code
+        rememberPair()
+    }
+
     fun swap() {
         val previous = from.value
         from.value = to.value
         to.value = previous
         runtime.haptics.tick()
+        rememberPair()
+    }
+
+    /**
+     * The pair outlives the session, the amount does not — the same split as the calculator's
+     * last answer and half-typed sum (D16). Written only when the person chooses: a pair that came
+     * in a deep link is about that launch, and should not become the next one's.
+     */
+    private fun rememberPair() {
+        val pair = from.value to to.value
+        runtime.scope.launch {
+            runtime.storage.set(KEY_BASE, pair.first)
+            runtime.storage.set(KEY_TO, pair.second)
+        }
     }
 
     override fun saveState(): JsonObject = buildJsonObject {

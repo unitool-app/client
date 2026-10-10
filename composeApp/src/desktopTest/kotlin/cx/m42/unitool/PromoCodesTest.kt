@@ -12,7 +12,7 @@ import kotlin.test.assertIs
 import kotlinx.coroutines.runBlocking
 
 /**
- * The build's code table is hashes (idea/09, D256), so nothing in `UnitoolHost.kt` says which code
+ * The build's code table is hashes (done/idea/09, D256), so nothing in `UnitoolHost.kt` says which code
  * opens what. This is the one place that does: each code the tests, the README and the stores'
  * reviewers are given still matches a row. A row rehashed under another salt, or a code changed in
  * the library without a new row, fails here — not on a reviewer's phone.

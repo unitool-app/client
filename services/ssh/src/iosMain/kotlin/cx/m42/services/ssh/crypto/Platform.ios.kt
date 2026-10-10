@@ -5,12 +5,9 @@ import cx.m42.services.ssh.ios.toByteArray
 import cx.m42.services.ssh.ios.toCFData
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.IntVar
-import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import platform.CoreFoundation.CFErrorRefVar
 import platform.CoreFoundation.CFNumberCreate
@@ -19,8 +16,6 @@ import platform.CoreFoundation.kCFNumberSInt32Type
 import platform.Security.SecKeyCreateSignature
 import platform.Security.SecKeyCreateWithData
 import platform.Security.SecKeyVerifySignature
-import platform.Security.SecRandomCopyBytes
-import platform.Security.errSecSuccess
 import platform.Security.kSecAttrKeyClass
 import platform.Security.kSecAttrKeyClassPrivate
 import platform.Security.kSecAttrKeyClassPublic
@@ -30,17 +25,6 @@ import platform.Security.kSecAttrKeyTypeECSECPrimeRandom
 import platform.Security.kSecKeyAlgorithmECDSASignatureMessageX962SHA256
 import platform.Security.kSecKeyAlgorithmECDSASignatureMessageX962SHA384
 import platform.Security.kSecKeyAlgorithmECDSASignatureMessageX962SHA512
-import platform.Security.kSecRandomDefault
-
-/** The system's CSPRNG, as Security framework offers it. A failure is not an answer: no bytes, no key. */
-@OptIn(ExperimentalForeignApi::class)
-internal actual fun secureRandomBytes(size: Int): ByteArray {
-    val bytes = ByteArray(size)
-    if (size == 0) return bytes
-    val status = bytes.usePinned { SecRandomCopyBytes(kSecRandomDefault, size.convert(), it.addressOf(0)) }
-    check(status == errSecSuccess) { "SecRandomCopyBytes failed: $status" }
-    return bytes
-}
 
 /**
  * Security.framework's ECDSA over a key given as bytes (`SecKeyCreateWithData`, X9.63: `04‖X‖Y‖D`).

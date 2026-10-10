@@ -28,13 +28,28 @@ public class FakeIo(
     /** Every prompt [pause] showed, in order. */
     public val pauses: MutableList<String> = mutableListOf()
 
+    /** Every prompt [secret] showed, in order. The answers themselves never reach [errText]. */
+    public val secretPrompts: MutableList<String> = mutableListOf()
+
     public val files: MutableMap<String, ByteArray> = linkedMapOf()
+
+    /** Paths last written private (0600). */
+    public val privateFiles: MutableSet<String> = linkedSetOf()
 
     public val outBytes: ByteArray get() = out.toByteArray()
     public val outText: String get() = outBytes.decodeToString()
 
     /** stderr: every [say] line and every prompt with its answer, as a person would have seen them. */
     public val errText: String get() = err.toString()
+
+    /** Empties stdout, stderr and the prompts, keeping the files: the next command in the same directory. */
+    public fun clearOutput() {
+        out.clear()
+        err.clear()
+        prompts.clear()
+        pauses.clear()
+        secretPrompts.clear()
+    }
 
     override fun env(name: String): String? = environment[name]
 
@@ -63,9 +78,26 @@ public class FakeIo(
         return true
     }
 
-    override fun writeFile(path: String, bytes: ByteArray) {
+    /** Takes the next answer like [ask], and shows only the prompt, as a terminal with echo off would. */
+    override fun secret(prompt: String): String? {
+        if (!keyboard) return null
+        secretPrompts += prompt
+        err.append(prompt).append('\n')
+        return queue.removeFirstOrNull()
+    }
+
+    override fun readStdinHidden(): ByteArray = stdin
+
+    override fun readFile(path: String): ByteArray =
+        files[path]?.copyOf() ?: fail("cannot read $path: No such file or directory")
+
+    override fun exists(path: String): Boolean = path in files
+
+    override fun writeFile(path: String, bytes: ByteArray, private: Boolean, replace: Boolean) {
         if (!writable(path)) fail("cannot write $path: No such file or directory")
+        if (!replace && path in files) fail("$path exists; it was left as it was")
         files[path] = bytes.copyOf()
+        if (private) privateFiles += path else privateFiles -= path
     }
 }
 

@@ -70,7 +70,7 @@ public class Cli(
 
         val rest = args.drop(1)
         if (rest.isEmpty()) {
-            if (io.interactive) return Menu(this, io).run(app)
+            if (io.interactive) return app.wizard?.let { runWizard(app, it, io) } ?: Menu(this, io).run(app)
             app.default?.let { return runCommand(app, it, rest, io) }
             io.say(Help.app(this, app))
             return 2
@@ -93,8 +93,16 @@ public class Cli(
             io.say("Help: $path --help")
             return 2
         }
+        return guarded(path, io) { command.run(io) }
+    }
+
+    /** Runs [wizard] with the same treatment of failures as a command. The menu ends up here too for such an app. */
+    internal fun runWizard(app: CliApp, wizard: Wizard, io: Io): Int =
+        guarded("$name ${app.id}", io) { wizard.run(io, "$name ${app.id}") }
+
+    private fun guarded(path: String, io: Io, block: () -> Int): Int {
         return try {
-            command.run(io)
+            block()
         } catch (e: UsageError) {
             io.say("$path: ${e.message}")
             io.say("Help: $path --help")

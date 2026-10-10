@@ -1,6 +1,5 @@
 package cx.m42.services.ssh.agent
 
-import cx.m42.services.ssh.SecretBytes
 import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.ssh.key.PrivateKey
 import cx.m42.services.ssh.wire.WireReader
@@ -9,6 +8,7 @@ import cx.m42.superizer.ssh.AgentConstraint
 import cx.m42.superizer.ssh.ImportOutcome
 import cx.m42.superizer.ssh.SshAgent
 import cx.m42.superizer.ssh.SshOutcome
+import cx.m42.unitool.kit.crypto.SecretBytes
 
 /**
  * The ssh-agent protocol's bytes (draft-ietf-sshm-ssh-agent), with no transport: a message in, a

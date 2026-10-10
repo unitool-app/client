@@ -1,6 +1,7 @@
 package cx.m42.apps.converter
 
 import cx.m42.superizer.app.AppConfig
+import cx.m42.superizer.backup.BackupPolicy
 import cx.m42.superizer.testing.runAppTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -126,7 +127,7 @@ class ConverterInstanceTest {
     }
 }
 
-/** The preference the app contributes to the host's Settings page, and what reads it back. */
+/** The preference the app contributes to the host's Settings page, the last pair, and what reads them back. */
 class ConverterSettingsTest {
 
     private val url = ConverterConfig.DEFAULT_RATES_URL
@@ -156,5 +157,57 @@ class ConverterSettingsTest {
         // A deep link or a QR code is an instruction about *this launch*; the preference is a
         // standing wish, and an instruction wins.
         assertEquals("EUR", (instance as ConverterInstance).from.value)
+    }
+
+    @Test
+    fun aPickedPairIsWrittenDown() = runAppTest(
+        ConverterApp(),
+        prepare = { it.network.respond(url, payload) },
+    ) {
+        val converter = instance as ConverterInstance
+        converter.pickFrom("GBP")
+        converter.pickTo("VND")
+        assertEquals("GBP", runtime.storage.entries[KEY_BASE])
+        assertEquals("VND", runtime.storage.entries[KEY_TO])
+        click("currency-converter:swap")
+        assertEquals("VND", runtime.storage.entries[KEY_BASE])
+        assertEquals("GBP", runtime.storage.entries[KEY_TO])
+    }
+
+    @Test
+    fun thePairStaysOutOfTheBackup() = runAppTest(
+        ConverterApp(),
+        prepare = { it.network.respond(url, payload) },
+    ) {
+        val before = runtime.storage.entries.keys.toSet()
+        (instance as ConverterInstance).pickFrom("GBP")
+        val written = runtime.storage.entries.keys - before
+        val excluded = (app.manifest.backup as BackupPolicy.Except).keys
+        assertTrue(written.isNotEmpty() && excluded.containsAll(written), "wrote $written, excluded $excluded")
+    }
+
+    @Test
+    fun theLastPairIsWhatTheConverterOpensOn() = runAppTest(
+        ConverterApp(),
+        prepare = {
+            it.storage.entries[KEY_BASE] = "GBP"
+            it.storage.entries[KEY_TO] = "VND"
+            it.network.respond(url, payload)
+        },
+    ) {
+        val converter = instance as ConverterInstance
+        assertEquals("GBP", converter.from.value)
+        assertEquals("VND", converter.to.value)
+    }
+
+    @Test
+    fun aDeepLinkedPairIsNotWrittenDown() = runAppTest(
+        ConverterApp(),
+        config = AppConfig(Json.parseToJsonElement("""{"from":"EUR","to":"RUB"}""") as JsonObject),
+        prepare = { it.network.respond(url, payload) },
+    ) {
+        // The link was about one launch; the next one opens on what the person chose.
+        assertEquals(null, runtime.storage.entries[KEY_BASE])
+        assertEquals(null, runtime.storage.entries[KEY_TO])
     }
 }

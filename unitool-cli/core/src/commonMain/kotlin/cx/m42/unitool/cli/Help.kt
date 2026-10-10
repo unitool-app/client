@@ -67,6 +67,7 @@ internal object Help {
         val notes = listOfNotNull(
             param.choices?.joinToString(", "),
             param.defaultText?.let { "default $it" },
+            "repeatable".takeIf { param.repeated },
             "required".takeIf { param.required },
         )
         return if (notes.isEmpty()) param.help else "${param.help} (${notes.joinToString("; ")})"

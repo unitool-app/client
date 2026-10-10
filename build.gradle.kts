@@ -22,14 +22,14 @@ plugins {
 val forbiddenForApps = listOf("libs.superizer.host", "superizer:host", "project(\":composeApp\")")
 
 /**
- * The console tool's rule (.ai-notes/cli D283): it is one codebase with the phone, not a part of it.
+ * The console tool's rule (.ai-notes/done/cli D283): it is one codebase with the phone, not a part of it.
  * A CLI module that wants code from an app or a service moves that code to the shared module
  * instead (D273), so it may name neither, nor the library, nor Compose.
  */
 val forbiddenForCli = listOf("superizer", "compose", "project(\":composeApp\")", "project(\":apps:", "project(\":services:")
 
 /**
- * The shared module's rule (.ai-notes/cli D275): both sides depend on it, so it depends on nothing —
+ * The shared module's rule (.ai-notes/done/cli D275): both sides depend on it, so it depends on nothing —
  * no library contract, no UI, no network, no coroutines, no other module of this repository.
  */
 val forbiddenForKit = listOf("superizer", "compose", "ktor", "coroutines", "project(")
@@ -103,5 +103,6 @@ tasks.register("verify") {
     dependsOn(":composeApp:desktopTest", ":apps:calculator:desktopTest", ":apps:currency-converter:desktopTest",
         ":apps:twofa:desktopTest", ":services:qr-scanner:testDebugUnitTest",
         ":unitool-kit:desktopTest", ":unitool-kit:linuxX64Test",
-        ":unitool-cli:core:allTests", ":unitool-cli:apps:qr:allTests", ":unitool-cli:app:allTests")
+        ":unitool-cli:core:allTests", ":unitool-cli:apps:qr:allTests", ":unitool-cli:apps:split:allTests",
+        ":unitool-cli:app:allTests")
 }

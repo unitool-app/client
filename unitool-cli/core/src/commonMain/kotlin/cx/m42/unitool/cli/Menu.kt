@@ -14,6 +14,7 @@ internal class Menu(private val cli: Cli, private val io: Io) {
     fun run(app: CliApp?): Int {
         val chosen = app ?: cli.apps.singleOrNull()
             ?: pick("${cli.title} ${cli.version}: what would you like to do?", cli.apps) { it.id to it.summary }
+        chosen.wizard?.let { return cli.runWizard(chosen, it, io) }
         val command = chosen.commands.singleOrNull()
             ?: pick("${chosen.title}: which command?", chosen.commands) { it.name to it.summary }
         io.say("${chosen.title} · ${command.name}: ${command.summary}")

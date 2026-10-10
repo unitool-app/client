@@ -1,9 +1,9 @@
 package cx.m42.services.ssh.keyring
 
-import cx.m42.services.ssh.crypto.secureRandomBytes
 import cx.m42.services.ssh.diagnostics.SkipReason
 import cx.m42.services.ssh.ios.toByteArray
 import cx.m42.services.ssh.ios.toCFData
+import cx.m42.unitool.kit.crypto.secureRandomBytes
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
