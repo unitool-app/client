@@ -1,0 +1,28 @@
+---
+title: Sign in with the app
+description: Sign this browser in with Unitool on your phone, to see the docs of the parts you have opened.
+class: login
+---
+<h1>Sign in with the app</h1>
+<p>Open Unitool on your phone, go to <strong>Settings → Website</strong>, tap
+  <strong>Scan QR code to sign in</strong> and point the camera at this code. The phone shows this
+  browser and asks you to confirm.</p>
+<div id="qr" class="qr" aria-live="polite"><p class="muted">Loading…</p></div>
+<p id="status" class="muted" aria-live="polite"></p>
+<details id="no-camera" hidden>
+  <summary>No camera on the phone?</summary>
+  <p>In the app choose <strong>Paste a sign-in link</strong> instead, and paste this:</p>
+  <pre><code id="link"></code></pre>
+</details>
+<noscript><p>This page needs JavaScript to show the code and to notice when you confirm on the phone.
+  It is the only page of this site that uses any.</p></noscript>
+<h2 id="what-signing-in-does">What signing in does</h2>
+<ul>
+  <li>This browser becomes known as <strong>your installation of Unitool</strong> — not as you. There
+    is no name, no email and no password anywhere in it.</li>
+  <li>The documentation of the hidden parts you have opened in the app appears in the sidebar. Open
+    another one on the phone, and its pages appear here too.</li>
+  <li>The server notes when this browser opens a page and which page, and keeps that for 90 days.</li>
+  <li>Sign out under <a href="/account/">Account</a>, or on the phone in <strong>Settings → Website</strong>.</li>
+</ul>
+<script src="/login.js" defer></script>

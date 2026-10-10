@@ -67,7 +67,16 @@ internal fun ratesNetwork(): FakeNetwork = FakeNetwork().apply {
             """"base_code":"USD","rates":{"USD":1,"EUR":0.92,"GBP":0.79,"RUB":92.10,"VND":26000}}""",
     )
     respond("https://api.github.com/users/octocat/keys", GITHUB_KEYS)
+    // Settings → Website, as far as the screenshots go: a first registration and a browser waiting.
+    respond("https://unitool.m42.cx/api/unitool/v1/devices", """{"deviceId":"d_AAAAAAAAAAAA","push":"none","pushEnabled":false}""", status = 201)
+    respond(
+        "https://unitool.m42.cx/api/unitool/v1/web/logins/inspect",
+        """{"loginId":"wl_AAAAAAAAAAAAAAAA","browser":{"userAgent":"Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0","ip":"203.0.113.7"},"createdAt":1791600000,"expiresAt":1791600300}""",
+    )
 }
+
+/** A sign-in link of the website, as the login page shows it under its QR. */
+internal const val WEBSITE_LINK = "https://unitool.m42.cx/login/app/#wlt_ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 /**
  * What GitHub's API answers for an account with three keys — two age can encrypt to and one it

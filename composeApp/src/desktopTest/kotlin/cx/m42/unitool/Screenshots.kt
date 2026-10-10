@@ -394,6 +394,19 @@ class Screenshots {
             typeInto("activate:promo", cx.m42.apps.testapp.SecretTestApp.PROMO_CODE)
             tapTag("activate:apply")
         },
+        // .ai-notes/site/02: Settings → Website, and the question the phone asks before a browser is signed in.
+        Screen("45-website-en", lang = "en") {
+            tapIcon("Open menu")
+            tapIcon("Settings")
+            scroll("web:browsers")
+        },
+        Screen("46-website-confirm-en", lang = "en") {
+            tapIcon("Open menu")
+            tapIcon("Settings")
+            tapTag("web:paste")
+            typeInto("web:link", WEBSITE_LINK)
+            tapTag("web:next")
+        },
         // A purchase on the Premium mock-up: the store's kind of alert, since nothing is sold yet.
         Screen("44-premium-failed") {
             tapIcon("Открыть меню")

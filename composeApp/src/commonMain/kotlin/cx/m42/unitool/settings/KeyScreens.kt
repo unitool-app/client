@@ -69,6 +69,8 @@ internal class SshKeysScreen(private val keys: KeysUi, private val tools: HostTo
         val strings = securityStrings(langTag)
         val list by keys.admin.keys.collectAsState()
         val anchor by keys.secretsKey.collectAsState()
+        // Opened by its code: the website's SSH keys docs are this install's to read from now on.
+        LaunchedEffect(Unit) { tools.opened?.add(ID) }
 
         Page("keys:screen") {
             Card {

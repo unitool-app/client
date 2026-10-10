@@ -34,6 +34,8 @@ import cx.m42.unitool.premium.PremiumOffer
 import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.unitool.settings.HostTools
 import cx.m42.unitool.settings.SshKeysScreen
+import cx.m42.unitool.settings.WebsiteSection
+import cx.m42.unitool.web.WebSignIn
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.superizer.runtime.FilePicker
@@ -63,12 +65,16 @@ public fun buildUnitool(
     security: UnitoolSecurity? = null,
     tools: HostTools = HostTools(),
     network: NetworkService? = null,
+    /** The Unitool server — device registry, push, and the website this app signs in to. */
+    server: String = PUSH_SERVER,
     extra: SuperizerBuilder.() -> Unit = {},
 ): Superizer {
     // Made here rather than left to the library's default, so the host's own screens — the
     // backup's GitHub keys — use the very service the apps do. A test hands in its fake.
     val net = network ?: KtorNetworkService(KtorNetworkService.defaultClient())
-    return buildHost(scope, debug, security, tools.with(net), net, extra)
+    // Signing in to the website with the app (.ai-notes/site/02): Settings → Website.
+    val web = WebSignIn(net, server, currentPlatform(), BuildInfo.VERSION)
+    return buildHost(scope, debug, security, tools.with(net, web.opened), net, server, web, extra)
 }
 
 private fun buildHost(
@@ -77,6 +83,8 @@ private fun buildHost(
     security: UnitoolSecurity?,
     tools: HostTools,
     network: NetworkService,
+    server: String,
+    web: WebSignIn,
     extra: SuperizerBuilder.() -> Unit,
 ): Superizer = Superizer.build(scope) {
     network(network)
@@ -99,7 +107,7 @@ private fun buildHost(
 
     // Where this device registers for push (push-opt-in D422): only once the person uses an app
     // that takes pushes, never at first start. Desktop and the web have no token and send nothing.
-    pushServer(PUSH_SERVER)
+    pushServer(server)
 
     languages(
         LanguageOption("ru", "Русский"),
@@ -180,8 +188,15 @@ private fun buildHost(
     // the platform brought, handed to the host. A test builds without it and gets a host with none.
     security?.install(this, BuildInfo.VERSION, tools)
 
+    // Last of the host's blocks, so it sits at the bottom of the host's part of Settings: sign in on
+    // the website, and the browsers that are.
+    hostSection(WebsiteSection(web, tools))
+
     extra()
-}.also { superizer -> security?.attach(superizer, scope) }
+}.also { superizer ->
+    security?.attach(superizer, scope)
+    web.attach(superizer, scope)
+}
 
 /**
  * The root composable every entry point calls: the shell, the host's words for how things are kept
@@ -205,7 +220,7 @@ public fun SuperizerBuilder.registerExtra(app: SuperizerApp<*>) {
 
 public const val SCHEME: String = "unitool"
 
-/** The Unitool server (`/prj/layers-fw/unitool-server`): device registry and push. */
+/** The Unitool server (`/prj/layers-fw/unitool-server`): device registry, push and the website. */
 public const val PUSH_SERVER: String = "https://unitool.m42.cx"
 
 /**

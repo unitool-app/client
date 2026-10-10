@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <meta name="description" content="{{description}}">
+  <link rel="canonical" href="{{canonical}}">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/img/icon.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="page-{{kind}}">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="brand" href="/">
+        <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="6" fill="#fff"/><rect x="7" y="9.5" width="14" height="3" rx="1.5" fill="#1747c8"/><rect x="7" y="15.5" width="14" height="3" rx="1.5" fill="#1747c8"/></svg>
+        Unitool
+      </a>
+      <nav class="menu" aria-label="Main">
+        {{nav}}
+      </nav>
+    </div>
+  </header>
+  <main id="main" class="wrap">
+{{body}}
+  </main>
+  <footer class="bottom">
+    <div class="wrap">
+      <p>{{footer}}</p>
+      <p class="muted">© {{year}} m42.cx. This site sets no cookies and loads nothing from anyone else.</p>
+    </div>
+  </footer>
+</body>
+</html>

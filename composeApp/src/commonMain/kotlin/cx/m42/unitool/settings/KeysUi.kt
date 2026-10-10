@@ -6,6 +6,7 @@ import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.ssh.KeyId
 import cx.m42.superizer.ssh.SshKeyAdmin
+import cx.m42.unitool.web.OpenedSections
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -42,6 +43,8 @@ public class HostTools(
     public val sharer: FileSharer? = null,
     /** The host's own network — the one the apps get — for the backup's GitHub keys. Set by [cx.m42.unitool.buildUnitool]. */
     public val network: NetworkService? = null,
+    /** The parts opened by code, for the website's private docs (.ai-notes/site/02). Set by [cx.m42.unitool.buildUnitool]. */
+    public val opened: OpenedSections? = null,
 ) {
-    internal fun with(network: NetworkService): HostTools = HostTools(files, qr, sharer, network)
+    internal fun with(network: NetworkService, opened: OpenedSections): HostTools = HostTools(files, qr, sharer, network, opened)
 }
