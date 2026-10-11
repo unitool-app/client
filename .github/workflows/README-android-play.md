@@ -24,16 +24,15 @@ record is created and can never be changed for that listing afterwards.
 3. Checks out the library and publishes it to mavenLocal, then builds everything with
    `SUPERIZER_FROM_MAVEN=1`. See [The library](#the-library) below; this is the step that differs
    most from a single-repository app.
-4. Runs `./gradlew verify` — the dependency rules of 02, plus the host and app tests.
-5. Runs `play/check-listing.py` against the screenshots that test just wrote. Advisory for every
-   track but `production`, which is how Play behaves: a listing problem must not stop a bundle
-   from reaching testers, because the listing is not in the bundle. Always in the job summary.
-6. Builds `:composeApp:bundleRelease` (the `.aab` Play takes) and `:composeApp:assembleRelease`
+4. Runs **no tests and no listing check** (owner, 2026-10-11): a push to `main` goes straight to
+   closed testing. `scripts/verify.sh` and `python3 play/check-listing.py` are run by hand, and
+   `verify.yml` runs the first in CI on demand (`gh workflow run verify.yml --ref main`).
+5. Builds `:composeApp:bundleRelease` (the `.aab` Play takes) and `:composeApp:assembleRelease`
    (an `.apk`, because a bundle cannot be sideloaded and RELEASING.md §2 wants the release build
    on a real device). Both, plus `mapping.txt`, are kept as run artifacts for 90 days.
-7. Verifies the APK is actually signed and that the bundle carries its `proguard.map`.
-8. Uploads the bundle with `r0adkll/upload-google-play`.
-9. **Asks Play where the build actually landed** (`scripts/play-track-check.py`) and fails if the
+6. Verifies the APK is actually signed and that the bundle carries its `proguard.map`.
+7. Uploads the bundle with `r0adkll/upload-google-play`.
+8. **Asks Play where the build actually landed** (`scripts/play-track-check.py`) and fails if the
    versionCode is not on the intended track. The upload action reports what it *sent*; this
    reports what Play *has*. Those came apart once already — a release went to `internal`, a track
    with nobody on it, through a run where every step was green — and nothing in the run said so.
@@ -90,7 +89,7 @@ at the moment the job starts.
 
 Push to `main`, and the bundle is published to the `alpha` track. There is nothing to choose and
 nothing to remember: the track is the `PLAY_TRACK` repository variable (set to `alpha`), the
-workflow's default is `alpha` as well, and step 9 above fails the run if the release is anywhere
+workflow's default is `alpha` as well, and step 8 above fails the run if the release is anywhere
 else. A manual run can override the track for a one-off; a push never does.
 
 ## Which track a build lands on

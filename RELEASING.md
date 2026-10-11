@@ -133,9 +133,8 @@ python3 play/check-listing.py
 wrong shape or with an alpha channel, a short description one character over, a privacy policy
 still carrying a TODO. All of those otherwise fail *after* the upload rather than before it.
 
-`android-play.yml` runs it on every release build, and treats it the way Play does: advisory for
-internal testing, fatal for production. A listing problem must not stop a bundle from reaching
-testers, because the listing is not in the bundle.
+`android-play.yml` no longer runs it (2026-10-11: a push to `main` goes to closed testing with no
+checks); run it by hand before a production release.
 
 Which screenshots reach the listing is named in `play/listing/screenshots.txt`, not taken from
 whatever is in the directory. The generator writes twelve frames, Play accepts eight, and two of

@@ -205,55 +205,11 @@ jobs:
       - name: Resolve the library from a repository, not from a checkout
         run: echo "SUPERIZER_FROM_MAVEN=1" >> "$GITHUB_ENV"
 
-      # The dependency rules of 02 and every test that needs no browser or device. Deliberately
-      # before the bundle: a release that skips its tests is not cheaper, it is just later.
-      - name: Verify
-        run: ./gradlew verify --stacktrace
-
-      # The daemons Verify warmed hold memory R8 needs more; the configuration cache makes the cold
-      # start cheap.
-      - name: Let go of the daemons the tests used
-        run: |
-          ./gradlew --stop
-          pkill -f KotlinCompileDaemon || true
-
-      # Screenshots for the listing are written by the desktop test above, so this costs nothing
-      # more than the Python. It catches the things Play rejects *after* a long upload — a
-      # screenshot of the wrong shape or with an alpha channel, a description one character over,
-      # a privacy policy still carrying a TODO.
-      #
-      # Fatal only for a production release, which is how Play itself behaves: internal testing
-      # tolerates most of the content forms being incomplete, and production does not. A listing
-      # problem must not stop a bundle from reaching testers — the listing is not in the bundle.
-      # It is always in the job summary, so "advisory" does not mean "invisible".
-      - name: Check the Play listing material
-        id: listing
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python3 play/check-listing.py 2>&1 | tee "$RUNNER_TEMP/listing.txt"
-
-      # Separate from the check itself because `continue-on-error` swallows the exit code, and the
-      # decision "fatal or not" depends on the track rather than on the check.
-      - name: Report the listing check
-        if: always() && steps.listing.outcome != ''
-        run: |
-          set -euo pipefail
-          TRACK="${{ inputs.track || vars.PLAY_TRACK || 'alpha' }}"
-          {
-            echo "### Play listing check — ${{ steps.listing.outcome }}"
-            echo
-            echo '```'
-            grep -E 'FAIL|SKIP|problem' "$RUNNER_TEMP/listing.txt" || echo 'everything Play checks is in order'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "${{ steps.listing.outcome }}" = "failure" ] && [ "$TRACK" = "production" ]; then
-            echo "::error::the listing is not fit for production — see the job summary"
-            exit 1
-          fi
-          if [ "${{ steps.listing.outcome }}" = "failure" ]; then
-            echo "::warning::the listing has problems Play would reject; fatal only for the production track"
-          fi
+      # No tests and no listing check on this path (owner, 2026-10-11): a push to main goes straight
+      # to the closed-testing track. `./gradlew verify` is run by hand — `scripts/verify.sh`, or
+      # `gh workflow run verify.yml --ref main` when the browser, the emulator or real ssh/age
+      # matter — and `python3 play/check-listing.py` likewise. What is left here is only what the
+      # build itself cannot do without: the secrets, the keystore, the signature on the result.
 
       # Play refuses a versionCode it has already accepted. run_number only ever grows within a
       # repository, including across re-runs of older commits, so it can never collide with another
