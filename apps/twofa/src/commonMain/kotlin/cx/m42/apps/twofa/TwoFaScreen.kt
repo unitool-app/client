@@ -1,5 +1,6 @@
 package cx.m42.apps.twofa
 
+import cx.m42.services.ssh.KnownKey
 import cx.m42.services.ssh.SshPublicKey
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -664,6 +665,7 @@ private fun ExportPage(instance: TwoFaInstance, strings: TwoFaStrings) {
     val login by instance.exportLogin.collectAsState()
     val keys by instance.exportKeys.collectAsState()
     val selected by instance.exportSelected.collectAsState()
+    val saved by instance.savedKeys.collectAsState()
     val done by instance.exportDone.collectAsState()
     // The file name in the commands carries the date, so it follows the clock like the codes do.
     val now by instance.now.collectAsState()
@@ -681,6 +683,19 @@ private fun ExportPage(instance: TwoFaInstance, strings: TwoFaStrings) {
     ) {
         Text(text = strings.exportIntro(accounts.size), style = tokens.body, color = tokens.muted)
         Spacer(Modifier.height(20.dp))
+        // Other devices' keys the host keeps (.ai-notes/public-keys, D515), above GitHub: a phone
+        // next to this one is the likelier reader. Only where there are some.
+        if (saved.isNotEmpty()) {
+            FieldLabel(strings.savedKeys)
+            Card {
+                saved.forEachIndexed { index, key ->
+                    if (index > 0) RowDivider()
+                    SavedKeyRow(key, key.key.fingerprint in selected, index) { instance.toggleSaved(key) }
+                }
+            }
+            Hint(strings.savedKeysHint)
+            Spacer(Modifier.height(20.dp))
+        }
         FieldLabel(strings.githubAccount)
         AppTextField(
             value = login,
@@ -717,9 +732,12 @@ private fun ExportPage(instance: TwoFaInstance, strings: TwoFaStrings) {
                 }
             }
             Hint(strings.keysHint)
+        }
 
+        if (loaded != null || saved.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
-            val ready = selected.isNotEmpty() && accounts.isNotEmpty()
+            val recipients = remember(selected, saved, keys) { instance.exportRecipients() }
+            val ready = recipients.isNotEmpty() && accounts.isNotEmpty()
             if (instance.canShare) {
                 AppButton(
                     text = strings.shareExport,
@@ -749,7 +767,6 @@ private fun ExportPage(instance: TwoFaInstance, strings: TwoFaStrings) {
                 )
             }
 
-            val recipients = loaded.keys.filter { it.usable && it.key.fingerprint in selected }.map { it.key }
             val commands = Export.commands(recipients, Export.fileName(now))
             if (commands.isNotEmpty()) {
                 val copy: (String) -> Unit = { command ->
@@ -835,6 +852,27 @@ private fun KeyRow(key: GitHubKey, checked: Boolean, index: Int, strings: TwoFaS
             Spacer(Modifier.width(12.dp))
             Switch(checked = checked, label = key.key.label)
         }
+    }
+}
+
+/** A saved key of another device: its name, kind and fingerprint, and a switch. Only usable ones are ever saved. */
+@Composable
+private fun SavedKeyRow(key: KnownKey, checked: Boolean, index: Int, onToggle: () -> Unit) {
+    val tokens = AppTheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Switch, onClick = onToggle)
+            .testTag("2fa:saved-key-$index")
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = key.name, style = tokens.label, color = tokens.foreground)
+            Text(text = "${key.key.label} · ${key.key.fingerprint}", style = tokens.footnote, color = tokens.muted)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, label = key.name)
     }
 }
 

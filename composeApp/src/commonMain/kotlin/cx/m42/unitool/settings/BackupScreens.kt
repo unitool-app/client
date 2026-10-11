@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import cx.m42.services.backup.AgeBackupCipher
 import cx.m42.services.backup.GitHubKeys
+import cx.m42.services.ssh.PublicKeyBookAdmin
 import cx.m42.superizer.HostScreen
 import cx.m42.superizer.HostSection
 import cx.m42.superizer.Superizer
@@ -39,12 +40,13 @@ import kotlinx.coroutines.launch
 
 /*
  * Backup and restore (05 §3.1, §3.4): every app's data in one file, encrypted to the keys a GitHub
- * account publishes, and back on another device. Keys are never in it (D170) — only their names, so
+ * account publishes or to other devices' saved public keys (.ai-notes/public-keys), and back on
+ * another device. Keys are never in it (D170) — only their names, so
  * the next device can say which to import again.
  */
 
 /** The line in Settings: when the last backup was, in the catalogue's words, and the way in. */
-internal class BackupSection(private val tools: HostTools) : HostSection {
+internal class BackupSection(private val tools: HostTools, private val book: PublicKeyBookAdmin? = null) : HostSection {
     override val id: String = "backup"
 
     override fun title(langTag: String): String = securityStrings(langTag).backup
@@ -60,11 +62,12 @@ internal class BackupSection(private val tools: HostTools) : HostSection {
             FindingRow(it)
         }
         RowDivider()
-        ActionRow(strings.open, "backup:open") { open(BackupScreen(tools)) }
+        ActionRow(strings.open, "backup:open") { open(BackupScreen(tools, book)) }
     }
 }
 
-internal class BackupScreen(private val tools: HostTools) : HostScreen {
+/** [book]: other devices' public keys, a second way to say whom the backup is for (.ai-notes/public-keys, D514). */
+internal class BackupScreen(private val tools: HostTools, private val book: PublicKeyBookAdmin? = null) : HostScreen {
     override val id: String = "backup"
 
     override fun title(langTag: String): String = securityStrings(langTag).backup
@@ -83,6 +86,9 @@ internal class BackupScreen(private val tools: HostTools) : HostScreen {
         val chosen = remember { mutableStateMapOf<String, Boolean>() }
         var withSettings by remember { mutableStateOf(true) }
         var restored by remember { mutableStateOf<RestoreReport?>(null) }
+        val known = book?.keys?.collectAsState()?.value.orEmpty()
+        // Saved keys start unticked (D514): a backup goes to whom the person picks, not to every key ever saved.
+        val ticked = remember { mutableStateMapOf<String, Boolean>() }
 
         LaunchedEffect(Unit) { preview = superizer.backup.preview() }
 
@@ -100,7 +106,21 @@ internal class BackupScreen(private val tools: HostTools) : HostScreen {
                     RowText(strings.backupExcludes, color = AppTheme.muted, small = true)
                 }
             }
-            FieldLabel(strings.githubLogin)
+            if (book != null) {
+                Section(title = strings.savedKeys, hint = strings.savedKeysHint) {
+                    known.forEachIndexed { i, key ->
+                        ToggleRow(
+                            label = "${key.name} · ${key.key.label} · ${shortFingerprint(key.id)}",
+                            checked = ticked[key.id.fingerprint] == true,
+                            onCheckedChange = { ticked[key.id.fingerprint] = it; said = null },
+                            modifier = Modifier.testTag("backup:known-$i"),
+                        )
+                        RowDivider()
+                    }
+                    ActionRow(strings.addPublicKey, "backup:add-public") { open(AddPublicKeyScreen(book, tools)) }
+                }
+            }
+            FieldLabel(if (book != null) strings.orGithub else strings.githubLogin)
             Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 12.dp)) {
                 AppTextField(
                     value = login,
@@ -137,26 +157,30 @@ internal class BackupScreen(private val tools: HostTools) : HostScreen {
                             )
                         }
                     }
-                    PageButton(if (busy) strings.working else strings.makeBackup, "backup:make", enabled = !busy) {
-                        scope.launch {
-                            busy = true
-                            said = null
-                            try {
-                                val lines = f.keys.filter { it.usable }.map { it.line }
-                                said = when (val made = superizer.backup.export(lines, strings.backupReason)) {
-                                    is BackupOutcome.Ok -> {
-                                        val name = AgeBackupCipher.fileName(isoDate(superizer.backup.lastBackupAt.value ?: 0))
-                                        val sharer = tools.sharer
-                                        if (sharer != null) sharer.share(name, made.value.decodeToString(), AgeBackupCipher.MIME_TYPE, null)
-                                        made.value.fill(0)
-                                        superizer.storage.inspect()
-                                        Said.Made
-                                    }
-                                    else -> made.said()
+                }
+            }
+            val githubLines = (fetched as? GitHubKeys.Fetched.Keys)?.keys?.filter { it.usable }?.map { it.line }.orEmpty()
+            val knownLines = known.filter { ticked[it.id.fingerprint] == true }.map { it.line }
+            if (fetched is GitHubKeys.Fetched.Keys || knownLines.isNotEmpty()) {
+                PageButton(if (busy) strings.working else strings.makeBackup, "backup:make", enabled = !busy) {
+                    scope.launch {
+                        busy = true
+                        said = null
+                        try {
+                            val lines = knownLines + githubLines
+                            said = when (val made = superizer.backup.export(lines, strings.backupReason)) {
+                                is BackupOutcome.Ok -> {
+                                    val name = AgeBackupCipher.fileName(isoDate(superizer.backup.lastBackupAt.value ?: 0))
+                                    val sharer = tools.sharer
+                                    if (sharer != null) sharer.share(name, made.value.decodeToString(), AgeBackupCipher.MIME_TYPE, null)
+                                    made.value.fill(0)
+                                    superizer.storage.inspect()
+                                    Said.Made
                                 }
-                            } finally {
-                                busy = false
+                                else -> made.said()
                             }
+                        } finally {
+                            busy = false
                         }
                     }
                 }

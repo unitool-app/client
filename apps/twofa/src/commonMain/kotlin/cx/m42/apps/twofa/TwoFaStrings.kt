@@ -52,6 +52,8 @@ internal interface TwoFaStrings {
     val export: String
     val exportTitle: String
     val githubAccount: String
+    val savedKeys: String
+    val savedKeysHint: String
     val githubHint: String
     val findKeys: String
     val findingKeys: String
@@ -83,7 +85,7 @@ internal interface TwoFaStrings {
     fun keysOf(login: String): String
     fun keysError(error: KeysError): String
     fun exportDone(done: ExportDone): String
-    fun shareMessage(login: String, command: String, transfer: String): String
+    fun shareMessage(audience: String, command: String, transfer: String): String
 
     fun importIntro(found: Int, addable: Int): String
     fun importAdd(count: Int): String
@@ -147,6 +149,8 @@ internal object TwoFaStringsRu : TwoFaStrings {
     override val export = "Экспорт ключей"
     override val exportTitle = "Экспорт ключей"
     override val githubAccount = "Аккаунт GitHub"
+    override val savedKeys = "Сохранённые ключи"
+    override val savedKeysHint = "Открытые ключи других устройств, сохранённые в Unitool. Открыть файл сможет только устройство с отмеченным ключом — в 2FA через «Импорт из файла»."
     override val githubHint = "Имя пользователя. Приложение возьмёт открытые SSH-ключи, которые он выложил на GitHub."
     override val findKeys = "Найти ключи"
     override val findingKeys = "Спрашиваем GitHub…"
@@ -220,8 +224,8 @@ internal object TwoFaStringsRu : TwoFaStrings {
         ExportDone.Via.Copied -> "Скопировано. Сохраните текст в файл ${done.fileName}"
     }
 
-    override fun shareMessage(login: String, command: String, transfer: String): String =
-        "Ключи 2FA из Unitool, зашифрованы для github.com/$login.\nРасшифровать: $command\n" +
+    override fun shareMessage(audience: String, command: String, transfer: String): String =
+        "Ключи 2FA из Unitool, зашифрованы для: $audience.\nРасшифровать: $command\n" +
             "Перенести на другой телефон одним QR-кодом: $transfer"
 
     override fun importIntro(found: Int, addable: Int): String = when {
@@ -323,6 +327,8 @@ internal object TwoFaStringsEn : TwoFaStrings {
     override val export = "Export keys"
     override val exportTitle = "Export keys"
     override val githubAccount = "GitHub account"
+    override val savedKeys = "Saved keys"
+    override val savedKeysHint = "Other devices' public keys, saved in Unitool. Only the device holding a ticked key opens the file — in 2FA, through “Import from a file”."
     override val githubHint = "A username. The app takes the public SSH keys that user has put on GitHub."
     override val findKeys = "Find keys"
     override val findingKeys = "Asking GitHub…"
@@ -395,8 +401,8 @@ internal object TwoFaStringsEn : TwoFaStrings {
         ExportDone.Via.Copied -> "Copied. Save the text as ${done.fileName}"
     }
 
-    override fun shareMessage(login: String, command: String, transfer: String): String =
-        "2FA keys from Unitool, encrypted for github.com/$login.\nTo decrypt: $command\n" +
+    override fun shareMessage(audience: String, command: String, transfer: String): String =
+        "2FA keys from Unitool, encrypted for $audience.\nTo decrypt: $command\n" +
             "To move them to another phone as one QR code: $transfer"
 
     override fun importIntro(found: Int, addable: Int): String = when {

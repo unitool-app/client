@@ -1,6 +1,7 @@
 package cx.m42.unitool.i18n
 
 import cx.m42.services.backup.GitHubKeys
+import cx.m42.services.ssh.AddKnownOutcome
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -155,4 +156,23 @@ internal interface SecurityStrings {
     val secretsLocked: String
     val backupUnreadable: String
     fun entries(n: Int): String
+
+    // Other devices' public keys (.ai-notes/public-keys)
+    val knownKeys: String
+    val knownKeysHint: String
+    val noKnownKeys: String
+    val addPublicKey: String
+    val scanPublicQrHint: String
+    val publicFileHint: String
+    val pastePublicHint: String
+    val fingerprint: String
+    val checkFingerprint: String
+    val save: String
+    val showQr: String
+    val qrScreenHint: String
+    val deleteAgain: String
+    val savedKeys: String
+    val savedKeysHint: String
+    val orGithub: String
+    fun knownProblem(outcome: AddKnownOutcome): String
 }

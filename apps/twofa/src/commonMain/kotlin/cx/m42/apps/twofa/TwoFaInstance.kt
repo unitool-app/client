@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.Age
+import cx.m42.services.ssh.KnownKey
+import cx.m42.services.ssh.PublicKeyBook
 import cx.m42.services.ssh.SshPublicKey
 import cx.m42.superizer.secrets.SecretVault
 import cx.m42.superizer.app.AppChrome
@@ -151,7 +153,16 @@ internal class TwoFaInstance(
     /** The export page: a GitHub login, the keys it has, which of them to encrypt to. */
     val exportLogin = MutableStateFlow("")
     val exportKeys = MutableStateFlow<KeysState>(KeysState.Idle)
+
+    /** Fingerprints of the keys ticked, the GitHub account's and the saved ones alike. */
     val exportSelected = MutableStateFlow<Set<String>>(emptySet())
+
+    /**
+     * Other devices' public keys the host keeps (.ai-notes/public-keys, D515): to encrypt to as well
+     * as, or instead of, a GitHub account. Read only — the host alone adds them. Empty where it keeps none.
+     */
+    private val book: PublicKeyBook? = runtime.service(PublicKeyBook.Key)
+    val savedKeys: StateFlow<List<KnownKey>> = book?.keys ?: MutableStateFlow(emptyList())
 
     /** The name of the file last handed over, and how — the page says so under the buttons. */
     val exportDone = MutableStateFlow<ExportDone?>(null)
@@ -574,7 +585,9 @@ internal class TwoFaInstance(
             val state = GitHubKeys.fetch(runtime.network, login)
             exportKeys.value = state
             if (state is KeysState.Loaded) {
-                exportSelected.value = state.keys.filter { it.usable }.map { it.key.fingerprint }.toSet()
+                // Every usable key of the account ticked; the saved keys keep whatever the person chose.
+                val saved = savedKeys.value.map { it.key.fingerprint }.toSet()
+                exportSelected.value = exportSelected.value.filter { it in saved }.toSet() + state.keys.filter { it.usable }.map { it.key.fingerprint }
                 runtime.storage.set(KEY_EXPORT_LOGIN, login)
             }
         }
@@ -587,11 +600,27 @@ internal class TwoFaInstance(
         exportDone.value = null
     }
 
-    /** The ticked keys, in the order GitHub listed them. */
+    /** A saved key ticked or unticked; they start unticked (D514). */
+    fun toggleSaved(key: KnownKey) {
+        val fingerprint = key.key.fingerprint
+        exportSelected.value = exportSelected.value.let { if (fingerprint in it) it - fingerprint else it + fingerprint }
+        exportDone.value = null
+    }
+
+    /** The ticked keys: the saved ones first, then the GitHub account's in the order it listed them. */
     fun exportRecipients(): List<SshPublicKey> {
-        val loaded = exportKeys.value as? KeysState.Loaded ?: return emptyList()
         val selected = exportSelected.value
-        return loaded.keys.filter { it.usable && it.key.fingerprint in selected }.map { it.key }
+        val saved = savedKeys.value.filter { Age.supports(it.key) && it.key.fingerprint in selected }.map { it.key }
+        val github = (exportKeys.value as? KeysState.Loaded)?.keys.orEmpty().filter { it.usable && it.key.fingerprint in selected }.map { it.key }
+        return (saved + github).distinct()
+    }
+
+    /** Whom the file is for, in words for the share message: the account and the saved keys' names. */
+    private fun exportAudience(recipients: List<SshPublicKey>): String {
+        val loaded = exportKeys.value as? KeysState.Loaded
+        val github = loaded?.takeIf { l -> l.keys.any { it.key in recipients } }?.let { "github.com/${it.login}" }
+        val names = savedKeys.value.filter { it.key in recipients }.map { it.name }
+        return (listOfNotNull(github) + names).joinToString(", ")
     }
 
     fun exportFileName(): String = Export.fileName(runtime.clock.now())
@@ -604,11 +633,10 @@ internal class TwoFaInstance(
      * plain links exist only inside this call — never in storage, a snapshot or a log.
      */
     fun buildExport(): ExportFile? {
-        val loaded = exportKeys.value as? KeysState.Loaded ?: return null
         val recipients = exportRecipients()
         if (recipients.isEmpty() || _accounts.value.isEmpty()) return null
         val file = Age.encrypt(Export.plaintext(_accounts.value).encodeToByteArray(), recipients)
-        return ExportFile(exportFileName(), Age.armor(file), recipients, loaded.login)
+        return ExportFile(exportFileName(), Age.armor(file), recipients, exportAudience(recipients))
     }
 
     /** Encrypts and opens the share sheet, with the command that opens the file as its message. */
@@ -617,7 +645,7 @@ internal class TwoFaInstance(
         val file = buildExport() ?: return
         runtime.scope.launch {
             val message = strings.shareMessage(
-                file.login,
+                file.audience,
                 Export.commands(file.recipients, file.name).first(),
                 Export.transferCommands(file.recipients, file.name, Export.plaintext(_accounts.value)).first(),
             )

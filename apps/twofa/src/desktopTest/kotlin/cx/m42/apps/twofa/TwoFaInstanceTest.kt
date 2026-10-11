@@ -10,6 +10,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
+import cx.m42.services.ssh.KnownKey
+import cx.m42.services.ssh.PublicKeyBook
+import cx.m42.services.ssh.SshPublicKey
 import cx.m42.superizer.app.AppConfig
 import cx.m42.superizer.testing.AppTestScope
 import cx.m42.superizer.testing.AppContractTest
@@ -19,6 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -330,6 +334,40 @@ class TwoFaExportTest {
         node("2fa:github").performTextReplacement("octocat")
         idle()
         click("2fa:find-keys")
+    }
+
+    @Test
+    fun anotherDevicesSavedKeyIsEnoughWithoutGitHub() {
+        // The host's saved public keys (.ai-notes/public-keys, D515): the other phone's key, read off its screen.
+        val identity = JcaAge.ed25519()
+        val sharer = FakeSharer()
+        val book = object : PublicKeyBook {
+            override val keys = MutableStateFlow(listOf(KnownKey(SshPublicKey.parse(identity.publicLine)!!, "Ivan's phone", 0)))
+        }
+        runAppTest(
+            TwoFaApp(),
+            prepare = {
+                it.storage.entries[KEY_ACCOUNTS] = stored
+                it.provide(FileSharer.Key, sharer)
+                it.provide(PublicKeyBook.Key, book)
+            },
+        ) {
+            val twofa = instance as TwoFaInstance
+            click("2fa:export")
+            assertShown("2fa:saved-key-0")
+            // Saved keys start unticked: nothing to share until one is chosen.
+            click("2fa:share")
+            assertTrue(sharer.shared.isEmpty())
+
+            click("2fa:saved-key-0")
+            node("2fa:command-0").assertTextEquals("age -d -i ~/.ssh/id_ed25519 unitool-2fa-2023-11-14.age")
+            click("2fa:share")
+            val shared = sharer.shared.single()
+            assertTrue(shared.message!!.startsWith("Ключи 2FA из Unitool, зашифрованы для: Ivan's phone."), shared.message)
+            val opened = JcaAge.decrypt(shared.text, identity).decodeToString().lines().filter { it.isNotEmpty() }
+            assertEquals(twofa.accounts.value.map { OtpAuthUri.format(it) }, opened)
+            assertTrue(runtime.network.calls.isEmpty(), "GitHub was never asked")
+        }
     }
 
     @Test

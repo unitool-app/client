@@ -93,6 +93,7 @@ internal class SshKeysScreen(private val keys: KeysUi, private val tools: HostTo
                     ActionRow(strings.lockKeys, "keys:lock-all") { keys.admin.lockAll() }
                 }
             }
+            keys.publicKeys?.let { KnownKeysCard(it, tools, strings, open) }
         }
     }
 
@@ -165,6 +166,8 @@ internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTo
                 RowText(line, Modifier.testTag("key:public"), mono = true)
                 val buttons = buildList<Triple<String, String, () -> Unit>> {
                     add(Triple(if (copied) strings.copied else strings.copy, "key:copy") { clipboard.setText(AnnotatedString(line)); copied = true })
+                    // For another phone to read and keep, to encrypt to this key (.ai-notes/public-keys).
+                    add(Triple(strings.showQr, "key:qr") { open(PublicKeyQrScreen(key.comment, line, key.id.fingerprint)) })
                     tools.sharer?.let { sharer ->
                         add(Triple(strings.share, "key:share") { scope.launch { sharer.share(pubFileName(key), line + "\n", "text/plain", null) } })
                     }

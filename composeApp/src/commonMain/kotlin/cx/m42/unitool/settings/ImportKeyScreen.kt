@@ -585,7 +585,7 @@ private const val SESSION_SECONDS = 300
 private const val QR_COMMAND = "qrencode -t ansiutf8 < ~/.ssh/id_ed25519; read _; clear"
 
 /** A key is many lines of base64: no suggestions, nothing learnt, no capitals. */
-private val PastedKeyKeyboard = KeyboardOptions(
+internal val PastedKeyKeyboard = KeyboardOptions(
     capitalization = KeyboardCapitalization.None,
     autoCorrectEnabled = false,
     keyboardType = KeyboardType.Uri,

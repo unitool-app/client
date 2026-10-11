@@ -160,7 +160,7 @@ internal class StorageSecurityScreen(private val keys: KeysUi?, private val tool
                 DiagnosticsAction.EnableScreenLock -> superizer.lock.openDeviceSettings()
                 DiagnosticsAction.RunSelfTest -> runSelfTest()
                 DiagnosticsAction.ShareReport -> shareReport()
-                DiagnosticsAction.MakeBackup -> open(BackupScreen(tools))
+                DiagnosticsAction.MakeBackup -> open(BackupScreen(tools, keys?.publicKeys))
             }
         }
 

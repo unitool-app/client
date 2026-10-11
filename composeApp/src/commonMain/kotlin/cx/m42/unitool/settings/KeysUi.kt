@@ -2,6 +2,7 @@ package cx.m42.unitool.settings
 
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
+import cx.m42.services.ssh.PublicKeyBookAdmin
 import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.ssh.KeyId
@@ -27,6 +28,9 @@ internal interface KeysUi {
 
     /** The device has a chip, so level 3 is the person's choice (09, D242) and the wizard offers both. */
     val chipHere: Boolean get() = admin.device.levels.any { it < 3 }
+
+    /** Other devices' public keys (.ai-notes/public-keys); null where the host keeps none — the screenshots' fake. */
+    val publicKeys: PublicKeyBookAdmin? get() = null
 
     /** Reseals every secret to [id] and makes it the anchor (05 §3). */
     suspend fun sealSecretsWith(id: KeyId)

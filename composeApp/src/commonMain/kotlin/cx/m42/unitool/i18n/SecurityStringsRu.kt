@@ -1,6 +1,7 @@
 package cx.m42.unitool.i18n
 
 import cx.m42.services.backup.GitHubKeys
+import cx.m42.services.ssh.AddKnownOutcome
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -104,7 +105,7 @@ internal object SecurityStringsRu : SecurityStrings {
 
     override fun refusal(refusal: ImportRefusal) = when (refusal) {
         ImportRefusal.NotAKey -> "Это не закрытый SSH-ключ."
-        ImportRefusal.PublicKeyOnly -> "Это открытый ключ (.pub). Нужен файл без .pub."
+        ImportRefusal.PublicKeyOnly -> "Это открытый ключ (.pub). Нужен файл без .pub — а чтобы шифровать на чужой ключ, есть «Добавить открытый ключ» в SSH-ключах."
         ImportRefusal.OldFormat -> "Старый формат ключа. Перепишите его в новый на компьютере — пароль можно оставить прежним:"
         ImportRefusal.PuttyFormat -> "Ключ PuTTY. Переведите его на компьютере:"
         ImportRefusal.UnsupportedCipher -> "Зашифрован шифром, который это приложение не читает. Перешифруйте на компьютере:"
@@ -230,6 +231,30 @@ internal object SecurityStringsRu : SecurityStrings {
     override val secretsLocked = "Не удалось открыть секрет, поэтому копия не сделана."
     override val backupUnreadable = "Это не копия, которую открывают здешние ключи."
     override fun entries(n: Int) = "записей: $n"
+
+    override val knownKeys = "Ключи других устройств"
+    override val knownKeysHint = "Только открытая половина: на них можно шифровать — резервную копию, экспорт 2FA, — а открыть сможет только устройство, где лежит сам ключ."
+    override val noKnownKeys = "Пока нет."
+    override val addPublicKey = "Добавить открытый ключ"
+    override val scanPublicQrHint = "На другом телефоне: SSH-ключи → ключ → «Показать QR-код»."
+    override val publicFileHint = "Файл .pub, например ~/.ssh/id_ed25519.pub"
+    override val pastePublicHint = "Одна строка: ssh-ed25519 AAAA… имя"
+    override val fingerprint = "Отпечаток"
+    override val checkFingerprint = "Если ключ пришёл не QR-кодом с экрана другого устройства, сверьте этот отпечаток с тем экраном, прежде чем сохранять."
+    override val save = "Сохранить"
+    override val showQr = "Показать QR-код"
+    override val qrScreenHint = "На другом телефоне: SSH-ключи → «Добавить открытый ключ» → «Сканировать QR-код». В коде только открытая половина: на этот ключ можно зашифровать, но ничего нельзя открыть."
+    override val deleteAgain = "Нажмите ещё раз, чтобы удалить"
+    override val savedKeys = "Сохранённые ключи"
+    override val savedKeysHint = "Открытые ключи других устройств. Открыть файл сможет только устройство с отмеченным ключом."
+    override val orGithub = "Или ключи аккаунта GitHub"
+    override fun knownProblem(outcome: AddKnownOutcome) = when (outcome) {
+        is AddKnownOutcome.Ok -> ""
+        AddKnownOutcome.NotAPublicKey -> "Это не одна строка открытого ключа. Приватный ключ добавляется через «Добавить ключ»."
+        is AddKnownOutcome.CannotEncryptTo -> "На ключ ${outcome.key.label} зашифровать нельзя: подходят Ed25519 и RSA от 2048 бит. Ключ, созданный в чипе iPhone, — ECDSA."
+        is AddKnownOutcome.OwnKey -> "Это ваш ключ «${outcome.comment}», он уже здесь вместе с приватной половиной."
+        is AddKnownOutcome.AlreadySaved -> "Уже сохранён как «${outcome.name}»."
+    }
 }
 
 internal fun securityStrings(langTag: String): SecurityStrings =

@@ -1,5 +1,7 @@
 package cx.m42.unitool.security
 
+import cx.m42.services.ssh.PublicKeyBook
+import cx.m42.services.ssh.PublicKeyBookAdmin
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.diagnostics.PlatformSelfTest
 import cx.m42.services.backup.AgeBackupCipher
@@ -52,6 +54,7 @@ public class UnitoolSecurity(
         override val secretsKey: StateFlow<KeyId?> get() = keyring.secretsKey
         override val sealsToKey: Boolean get() = chipVault == null
         override val inBrowser: Boolean get() = keyring.admin.device.platform == Platform.Web
+        override val publicKeys: PublicKeyBookAdmin get() = keyring.publicKeys
 
         override suspend fun sealSecretsWith(id: KeyId) {
             val superizer = superizer ?: return
@@ -66,6 +69,8 @@ public class UnitoolSecurity(
      */
     public fun install(builder: SuperizerBuilder, hostVersion: String, tools: HostTools = HostTools()) {
         builder.service(SshKeyring.Key) { caller -> keyring.forApp(caller) }
+        // Other devices' public keys, to read only: the host alone adds them (.ai-notes/public-keys, D512).
+        builder.service(PublicKeyBook.Key, keyring.publicKeys.readOnly)
         builder.secretVault(chipVault ?: keyring.secretsKey.value?.let { keyring.ageVault(it, ::hostSecretValues) })
         // One release more (04 §9, Б4): an app that sealed with the vault itself moves its data into
         // runtime.secrets, and needs the vault it sealed with to open it.
@@ -81,7 +86,7 @@ public class UnitoolSecurity(
         // on Home whenever that is worse than the listing promises (06 §7).
         builder.hostScreen(SshKeysScreen(keysUi, tools))
         builder.hostSection(StorageSecuritySection(keysUi, tools))
-        builder.hostSection(BackupSection(tools))
+        builder.hostSection(BackupSection(tools, keyring.publicKeys))
         builder.homeBanner(DiagnosticsBanner(keysUi, tools))
     }
 

@@ -1,6 +1,7 @@
 package cx.m42.unitool.i18n
 
 import cx.m42.services.backup.GitHubKeys
+import cx.m42.services.ssh.AddKnownOutcome
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -95,7 +96,7 @@ internal object SecurityStringsEn : SecurityStrings {
 
     override fun refusal(refusal: ImportRefusal) = when (refusal) {
         ImportRefusal.NotAKey -> "This is not an SSH private key."
-        ImportRefusal.PublicKeyOnly -> "This is a public key (.pub). The file without .pub is needed."
+        ImportRefusal.PublicKeyOnly -> "This is a public key (.pub). The file without .pub is needed — or, to encrypt to someone else's key, “Add a public key” in SSH keys."
         ImportRefusal.OldFormat -> "An old key format. Rewrite it in the new one on your computer — the passphrase can stay the same:"
         ImportRefusal.PuttyFormat -> "A PuTTY key. Convert it on your computer:"
         ImportRefusal.UnsupportedCipher -> "Encrypted with a cipher this app does not read. Re-encrypt it on your computer:"
@@ -225,4 +226,28 @@ internal object SecurityStringsEn : SecurityStrings {
     override val secretsLocked = "A secret could not be opened, so no backup was made."
     override val backupUnreadable = "This is not a backup the keys here can open."
     override fun entries(n: Int) = if (n == 1) "1 entry" else "$n entries"
+
+    override val knownKeys = "Other devices' keys"
+    override val knownKeysHint = "Only the public half: you can encrypt to them — a backup, a 2FA export — and only the device that holds the key opens it."
+    override val noKnownKeys = "None yet."
+    override val addPublicKey = "Add a public key"
+    override val scanPublicQrHint = "On the other phone: SSH keys → the key → Show QR code."
+    override val publicFileHint = "The .pub file, e.g. ~/.ssh/id_ed25519.pub"
+    override val pastePublicHint = "One line: ssh-ed25519 AAAA… name"
+    override val fingerprint = "Fingerprint"
+    override val checkFingerprint = "If the key did not come from a QR code on the other device's screen, compare this fingerprint with that screen before you save."
+    override val save = "Save"
+    override val showQr = "Show QR code"
+    override val qrScreenHint = "On the other phone: SSH keys → Add a public key → Scan a QR code. Only the public half is in it — enough to encrypt to this key, never to open anything."
+    override val deleteAgain = "Tap again to delete"
+    override val savedKeys = "Saved keys"
+    override val savedKeysHint = "Other devices' public keys. Only the device holding a ticked key will open the file."
+    override val orGithub = "Or the keys of a GitHub account"
+    override fun knownProblem(outcome: AddKnownOutcome) = when (outcome) {
+        is AddKnownOutcome.Ok -> ""
+        AddKnownOutcome.NotAPublicKey -> "This is not one public key line. A private key goes in through “Add a key”."
+        is AddKnownOutcome.CannotEncryptTo -> "Nothing can be encrypted to a ${outcome.key.label} key: Ed25519 and RSA of 2048 bits or more work. A key made in an iPhone's chip is ECDSA."
+        is AddKnownOutcome.OwnKey -> "This is your own key “${outcome.comment}” — it is already here, with its private half."
+        is AddKnownOutcome.AlreadySaved -> "Already saved as “${outcome.name}”."
+    }
 }

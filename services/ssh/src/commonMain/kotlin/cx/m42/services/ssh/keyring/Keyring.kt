@@ -2,6 +2,10 @@ package cx.m42.services.ssh.keyring
 
 import cx.m42.services.ssh.Age
 import cx.m42.services.ssh.AgeIdentity
+import cx.m42.services.ssh.AddKnownOutcome
+import cx.m42.services.ssh.KnownKey
+import cx.m42.services.ssh.PublicKeyBook
+import cx.m42.services.ssh.PublicKeyBookAdmin
 import cx.m42.services.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.StanzaUnwrapper
@@ -101,6 +105,11 @@ internal class Keyring(
 
     val admin: SshKeyAdmin = Admin()
 
+    private val _known = MutableStateFlow(knownKeys())
+
+    /** Other devices' public keys (.ai-notes/public-keys): the host's door; apps get [PublicKeyBookAdmin.readOnly]. */
+    val publicKeys: PublicKeyBookAdmin = Book()
+
     fun forApp(caller: AppId, brick: String? = null): SshKeyring = AppKeyring(caller, brick)
 
     val device: KeyringDevice
@@ -113,7 +122,7 @@ internal class Keyring(
 
     private suspend fun update(change: (RecordsFile) -> RecordsFile) = writing.withLock {
         file = change(file)
-        if (file.keys.isEmpty() && file.grants.isEmpty()) {
+        if (file.keys.isEmpty() && file.grants.isEmpty() && file.known.isEmpty()) {
             // The last key is gone: the file goes with it, not an empty shell of it (03 §2).
             store.clear()
             file = RecordsFile()
@@ -124,6 +133,7 @@ internal class Keyring(
         _grants.value = file.grants
         _journal.value = file.journal
         _secretsKey.value = file.secretsKey?.let(::KeyId)
+        _known.value = knownKeys()
     }
 
     private fun infos(): List<SshKeyInfo> = file.keys.mapNotNull { info(it) }
@@ -412,6 +422,50 @@ internal class Keyring(
     suspend fun setSecretsKey(id: KeyId?) = update { it.copy(secretsKey = id?.fingerprint) }
 
     // ------------------------------------------------------------ SshKeyAdmin
+
+    private fun knownKeys(): List<KnownKey> =
+        file.known.mapNotNull { r -> SshPublicKey.parse(r.publicKey)?.let { KnownKey(it, r.name, r.addedAt) } }
+
+    private inner class Book : PublicKeyBookAdmin {
+        override val keys: StateFlow<List<KnownKey>> get() = _known.asStateFlow()
+
+        override val readOnly: PublicKeyBook = object : PublicKeyBook {
+            override val keys: StateFlow<List<KnownKey>> get() = _known.asStateFlow()
+        }
+
+        override fun inspect(text: String): AddKnownOutcome {
+            val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }.toList()
+            val line = lines.singleOrNull() ?: return AddKnownOutcome.NotAPublicKey
+            val key = SshPublicKey.parse(line) ?: return AddKnownOutcome.NotAPublicKey
+            val comment = line.split(' ', '\t').filter { it.isNotEmpty() }.drop(2).joinToString(" ")
+            return check(key, comment)
+        }
+
+        private fun check(key: SshPublicKey, comment: String): AddKnownOutcome {
+            if (!Age.supports(key)) return AddKnownOutcome.CannotEncryptTo(key)
+            file.keys.firstOrNull { it.id == key.fingerprint }?.let { return AddKnownOutcome.OwnKey(it.comment) }
+            file.known.firstOrNull { it.id == key.fingerprint }?.let { return AddKnownOutcome.AlreadySaved(it.name) }
+            return AddKnownOutcome.Ok(key, comment)
+        }
+
+        override suspend fun add(key: SshPublicKey, name: String): AddKnownOutcome {
+            val checked = check(key, name.trim())
+            if (checked !is AddKnownOutcome.Ok) return checked
+            val record = KnownRecord(key.fingerprint, key.authorizedKeysLine(), name.trim().ifEmpty { key.label }, clock.now())
+            update { f -> if (f.known.any { it.id == record.id }) f else f.copy(known = f.known + record) }
+            return checked
+        }
+
+        override suspend fun rename(id: KeyId, name: String) {
+            val trimmed = name.trim()
+            if (trimmed.isEmpty()) return
+            update { f -> f.copy(known = f.known.map { if (it.id == id.fingerprint) it.copy(name = trimmed) else it }) }
+        }
+
+        override suspend fun remove(id: KeyId) {
+            update { f -> f.copy(known = f.known.filterNot { it.id == id.fingerprint }) }
+        }
+    }
 
     private inner class Admin : SshKeyAdmin {
         override val keys: StateFlow<List<SshKeyInfo>> get() = this@Keyring.keys

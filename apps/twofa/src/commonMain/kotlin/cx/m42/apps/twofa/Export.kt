@@ -153,7 +153,8 @@ internal object Export {
 }
 
 /** An export ready to hand over: armored age text and the name to give it. */
-internal data class ExportFile(val name: String, val text: String, val recipients: List<SshPublicKey>, val login: String)
+/** [audience]: whom it is for, in words — `github.com/<login>` and the saved keys' names. */
+internal data class ExportFile(val name: String, val text: String, val recipients: List<SshPublicKey>, val audience: String)
 
 /** An export that left the app, and which way. */
 internal data class ExportDone(val fileName: String, val via: Via) {

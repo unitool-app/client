@@ -10,8 +10,8 @@ import kotlinx.serialization.json.Json
 
 /**
  * The keyring's own file (03 §2, D159) — never the host's store: public halves, the ciphertext of a
- * sealed key, grants and a journal without data. Excluded from every backup by name (I10), erased
- * whole when the last key goes.
+ * sealed key, grants, a journal without data, and other devices' public keys. Excluded from every
+ * backup by name (I10), erased whole when the last of them goes.
  *
  * Android: its own prefs file `cx.m42.services.ssh`. iOS: a file in Application Support with
  * `NSFileProtectionComplete` and `isExcludedFromBackup`. Desktop: a file next to the host's. Web:
@@ -54,6 +54,18 @@ internal data class RecordsFile(
     val journal: List<UseRecord> = emptyList(),
     /** The key the host's secrets are sealed to, where there is no chip (05 §3, D173). */
     val secretsKey: String? = null,
+    /** Other devices' public keys, to encrypt to (.ai-notes/public-keys, D507). */
+    val known: List<KnownRecord> = emptyList(),
+)
+
+@Serializable
+internal data class KnownRecord(
+    /** The fingerprint, `SHA256:…`. */
+    val id: String,
+    /** `type base64`, no comment. */
+    val publicKey: String,
+    val name: String,
+    val addedAt: Long,
 )
 
 @Serializable

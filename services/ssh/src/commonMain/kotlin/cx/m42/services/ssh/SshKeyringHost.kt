@@ -48,6 +48,9 @@ public class SshKeyringHost internal constructor(
 
     public fun forApp(caller: AppId): SshKeyring = keyring.forApp(caller)
 
+    /** Other devices' public keys (.ai-notes/public-keys): this to the host's screens, [PublicKeyBookAdmin.readOnly] to the registry (D512). */
+    public val publicKeys: PublicKeyBookAdmin get() = keyring.publicKeys
+
     public val agent: SshAgent by lazy { HostAgent(keyring, clock) }
 
     /** The agent protocol's bytes over [agent], for a transport the caller brings (a test's socket). */
@@ -125,6 +128,7 @@ public class SshKeyringHost internal constructor(
             "keyring.levels" to device.levels.sorted().joinToString(","),
             "keyring.records" to records.location,
             "keyring.keys" to keyring.keys.value.size.toString(),
+            "keyring.known" to keyring.publicKeys.keys.value.size.toString(),
         )
         device.sdk?.let { facts["android.sdk"] = it.toString() }
         if (device.levels.any { it < 3 }) {
