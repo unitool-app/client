@@ -14,7 +14,8 @@ make. Set the secrets once and the rest is a button:
 ./scripts/push-play-secrets.sh unitool-app/client
 ```
 
-Then **Actions → Build and Deploy Android to Google Play → Run workflow**, or just push to `main`.
+Then **Actions → Build and Deploy Android to Google Play → Run workflow**, or just push to `main`,
+which publishes to internal testing (`internal`).
 Turn `upload` off for a run that only builds and keeps the artifact. The first release already
 exists on the `alpha` track (§5), so there is nothing left that has to be uploaded by hand.
 
@@ -133,7 +134,7 @@ python3 play/check-listing.py
 wrong shape or with an alpha channel, a short description one character over, a privacy policy
 still carrying a TODO. All of those otherwise fail *after* the upload rather than before it.
 
-`android-play.yml` no longer runs it (2026-10-11: a push to `main` goes to closed testing with no
+`android-play.yml` no longer runs it (2026-10-11: a push to `main` goes to internal testing with no
 checks); run it by hand before a production release.
 
 Which screenshots reach the listing is named in `play/listing/screenshots.txt`, not taken from

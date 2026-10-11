@@ -29,10 +29,10 @@ on:
         description: 'Play track to publish to'
         required: false
         type: choice
-        default: alpha
+        default: internal
         options:
-          - alpha
           - internal
+          - alpha
           - beta
           - production
 
@@ -206,7 +206,7 @@ jobs:
         run: echo "SUPERIZER_FROM_MAVEN=1" >> "$GITHUB_ENV"
 
       # No tests and no listing check on this path (owner, 2026-10-11): a push to main goes straight
-      # to the closed-testing track. `./gradlew verify` is run by hand — `scripts/verify.sh`, or
+      # to the internal-testing track. `./gradlew verify` is run by hand — `scripts/verify.sh`, or
       # `gh workflow run verify.yml --ref main` when the browser, the emulator or real ssh/age
       # matter — and `python3 play/check-listing.py` likewise. What is left here is only what the
       # build itself cannot do without: the secrets, the keystore, the signature on the result.
@@ -276,16 +276,13 @@ jobs:
       # Actions run, and the run knows its own commit. It tracks the versionCode by construction —
       # release `4` is versionCode `1004`.
       #
-      # The track is an API id, not the heading the console shows. `alpha` is the built-in *closed
-      # testing* track — the one the console labels «Закрытое тестирование» — and it is where this
-      # app's testers already are: `edits.tracks.list` shows release "1 (1.0)" sitting there, and
-      # `internal` empty. A build published to an empty track is a build nobody installs, which is
-      # a failure that looks exactly like success.
-      #
-      # A closed track created by hand in the console is different: it gets an id of its own that
-      # nothing here can guess, so that case is the PLAY_TRACK repository variable rather than an
-      # edit to this file. A wrong id fails with `Track not found`, which is the whole error — it
-      # does not list the tracks that do exist.
+      # The track is an API id, not the heading the console shows. A push to main goes to
+      # `internal` — the console's «Внутреннее тестирование» (owner, 2026-10-12): it is out to its
+      # testers within minutes, with no review. Only that track's testers get it, so the list in
+      # Play Console → Testing → Internal testing → Testers must not be empty; a build on a track
+      # nobody is on is a failure that looks exactly like success. The PLAY_TRACK repository
+      # variable is deliberately not read here any more: it still says `alpha`, and it would win.
+      # Closed testing (`alpha`) is a manual run, or a promotion in the console.
       - name: Publish to Google Play
         if: github.event_name == 'push' || inputs.upload
         uses: r0adkll/upload-google-play@v1
@@ -293,7 +290,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: cx.m42.unitool
           releaseFiles: composeApp/build/outputs/bundle/release/*.aab
-          track: ${{ inputs.track || vars.PLAY_TRACK || 'alpha' }}
+          track: ${{ inputs.track || 'internal' }}
           status: completed
           releaseName: ${{ github.run_number }}
           # Edited before a release, not generated: Play shows these to a person. One file per
@@ -313,7 +310,7 @@ jobs:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
           set -euo pipefail
-          TRACK="${{ inputs.track || vars.PLAY_TRACK || 'alpha' }}"
+          TRACK="${{ inputs.track || 'internal' }}"
           python3 scripts/play-track-check.py cx.m42.unitool "$ANDROID_VERSION_CODE" "$TRACK" \
             | tee "$RUNNER_TEMP/track.txt"
           {
@@ -334,6 +331,6 @@ jobs:
             echo "|---|---|"
             echo "| versionCode | \`$((1000 + GITHUB_RUN_NUMBER))\` |"
             echo "| Superizer | \`${{ steps.superizer.outputs.library }}\` (from mavenLocal) |"
-            echo "| Track | \`${{ inputs.track || vars.PLAY_TRACK || 'alpha' }}\` |"
+            echo "| Track | \`${{ inputs.track || 'internal' }}\` |"
             echo "| Uploaded | ${{ github.event_name == 'push' || inputs.upload }} |"
           } >> "$GITHUB_STEP_SUMMARY"

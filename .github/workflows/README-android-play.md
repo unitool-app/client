@@ -25,7 +25,7 @@ record is created and can never be changed for that listing afterwards.
    `SUPERIZER_FROM_MAVEN=1`. See [The library](#the-library) below; this is the step that differs
    most from a single-repository app.
 4. Runs **no tests and no listing check** (owner, 2026-10-11): a push to `main` goes straight to
-   closed testing. `scripts/verify.sh` and `python3 play/check-listing.py` are run by hand, and
+   internal testing. `scripts/verify.sh` and `python3 play/check-listing.py` are run by hand, and
    `verify.yml` runs the first in CI on demand (`gh workflow run verify.yml --ref main`).
 5. Builds `:composeApp:bundleRelease` (the `.aab` Play takes) and `:composeApp:assembleRelease`
    (an `.apk`, because a bundle cannot be sideloaded and RELEASING.md §2 wants the release build
@@ -85,31 +85,31 @@ This is what the `SUPERIZER_REF` variable is for once the pace picks up: pin a r
 the exact library commit it was tested against, instead of to whatever the default branch holds
 at the moment the job starts.
 
-## Every build goes to closed testing
+## Every build goes to internal testing
 
-Push to `main`, and the bundle is published to the `alpha` track. There is nothing to choose and
-nothing to remember: the track is the `PLAY_TRACK` repository variable (set to `alpha`), the
-workflow's default is `alpha` as well, and step 8 above fails the run if the release is anywhere
-else. A manual run can override the track for a one-off; a push never does.
+Push to `main`, and the bundle is published to the `internal` track — the console's «Внутреннее
+тестирование» (owner, 2026-10-12). It reaches its testers within minutes and is not reviewed. The
+track is fixed in the workflow, and step 8 above fails the run if the release is anywhere else. A
+manual run can pick another track for a one-off; a push never does.
 
 ## Which track a build lands on
 
 Play names its tracks in the API, and the name is **not** the label the console shows. The four
-built-in ids are `internal`, `alpha` (closed testing), `beta` (open testing) and `production`.
+built-in ids are `internal` (internal testing), `alpha` (closed testing), `beta` (open testing) and
+`production`.
 
-The default here is `alpha`, the built-in **closed testing** track — the one the console labels
-«Закрытое тестирование». Not a guess: `edits.tracks.list` reports release `1 (1.0)` sitting on
-`alpha`, and `internal`, `beta` and `production` empty. That is where this app's testers are, so
-that is where a build has to land. Publishing to an empty track is the failure that looks most like
-success — green run, uploaded bundle, nobody able to install it. Promote to production from the
+Only the testers of the track a build lands on can install it. So the `internal` track needs its
+own tester list — Play Console → Testing → Internal testing → *Testers* — and it is a different
+list from closed testing's: the testers already on `alpha` do not see an `internal` build.
+Publishing to a track nobody is on is the failure that looks most like success — green run,
+uploaded bundle, nobody able to install it. Promote to closed testing or production from the
 console once the release build has been through the device smoke test in RELEASING.md §2.
 
-A closed track created by hand in the console is a different matter: it gets an id of its own that
-CI cannot guess, so it goes in the `PLAY_TRACK` repository variable (**Settings → Secrets and
-variables → Actions → Variables**) rather than in this file. The manual run's `track` input beats
-the variable, which beats the `alpha` default. An id no track has fails the upload with `Track
-not found` and nothing else — the error does not list the tracks that do exist, so read the id off
-the Play Developer API (`edits.tracks.list`) rather than off the console's heading.
+The `PLAY_TRACK` repository variable used to choose the track and still says `alpha`; the workflow
+no longer reads it, because it would beat the `internal` default. Delete it or leave it — it is
+inert. An id no track has fails the upload with `Track not found` and nothing else — the error does
+not list the tracks that do exist, so read the id off the Play Developer API (`edits.tracks.list`)
+rather than off the console's heading.
 
 Anything past internal testing wants two more things:
 
