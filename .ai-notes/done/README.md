@@ -14,3 +14,4 @@
 | [idea/09](idea/09-secret-apps-by-code.md) | секретные приложения по коду, Superizer 0.5.0 | — |
 | [push-opt-in](push-opt-in/README.md) | пуши только для используемых приложений: Superizer 0.6.0 / contract 5, регистрация на unitool.m42.cx, сервер шлёт по `apps` (2026-10-10) | проверка на телефоне через тестовое приложение; Data safety и App Privacy в консолях |
 | [screenshots](screenshots/) | кадры iPad 13" для App Store, загружены 2026-10-08 | — |
+| [counters](counters/README.md) | «Счётчики»: счета с именованными счётчиками ±, архив (2026-10-18) | закоммичено; проверка на телефоне |

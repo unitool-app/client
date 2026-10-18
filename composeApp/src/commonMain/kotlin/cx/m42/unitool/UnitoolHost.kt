@@ -13,6 +13,7 @@ import cx.m42.unitool.security.KeyPromptSheet
 import cx.m42.apps.calculator.CalculatorApp
 import cx.m42.apps.calculator.CalculatorConfig
 import cx.m42.apps.converter.ConverterApp
+import cx.m42.apps.counters.CountersApp
 import cx.m42.apps.dates.DatesApp
 import cx.m42.apps.testapp.SecretTestApp
 import cx.m42.apps.testapp.TestApp
@@ -124,6 +125,8 @@ private fun buildHost(
     register(TwoFaApp())
     // Days between two dates. Public and offline, in the catalog like the converter.
     register(DatesApp())
+    // Named counters with plus and minus — levels in a board game. Public and offline, in the catalog.
+    register(CountersApp())
     // Hidden (D8). It is a diagnostic instrument, and it stays invisible until someone types the
     // code below — which is also the only way the Service Menu opens in a release.
     register(TestApp())
