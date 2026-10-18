@@ -153,6 +153,7 @@ kotlin {
             implementation(project(":apps:calculator"))
             implementation(project(":apps:currency-converter"))
             implementation(project(":apps:twofa"))
+            implementation(project(":apps:date-diff"))
             implementation(project(":services:qr-scanner"))
             implementation(project(":services:share"))
             implementation(project(":services:vault"))

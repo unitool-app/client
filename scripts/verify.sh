@@ -70,7 +70,7 @@ fi
 
 # ---------------------------------------------------------------- 2. tests
 step "2. Unit and UI tests (desktop)"
-if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest :apps:twofa:desktopTest \
+if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest :apps:twofa:desktopTest :apps:date-diff:desktopTest \
     :services:ssh:desktopTest :services:backup:desktopTest :services:qr-scanner:testDebugUnitTest --continue > "$out/test.log" 2>&1; then
   ok "host and app tests"
 else
