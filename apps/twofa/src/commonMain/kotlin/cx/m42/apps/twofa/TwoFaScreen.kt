@@ -328,9 +328,9 @@ private fun AccountRow(
             }
             Spacer(Modifier.height(2.dp))
             Text(
-                text = Totp.grouped(Totp.code(account, now)),
+                text = shownCode(account, now, shown = copied),
                 style = codeStyle(32.sp),
-                color = if (expiring) tokens.danger else tokens.foreground,
+                color = if (!copied) tokens.muted else if (expiring) tokens.danger else tokens.foreground,
                 modifier = Modifier.testTag("2fa:code-$index"),
             )
             if (copied) {
@@ -342,7 +342,7 @@ private fun AccountRow(
                 )
             }
         }
-        Countdown(left, account.period, expiring, strings)
+        if (copied) Countdown(left, account.period, expiring, strings)
         Box(
             modifier = Modifier
                 .size(44.dp)
@@ -356,6 +356,10 @@ private fun AccountRow(
         }
     }
 }
+
+/** The code, or as many dots in its place until it is tapped (TwoFaInstance.copiedId). */
+private fun shownCode(account: TotpAccount, now: Long, shown: Boolean): String =
+    Totp.grouped(if (shown) Totp.code(account, now) else "•".repeat(account.digits))
 
 /** A ring that empties as the code ages, with the seconds in it. */
 @Composable
@@ -1041,14 +1045,16 @@ private fun DetailsPage(instance: TwoFaInstance, strings: TwoFaStrings, id: Stri
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                text = Totp.grouped(Totp.code(account, now)),
+                text = shownCode(account, now, shown = copiedId == account.id),
                 style = codeStyle(48.sp),
-                color = if (expiring) tokens.danger else tokens.foreground,
+                color = if (copiedId != account.id) tokens.muted else if (expiring) tokens.danger else tokens.foreground,
                 modifier = Modifier.testTag("2fa:detail-code"),
             )
             Spacer(Modifier.height(8.dp))
-            Countdown(left, account.period, expiring, strings)
-            Spacer(Modifier.height(8.dp))
+            if (copiedId == account.id) {
+                Countdown(left, account.period, expiring, strings)
+                Spacer(Modifier.height(8.dp))
+            }
             Text(
                 text = if (copiedId == account.id) strings.copied else strings.tapToCopy,
                 style = tokens.footnote,

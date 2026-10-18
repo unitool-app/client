@@ -75,6 +75,18 @@ internal const val EXPORT_MIME = "application/octet-stream"
  */
 internal const val CLIPBOARD_SECONDS = 60
 
+/**
+ * How long a tapped code stays on the screen. The list shows none until one is tapped, and only
+ * that one, so a glance over someone's shoulder does not take every code at once.
+ */
+internal const val CODE_SECONDS = 30
+
+/**
+ * How long a shown key stays on the screen. After that it is hidden again, and showing it asks the
+ * device again — an unlocked phone left open on this page does not keep the secret in view.
+ */
+internal const val SECRET_SECONDS = 60
+
 private const val CLIPBOARD_REFOCUS_MILLIS = 1_000L
 
 /**
@@ -174,8 +186,12 @@ internal class TwoFaInstance(
     private val sharer: FileSharer? = runtime.service(FileSharer.Key)
     val canShare: Boolean get() = sharer != null
 
-    /** Which account's code was copied last, so the row can say so. */
+    /**
+     * The one account whose code is on screen, copied by the tap that showed it. Every other code
+     * is dots; this one goes back to dots after [CODE_SECONDS].
+     */
     val copiedId = MutableStateFlow<String?>(null)
+    private var hideCodeTimer: Job? = null
 
     /**
      * The host's "is this still the owner?" (06 §5.5), asked before the three actions that give
@@ -189,6 +205,7 @@ internal class TwoFaInstance(
 
     /** The account whose key is on screen, if any. Never in a snapshot: it is the secret itself. */
     val shownSecret = MutableStateFlow<String?>(null)
+    private var hideSecretTimer: Job? = null
 
     /** The last code copied and the clipboard it went to, until it has been cleared from it. */
     private var onClipboard: Pair<String, CodeClipboard>? = null
@@ -264,6 +281,11 @@ internal class TwoFaInstance(
     fun copy(account: TotpAccount): String {
         tick()
         copiedId.value = account.id
+        hideCodeTimer?.cancel()
+        hideCodeTimer = runtime.scope.launch {
+            delay(CODE_SECONDS * 1000L)
+            copiedId.value = null
+        }
         runtime.haptics.tick()
         runtime.analytics.event("2fa_copy")
         return codeOf(account)
@@ -294,12 +316,23 @@ internal class TwoFaInstance(
     /** Shows [account]'s key once the person has confirmed; hiding it asks nothing. */
     fun toggleSecret(account: TotpAccount) {
         if (shownSecret.value == account.id) {
-            shownSecret.value = null
+            hideSecret()
             return
         }
         runtime.scope.launch {
-            if (confirmed(strings.confirmShowKey)) shownSecret.value = account.id
+            if (!confirmed(strings.confirmShowKey)) return@launch
+            shownSecret.value = account.id
+            hideSecretTimer?.cancel()
+            hideSecretTimer = launch {
+                delay(SECRET_SECONDS * 1000L)
+                shownSecret.value = null
+            }
         }
+    }
+
+    private fun hideSecret() {
+        hideSecretTimer?.cancel()
+        shownSecret.value = null
     }
 
     /**
@@ -354,8 +387,9 @@ internal class TwoFaInstance(
 
     private fun go(page: Page) {
         _page.value = page
+        hideCodeTimer?.cancel()
         copiedId.value = null
-        shownSecret.value = null
+        hideSecret()
         if (page != Page.Import) {
             importBatch.value = null
             importSelected.value = emptySet()

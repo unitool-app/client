@@ -96,6 +96,35 @@ class TwoFaProtectionTest {
     }
 
     @Test
+    fun aKeyOnScreenIsHiddenAfterAMinuteAndAsksAgain() {
+        val presence = FakeUserPresence()
+        runAppTest(
+            TwoFaApp(),
+            prepare = {
+                it.storage.entries[KEY_ACCOUNTS] = stored
+                it.provide(UserPresence.Key, presence)
+            },
+        ) {
+            val twofa = instance as TwoFaInstance
+            val time = (runtime.scope as TestScope).testScheduler
+            click("2fa:details-0")
+            click("2fa:toggle-secret")
+            assertEquals("a", twofa.shownSecret.value)
+
+            time.advanceTimeBy(59_000)
+            time.runCurrent()
+            assertEquals("a", twofa.shownSecret.value)
+            time.advanceTimeBy(2_000)
+            time.runCurrent()
+            assertEquals(null, twofa.shownSecret.value)
+
+            click("2fa:toggle-secret")
+            assertEquals("a", twofa.shownSecret.value)
+            assertEquals(2, presence.reasons.size)
+        }
+    }
+
+    @Test
     fun deleteGoesThroughOnlyOnceConfirmed() {
         val presence = FakeUserPresence(answer = false)
         runAppTest(

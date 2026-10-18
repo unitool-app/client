@@ -104,7 +104,7 @@ internal object TwoFaStringsRu : TwoFaStrings {
     override val search = "Поиск"
     override val nothingFound = "Ничего не нашлось"
     override val copied = "Код скопирован"
-    override val tapToCopy = "Нажмите на код, чтобы скопировать"
+    override val tapToCopy = "Нажмите на аккаунт, чтобы показать и скопировать код"
     override val details = "Подробнее"
 
     override val newAccount = "Новый аккаунт"
@@ -284,7 +284,7 @@ internal object TwoFaStringsEn : TwoFaStrings {
     override val search = "Search"
     override val nothingFound = "Nothing found"
     override val copied = "Code copied"
-    override val tapToCopy = "Tap a code to copy it"
+    override val tapToCopy = "Tap an account to show and copy its code"
     override val details = "Details"
 
     override val newAccount = "New account"

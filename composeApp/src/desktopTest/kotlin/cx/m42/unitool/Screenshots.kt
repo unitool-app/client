@@ -275,6 +275,8 @@ class Screenshots {
         Screen("14-2fa-list", clock = TwoFaClock) {
             openTwoFa()
             TwoFaLinks.forEach { addTwoFa(it) }
+            // Every code is dots until tapped; one shown says what the app is for.
+            tapTag("2fa:row-0")
         },
         Screen("15-2fa-add-link", clock = TwoFaClock) {
             openTwoFa()
@@ -298,6 +300,7 @@ class Screenshots {
             tapIcon("Back")
             tapTag(TWOFA_TILE)
             TwoFaLinks.forEach { addTwoFa(it) }
+            tapTag("2fa:row-0")
         },
         Screen("19-2fa-export", clock = TwoFaClock) {
             openTwoFa()

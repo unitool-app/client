@@ -23,6 +23,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -75,13 +76,40 @@ class TwoFaInstanceTest {
     }
 
     @Test
-    fun storedAccountsAreListedWithTheirCurrentCodes() = runAppTest(
+    fun storedAccountsAreListedWithTheirCodesHiddenUntilTapped() = runAppTest(
         TwoFaApp(),
         prepare = { it.storage.entries[KEY_ACCOUNTS] = stored },
     ) {
         val twofa = instance as TwoFaInstance
-        inRow("2fa:code-0").assertTextEquals(twofa.expected(0))
+        inRow("2fa:code-0").assertTextEquals("••• •••")
+        inRow("2fa:code-1").assertTextEquals("••• •••")
+
+        click("2fa:row-1")
+        inRow("2fa:code-0").assertTextEquals("••• •••")
         inRow("2fa:code-1").assertTextEquals(twofa.expected(1))
+
+        // One at a time: the next tap hides the first.
+        click("2fa:row-0")
+        inRow("2fa:code-0").assertTextEquals(twofa.expected(0))
+        inRow("2fa:code-1").assertTextEquals("••• •••")
+    }
+
+    @Test
+    fun aShownCodeIsHiddenAgainAfterThirtySeconds() = runAppTest(
+        TwoFaApp(),
+        prepare = { it.storage.entries[KEY_ACCOUNTS] = stored },
+    ) {
+        val twofa = instance as TwoFaInstance
+        val time = (runtime.scope as TestScope).testScheduler
+        click("2fa:row-0")
+        time.advanceTimeBy(29_000)
+        time.runCurrent()
+        assertEquals("a", twofa.copiedId.value)
+        time.advanceTimeBy(2_000)
+        time.runCurrent()
+        assertEquals(null, twofa.copiedId.value)
+        idle()
+        inRow("2fa:code-0").assertTextEquals("••• •••")
     }
 
     @Test
@@ -90,6 +118,7 @@ class TwoFaInstanceTest {
         prepare = { it.storage.entries[KEY_ACCOUNTS] = stored },
     ) {
         val twofa = instance as TwoFaInstance
+        click("2fa:row-0")
         val before = twofa.expected(0)
         runtime.clock.advance(seconds = 30)
         twofa.tick()
@@ -113,6 +142,7 @@ class TwoFaInstanceTest {
         val twofa = instance as TwoFaInstance
         assertEquals(listOf("GitHub"), twofa.accounts.value.map { it.issuer })
         assertTrue(runtime.secrets.entries[KEY_SECRET_ACCOUNTS]!!.contains(secret))
+        click("2fa:row-0")
         inRow("2fa:code-0").assertTextEquals(twofa.expected(0))
     }
 
