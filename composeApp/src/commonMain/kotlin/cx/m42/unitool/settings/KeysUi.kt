@@ -1,5 +1,6 @@
 package cx.m42.unitool.settings
 
+import cx.m42.services.link.LocalLink
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.PublicKeyBookAdmin
@@ -49,6 +50,8 @@ public class HostTools(
     public val network: NetworkService? = null,
     /** The parts opened by code, for the website's private docs (.ai-notes/site/02). Set by [cx.m42.unitool.buildUnitool]. */
     public val opened: OpenedSections? = null,
+    /** Listening for a computer in the same network, for the passwords in a browser (.ai-notes/passwords-browser). */
+    public val link: LocalLink? = null,
 ) {
-    internal fun with(network: NetworkService, opened: OpenedSections): HostTools = HostTools(files, qr, sharer, network, opened)
+    internal fun with(network: NetworkService, opened: OpenedSections): HostTools = HostTools(files, qr, sharer, network, opened, link)
 }

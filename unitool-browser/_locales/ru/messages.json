@@ -1,0 +1,181 @@
+{
+  "description": {
+    "message": "Пароли из Unitool на телефоне — в браузер этого компьютера. Каждый пароль вы подтверждаете на телефоне."
+  },
+  "notPaired": {
+    "message": "Привяжите телефон с Unitool, чтобы брать пароли с него."
+  },
+  "pairPhone": {
+    "message": "Привязать телефон"
+  },
+  "pairAnother": {
+    "message": "Привязать ещё телефон"
+  },
+  "phones": {
+    "message": "Телефоны"
+  },
+  "request": {
+    "message": "Запросить пароль"
+  },
+  "onlyWeb": {
+    "message": "Пароли подставляются только на веб-страницы (http и https)."
+  },
+  "starting": {
+    "message": "Запускаю Unitool на компьютере…"
+  },
+  "firefoxAsk": {
+    "message": "Firefox может спросить, можно ли запустить Unitool, — разрешите."
+  },
+  "searching": {
+    "message": "Ищу телефон… Откройте «Пароли» на телефоне."
+  },
+  "searchingHint": {
+    "message": "Телефон и компьютер должны быть в одной сети Wi-Fi."
+  },
+  "found": {
+    "message": "Телефон найден. Сейчас на нём появится запрос."
+  },
+  "shown": {
+    "message": "Подтвердите на телефоне."
+  },
+  "secondsLeft": {
+    "message": "Осталось $VALUE$ с",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "filled": {
+    "message": "Вставлено: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "filledNoLogin": {
+    "message": "Пароль вставлен."
+  },
+  "submitYourself": {
+    "message": "Форму не отправляю — нажмите «Войти» сами."
+  },
+  "noField": {
+    "message": "На странице не нашлось поля для пароля."
+  },
+  "tabChanged": {
+    "message": "Вкладка ушла с сайта $VALUE$ — вставлять туда не буду.",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "copyLogin": {
+    "message": "Копировать логин"
+  },
+  "copyPassword": {
+    "message": "Копировать пароль"
+  },
+  "copied": {
+    "message": "Скопировано"
+  },
+  "clipboardNote": {
+    "message": "Пока это окно открыто, через 60 с пароль сотрётся из буфера обмена. Закроете окно раньше — не сотрётся: после этого расширение не может трогать буфер."
+  },
+  "denied": {
+    "message": "Отказано на телефоне."
+  },
+  "timeout": {
+    "message": "Телефон не ответил."
+  },
+  "cancelled": {
+    "message": "Отменено."
+  },
+  "again": {
+    "message": "Ещё раз"
+  },
+  "cancel": {
+    "message": "Отмена"
+  },
+  "back": {
+    "message": "Назад"
+  },
+  "pairTitle": {
+    "message": "Отсканируйте телефоном"
+  },
+  "pairSteps": {
+    "message": "Unitool → Пароли → Компьютеры → Привязать компьютер."
+  },
+  "pairCheck": {
+    "message": "Телефон покажет «$VALUE$» и этот ключ SSH — сверьте:",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "paired": {
+    "message": "Привязано: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "forget": {
+    "message": "Отвязать"
+  },
+  "keyLine": {
+    "message": "Пароли шифруются ключом $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "noPhones": {
+    "message": "Телефонов нет."
+  },
+  "err_host": {
+    "message": "Не удалось запустить Unitool на компьютере. Выполните в терминале: unitool browser install"
+  },
+  "err_host_firefox": {
+    "message": "Не удалось запустить Unitool на компьютере. Выполните в терминале: unitool browser install. В Firefox из snap проверьте, что запуск Unitool разрешён."
+  },
+  "err_not_paired": {
+    "message": "Телефон ещё не привязан."
+  },
+  "err_no_phone": {
+    "message": "Телефон не нашёлся за минуту. Откройте «Пароли» на телефоне; телефон и компьютер — в одной сети Wi-Fi. На iPhone разрешите Unitool доступ к локальной сети."
+  },
+  "err_phone_refused": {
+    "message": "Телефон не узнал этот компьютер. Привяжите его заново."
+  },
+  "err_bad_response": {
+    "message": "Пришёл ответ, который не подходит к этому запросу. Ничего не вставлено."
+  },
+  "err_key": {
+    "message": "Ключ SSH компьютера не читается."
+  },
+  "err_clock": {
+    "message": "Часы телефона и компьютера расходятся больше чем на 5 минут."
+  },
+  "err_busy": {
+    "message": "На телефоне уже открыт запрос другого компьютера."
+  },
+  "err_locked": {
+    "message": "«Пароли» на телефоне не открыты."
+  },
+  "err_origin": {
+    "message": "Пароли подставляются только на веб-страницы (http и https)."
+  },
+  "err_other": {
+    "message": "Что-то пошло не так: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  }
+}

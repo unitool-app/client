@@ -1,0 +1,181 @@
+{
+  "description": {
+    "message": "Passwords from Unitool on your phone, filled into this computer's browser. You confirm every one on the phone."
+  },
+  "notPaired": {
+    "message": "Pair a phone with Unitool to take passwords from it."
+  },
+  "pairPhone": {
+    "message": "Pair a phone"
+  },
+  "pairAnother": {
+    "message": "Pair another phone"
+  },
+  "phones": {
+    "message": "Phones"
+  },
+  "request": {
+    "message": "Ask for the password"
+  },
+  "onlyWeb": {
+    "message": "Passwords are filled into web pages only (http and https)."
+  },
+  "starting": {
+    "message": "Starting Unitool on this computer…"
+  },
+  "firefoxAsk": {
+    "message": "Firefox may ask whether it may start Unitool — allow it."
+  },
+  "searching": {
+    "message": "Looking for the phone… Open Passwords on the phone."
+  },
+  "searchingHint": {
+    "message": "The phone and the computer must be on the same Wi-Fi."
+  },
+  "found": {
+    "message": "Found the phone. The request is about to appear on it."
+  },
+  "shown": {
+    "message": "Confirm on the phone."
+  },
+  "secondsLeft": {
+    "message": "$VALUE$ s left",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "filled": {
+    "message": "Filled in: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "filledNoLogin": {
+    "message": "The password is filled in."
+  },
+  "submitYourself": {
+    "message": "The form is not submitted — press Sign in yourself."
+  },
+  "noField": {
+    "message": "No password field was found on the page."
+  },
+  "tabChanged": {
+    "message": "The tab has left $VALUE$ — nothing is filled in there.",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "copyLogin": {
+    "message": "Copy the login"
+  },
+  "copyPassword": {
+    "message": "Copy the password"
+  },
+  "copied": {
+    "message": "Copied"
+  },
+  "clipboardNote": {
+    "message": "While this window stays open, the password is cleared from the clipboard after 60 s. Close it sooner and it is not: after that the extension cannot touch the clipboard."
+  },
+  "denied": {
+    "message": "Denied on the phone."
+  },
+  "timeout": {
+    "message": "The phone didn't answer."
+  },
+  "cancelled": {
+    "message": "Cancelled."
+  },
+  "again": {
+    "message": "Again"
+  },
+  "cancel": {
+    "message": "Cancel"
+  },
+  "back": {
+    "message": "Back"
+  },
+  "pairTitle": {
+    "message": "Scan this with the phone"
+  },
+  "pairSteps": {
+    "message": "Unitool → Passwords → Computers → Pair a computer."
+  },
+  "pairCheck": {
+    "message": "The phone will show \"$VALUE$\" and this SSH key — check they match:",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "paired": {
+    "message": "Paired: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "forget": {
+    "message": "Unpair"
+  },
+  "keyLine": {
+    "message": "Passwords are encrypted to $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "noPhones": {
+    "message": "No phones."
+  },
+  "err_host": {
+    "message": "Couldn't start Unitool on this computer. In a terminal: unitool browser install"
+  },
+  "err_host_firefox": {
+    "message": "Couldn't start Unitool on this computer. In a terminal: unitool browser install. In Firefox from snap, check that starting Unitool is allowed."
+  },
+  "err_not_paired": {
+    "message": "No phone is paired yet."
+  },
+  "err_no_phone": {
+    "message": "The phone wasn't found within a minute. Open Passwords on the phone; the phone and the computer must be on the same Wi-Fi. On an iPhone, allow Unitool to use the local network."
+  },
+  "err_phone_refused": {
+    "message": "The phone didn't recognise this computer. Pair it again."
+  },
+  "err_bad_response": {
+    "message": "An answer came that doesn't fit this request. Nothing was filled in."
+  },
+  "err_key": {
+    "message": "This computer's SSH key can't be read."
+  },
+  "err_clock": {
+    "message": "The phone's and the computer's clocks differ by more than 5 minutes."
+  },
+  "err_busy": {
+    "message": "The phone is showing another computer's request."
+  },
+  "err_locked": {
+    "message": "Passwords isn't open on the phone."
+  },
+  "err_origin": {
+    "message": "Passwords are filled into web pages only (http and https)."
+  },
+  "err_other": {
+    "message": "Something went wrong: $VALUE$",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  }
+}

@@ -36,6 +36,7 @@ class PasswordsContractTest : AppContractTest(PasswordsApp()) {
         """{"page":"details","id":"gone"}""",
         """{"page":"export","github":"octocat"}""",
         """{"page":"import"}""",
+        """{"page":"computers"}""",
     )
 }
 

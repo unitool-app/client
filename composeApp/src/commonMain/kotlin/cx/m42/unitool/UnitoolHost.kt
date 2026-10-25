@@ -39,6 +39,7 @@ import cx.m42.unitool.settings.HostTools
 import cx.m42.unitool.settings.SshKeysScreen
 import cx.m42.unitool.settings.WebsiteSection
 import cx.m42.unitool.web.WebSignIn
+import cx.m42.services.link.LocalLink
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.superizer.runtime.FilePicker
@@ -191,6 +192,8 @@ private fun buildHost(
         qrScanner { camera.scan() }
     }
     tools.sharer?.let { service(FileSharer.Key, it) }
+    // The phone's side of a computer's browser asking for a password (passwords-browser D538).
+    tools.link?.let { service(LocalLink.Key, it) }
     tools.files?.let { service(FilePicker.Key, it) }
 
     // Keys, the vault behind runtime.secrets, and the diagnostics of both (ssh-new 07 §2.2): what

@@ -1,13 +1,13 @@
 package cx.m42.services.ssh.keyring
 
-import cx.m42.services.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.crypto.EcdsaDer
 import cx.m42.services.ssh.ios.cfDictionary
 import cx.m42.services.ssh.ios.toByteArray
 import cx.m42.services.ssh.ios.toCFData
-import cx.m42.services.ssh.key.PrivateKey
-import cx.m42.services.ssh.wire.wire
+import cx.m42.unitool.kit.ssh.PrivateKey
+import cx.m42.unitool.kit.ssh.wire
 import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.Chip
 import cx.m42.superizer.ssh.GeneratedKind

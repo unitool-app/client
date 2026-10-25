@@ -1,5 +1,6 @@
 package cx.m42.unitool
 
+import cx.m42.services.link.IosLocalLink
 import cx.m42.services.qr.IosQrScanner
 import cx.m42.services.files.IosFilePicker
 import cx.m42.unitool.settings.HostTools
@@ -84,6 +85,7 @@ object UnitoolIos {
             files = IosFilePicker(),
             qr = if (IosQrScanner.available()) IosQrScanner { superizer?.settings?.langTag?.value ?: "en" } else null,
             sharer = IosFileSharer(),
+            link = IosLocalLink(),
         )
         val built = buildUnitool(scope, debug = Platform.isDebugBinary, security = security, tools = tools) {
             notifier(LocalNotifier)

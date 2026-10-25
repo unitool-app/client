@@ -1,0 +1,19 @@
+{
+  "name": "unitool-browser",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Unitool for the browser: passwords from the phone, filled in on this computer",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && node build.mjs",
+    "test": "vitest run",
+    "zip": "node build.mjs --zip"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.0.0",
+    "puppeteer-core": "^24.43.1",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

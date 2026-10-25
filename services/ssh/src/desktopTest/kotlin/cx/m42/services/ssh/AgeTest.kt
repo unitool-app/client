@@ -1,5 +1,6 @@
 package cx.m42.services.ssh
 
+import cx.m42.unitool.kit.ssh.SshPublicKey
 import cx.m42.unitool.kit.crypto.ChaCha20Poly1305
 import cx.m42.unitool.kit.crypto.Curve25519
 import cx.m42.unitool.kit.crypto.Montgomery

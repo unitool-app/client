@@ -5,7 +5,7 @@ line with commands under it: `unitool qr encode …`. It lives in this repositor
 and the terminal are one codebase and cannot drift apart. The design is in
 [`.ai-notes/done/cli`](../.ai-notes/done/cli/README.md).
 
-Today there are two apps: `qr` and `split`.
+Today there are three apps: `qr`, `split` and `browser`.
 
 ## Running it
 
@@ -142,3 +142,24 @@ unitool split inspect secret.ucrypt  # what a container or a part is, without op
 
 A CLI module may not depend on an app, a service, Superizer or Compose. If it needs code the phone
 already has, that code moves to `:unitool-kit`, which depends on nothing (`checkDependencyRules`).
+
+## `unitool browser` — passwords from the phone into the browser
+
+The computer's side of [`.ai-notes/passwords-browser`](../.ai-notes/passwords-browser/README.md). The
+Unitool extension (`unitool-browser/`) starts `unitool browser host`; it finds the phone in the
+Wi-Fi (its own mDNS query, no Avahi), talks Noise to it, and opens the phone's answer — age to this
+computer's SSH key — with the key file in `~/.ssh`.
+
+```sh
+unitool browser install                        # manifests for Chrome, Chromium, Brave, Edge, Firefox + the wrapper they start
+unitool browser install --extension-id ID      # also allow a store's extension id
+unitool browser pair                           # a QR code here; Unitool → Passwords → Computers on the phone
+unitool browser pair --key ~/.ssh/other_key    # Ed25519 or RSA ≥ 2048, without a passphrase (D545)
+unitool browser devices                        # the paired phones and the key in use
+unitool browser forget ID
+```
+
+What it keeps: `~/.config/unitool/link/{key,phones,settings}`, 0600 in a 0700 directory — its link key,
+the phones, the key's path. Never a password and never the pairing secret. Tests: `BrowserHostTest`
+(JVM and linuxX64, against a phone made of the kit) and, in `services/link`, `NativeHostTest` (this
+binary against the desktop listener over the real network).

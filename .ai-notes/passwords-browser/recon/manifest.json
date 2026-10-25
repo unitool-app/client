@@ -1,0 +1,4 @@
+{ "manifest_version": 3, "name": "probe", "version": "1.0", "key": "<generated, see 00-recon>",
+  "permissions": ["nativeMessaging"],
+  "background": { "service_worker": "bg.js", "scripts": ["bg.js"] },
+  "browser_specific_settings": { "gecko": { "id": "probe@unitool.m42.cx" } } }

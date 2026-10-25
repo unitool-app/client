@@ -1,7 +1,8 @@
 package cx.m42.services.ssh.agent
 
-import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.ssh.key.PrivateKey
+import cx.m42.services.ssh.id
+import cx.m42.unitool.kit.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
 import cx.m42.services.ssh.keyring.Keyring
 import cx.m42.services.ssh.keyring.UseReason

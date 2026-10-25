@@ -1,11 +1,12 @@
 package cx.m42.services.ssh.key
 
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.services.ssh.AgeIdentity
-import cx.m42.services.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.StanzaUnwrapper
 import cx.m42.services.ssh.crypto.PlatformEcdsa
-import cx.m42.services.ssh.wire.wire
+import cx.m42.unitool.kit.ssh.wire
 import cx.m42.unitool.kit.crypto.Curve25519
 import cx.m42.unitool.kit.crypto.Ed25519
 import cx.m42.unitool.kit.crypto.Hash

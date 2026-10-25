@@ -22,6 +22,7 @@ kotlin {
             implementation(project(":unitool-cli:core"))
             implementation(project(":unitool-cli:apps:qr"))
             implementation(project(":unitool-cli:apps:split"))
+            implementation(project(":unitool-cli:apps:browser"))
         }
         commonTest.dependencies {
             implementation(project(":unitool-cli:testing"))

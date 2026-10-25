@@ -78,6 +78,18 @@
 	-->
 	<key>NSFaceIDUsageDescription</key>
 	<string>The 2FA app opens only after Face ID confirms it is you. Unitool learns only yes or no.</string>
+	<!--
+	  Passwords in a computer's browser (passwords-browser D551): while Passwords is on screen and a
+	  computer is paired, the phone listens in the Wi-Fi and announces itself over Bonjour. Without
+	  NSBonjourServices iOS drops the announcement; without the description it never asks. The
+	  system asks at the first pairing, not at install, because nothing listens before that.
+	-->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>A computer you paired in Passwords finds this phone in your Wi-Fi to ask for a password. You confirm every one on the phone; nothing is sent until you do.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_unitool._tcp</string>
+	</array>
 	<!-- Data messages: a push that updates an app without drawing anything (13 §1). -->
 	<key>FirebaseMessagingAutoInitEnabled</key>
 	<false/>

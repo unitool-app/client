@@ -1,17 +1,19 @@
 package cx.m42.services.ssh.keyring
 
+import cx.m42.services.ssh.id
 import cx.m42.services.ssh.Age
 import cx.m42.services.ssh.AgeIdentity
 import cx.m42.services.ssh.AddKnownOutcome
 import cx.m42.services.ssh.KnownKey
 import cx.m42.services.ssh.PublicKeyBook
 import cx.m42.services.ssh.PublicKeyBookAdmin
-import cx.m42.services.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.StanzaUnwrapper
-import cx.m42.services.ssh.key.OpenSshKeyFile
-import cx.m42.services.ssh.key.PrivateKey
+import cx.m42.unitool.kit.ssh.OpenSshKeyFile
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
+import cx.m42.services.ssh.key.toImportRefusal
 import cx.m42.superizer.app.AppId
 import cx.m42.superizer.runtime.Clock
 import cx.m42.superizer.runtime.Logger
@@ -380,7 +382,7 @@ internal class Keyring(
             val key = SshPublicKey.parse(record.publicKey) ?: return@filter false
             val probe = object : AgeIdentity {
                 override val publicKey = key
-                override suspend fun unwrap(stanza: Age.Stanza): ByteArray? = null
+                override suspend fun unwrap(stanza: cx.m42.unitool.kit.ssh.Age.Stanza): ByteArray? = null
             }
             stanzas.any { probe.matches(it) }
         }.sortedByDescending { record -> info(record)?.usable == true }
@@ -472,7 +474,7 @@ internal class Keyring(
         override val device: KeyringDevice get() = this@Keyring.device
 
         override fun inspect(file: ByteArray): Inspection = when (val parsed = OpenSshKeyFile.parse(file)) {
-            is OpenSshKeyFile.Parsed.Refused -> Inspection(refusal = parsed.refusal)
+            is OpenSshKeyFile.Parsed.Refused -> Inspection(refusal = parsed.refusal.toImportRefusal())
             is OpenSshKeyFile.Parsed.Ok -> {
                 val f = parsed.file
                 val key = f.publicKey
@@ -589,7 +591,7 @@ internal class Keyring(
         origin: KeyOrigin,
     ): ImportOutcome {
         val parsed = when (val p = OpenSshKeyFile.parse(bytes)) {
-            is OpenSshKeyFile.Parsed.Refused -> return ImportOutcome.Rejected(p.refusal)
+            is OpenSshKeyFile.Parsed.Refused -> return ImportOutcome.Rejected(p.refusal.toImportRefusal())
             is OpenSshKeyFile.Parsed.Ok -> p.file
         }
         try {
@@ -628,7 +630,7 @@ internal class Keyring(
     /** Puts [key] where [placement] says, with [encryptedFile] as its level-3 file or the file level 2 seals. */
     private suspend fun storeKey(key: PrivateKey, encryptedFile: ByteArray, options: ImportOptions, origin: KeyOrigin): ImportOutcome {
         val public = key.publicKey
-        OpenSshKeyFile.refusalFor(public)?.let { return ImportOutcome.Rejected(it) }
+        OpenSshKeyFile.refusalFor(public)?.let { return ImportOutcome.Rejected(it.toImportRefusal()) }
         val storage = placement(public, generated = origin is KeyOrigin.Generated, wantedLevel(options))
             ?: return ImportOutcome.Failed(LEVEL_UNAVAILABLE)
         if (!biometricPossible(storage, options)) return ImportOutcome.Failed(BIOMETRIC_UNAVAILABLE)

@@ -104,5 +104,6 @@ tasks.register("verify") {
         ":apps:twofa:desktopTest", ":services:qr-scanner:testDebugUnitTest",
         ":unitool-kit:desktopTest", ":unitool-kit:linuxX64Test",
         ":unitool-cli:core:allTests", ":unitool-cli:apps:qr:allTests", ":unitool-cli:apps:split:allTests",
-        ":unitool-cli:app:allTests")
+        ":unitool-cli:app:allTests", ":unitool-cli:apps:browser:allTests", ":services:link:desktopTest",
+        ":apps:passwords:desktopTest")
 }

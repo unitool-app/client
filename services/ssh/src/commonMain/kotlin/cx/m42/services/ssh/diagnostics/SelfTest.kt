@@ -2,8 +2,8 @@ package cx.m42.services.ssh.diagnostics
 
 import cx.m42.services.ssh.Age
 import cx.m42.services.ssh.SshSig
-import cx.m42.services.ssh.key.OpenSshKeyFile
-import cx.m42.services.ssh.key.PrivateKey
+import cx.m42.unitool.kit.ssh.OpenSshKeyFile
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
 import cx.m42.superizer.diagnostics.DeviceFacts
 import cx.m42.superizer.diagnostics.SelfTestCode

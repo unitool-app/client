@@ -1,6 +1,7 @@
 package cx.m42.apps.passwords
 
 import androidx.compose.runtime.Composable
+import cx.m42.services.link.LocalLink
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.Age
@@ -41,6 +42,9 @@ internal sealed interface Page {
 
     /** What was read, before it is added. */
     data object Import : Page
+
+    /** The paired computers (passwords-browser README §5). */
+    data object Computers : Page
 }
 
 /** Why the list on screen may not be what is stored — 2FA's three, word for word. */
@@ -150,6 +154,23 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
     private val sharer: FileSharer? = runtime.service(FileSharer.Key)
     val canShare: Boolean get() = sharer != null
 
+    // ---- a computer's browser asking (.ai-notes/passwords-browser)
+
+    private val browserStrings: BrowserStrings get() = runtime.locale.pick(BrowserStringTables, BrowserStringsEn)
+
+    /**
+     * The paired computers and the request sheet. It sees the entries only while the list is open:
+     * a locked or unreadable list answers a computer "locked", never an empty choice.
+     */
+    val browser = BrowserLink(
+        runtime = runtime,
+        link = runtime.service(LocalLink.Key),
+        scanner = scanner,
+        entries = { _entries.value.takeIf { _loaded.value && storageProblem.value?.blocksWriting != true } },
+        confirm = ::confirmed,
+        strings = { browserStrings },
+    )
+
     private val _chrome = MutableStateFlow(AppChrome())
     override val chrome: StateFlow<AppChrome> get() = _chrome.asStateFlow()
 
@@ -159,6 +180,7 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
         // In the instance's scope, as in 2FA: opening the list is a trip to the Keystore, and a
         // launch that suspends can be cancelled under it by the host's link route.
         runtime.scope.launch { load() }
+        runtime.scope.launch { browser.load() }
     }
 
     private suspend fun load() {
@@ -227,6 +249,8 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
         }
     }
 
+    fun startComputers() = go(Page.Computers)
+
     fun startImport() {
         importText.value = ""
         fileProblem.value = null
@@ -264,6 +288,7 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
             is Page.Edit -> AppChrome(title = strings.editEntry, canGoBack = true)
             Page.Export -> AppChrome(title = strings.exportTitle, canGoBack = true)
             Page.ImportFrom, Page.Import -> AppChrome(title = strings.importTitle, canGoBack = true)
+            Page.Computers -> AppChrome(title = browserStrings.computersTitle, canGoBack = true)
             is Page.Details -> AppChrome(title = entry(current.id)?.shownTitle, canGoBack = true)
         }
     }
@@ -598,6 +623,7 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
             Page.Add -> put("page", JsonPrimitive("add"))
             Page.Export -> put("page", JsonPrimitive("export"))
             Page.ImportFrom, Page.Import -> put("page", JsonPrimitive("import"))
+            Page.Computers -> put("page", JsonPrimitive("computers"))
             is Page.Details, is Page.Edit -> {
                 put("page", JsonPrimitive("details"))
                 put("id", JsonPrimitive((current as? Page.Details)?.id ?: (current as Page.Edit).id))
@@ -621,10 +647,16 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
             "add" -> Page.Add
             "export" -> Page.Export
             "import" -> Page.ImportFrom
+            "computers" -> Page.Computers
             "details" -> text("id")?.let { Page.Details(it) } ?: Page.List
             else -> Page.List
         }
         settlePage()
+    }
+
+    /** The host closed the app (or the idle exit did): the phone stops listening at once (D538). */
+    override fun dispose() {
+        browser.close()
     }
 
     @Composable

@@ -162,6 +162,7 @@ kotlin {
             implementation(project(":services:ssh"))
             implementation(project(":services:file-picker"))
             implementation(project(":services:backup"))
+            implementation(project(":services:link"))
 
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)

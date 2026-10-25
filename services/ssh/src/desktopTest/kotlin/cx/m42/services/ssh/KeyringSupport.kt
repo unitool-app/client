@@ -1,7 +1,7 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.key.OpenSshKeyFile
-import cx.m42.services.ssh.key.PrivateKey
+import cx.m42.unitool.kit.ssh.OpenSshKeyFile
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.services.ssh.key.SoftwareOps
 import cx.m42.services.ssh.keyring.ChipBackend
 import cx.m42.services.ssh.keyring.ChipResult

@@ -1,6 +1,7 @@
 package cx.m42.services.ssh
 
-import cx.m42.services.ssh.key.OpenSshKeyFile
+import cx.m42.unitool.kit.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.OpenSshKeyFile
 import cx.m42.superizer.ssh.ImportOptions
 import cx.m42.superizer.ssh.ImportOutcome
 import cx.m42.superizer.ssh.SshOutcome

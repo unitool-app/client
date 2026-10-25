@@ -71,7 +71,7 @@ fi
 # ---------------------------------------------------------------- 2. tests
 step "2. Unit and UI tests (desktop)"
 if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest :apps:twofa:desktopTest :apps:date-diff:desktopTest :apps:counters:desktopTest :apps:passwords:desktopTest \
-    :services:ssh:desktopTest :services:backup:desktopTest :services:qr-scanner:testDebugUnitTest --continue > "$out/test.log" 2>&1; then
+    :services:ssh:desktopTest :services:link:desktopTest :services:backup:desktopTest :services:qr-scanner:testDebugUnitTest --continue > "$out/test.log" 2>&1; then
   ok "host and app tests"
 else
   bad "tests — see $out/test.log"
@@ -158,6 +158,47 @@ if [ "$usage" -eq 2 ] && [ "$toolong" -eq 1 ]; then
 else
   bad "exit codes: wrong call gave $usage (want 2), too long gave $toolong (want 1)"
 fi
+
+# ---------------------------------------------------------------- 2c. passwords in the browser
+# .ai-notes/passwords-browser: the link (services/link), the host (unitool browser), the extension
+# (unitool-browser/) and the whole way through Chromium. After 2b, because two of these run the binary.
+step "2c. Passwords in the browser (passwords-browser)"
+if ./gradlew --quiet :unitool-cli:apps:browser:allTests :services:link:desktopTest --continue > "$out/browser.log" 2>&1; then
+  ok "host against a phone made of the kit (JVM and linuxX64); the real binary against the desktop listener over the network"
+else
+  bad "unitool browser / services/link — see $out/browser.log"
+fi
+if grep -qs '<skipped' services/link/build/test-results/desktopTest/TEST-cx.m42.services.link.NativeHostTest.xml; then
+  skip "NativeHostTest: the binary was not built"
+fi
+if command -v npm > /dev/null; then
+  if (cd unitool-browser && npm ci --silent && npm test --silent && npm run build --silent) >> "$out/browser.log" 2>&1; then
+    ok "extension: vitest (fill in jsdom, the background, the built manifests), dist/chrome and dist/firefox"
+  else
+    bad "extension — see $out/browser.log"
+  fi
+else
+  skip "extension: no npm here"
+fi
+# The binary as the browser starts it: one framed message in, one out, nothing written without a pairing.
+nm_home=$(mktemp -d)
+nm_out=$(printf '\021\000\000\000{"type":"status"}' | HOME="$nm_home" unitool-cli/app/build/dist/unitool browser host chrome-extension://x/ 2>> "$out/browser.log" | tail -c +5)
+if [ "$nm_out" = '{"type":"status","paired":false,"phones":0}' ] && [ ! -e "$nm_home/.config/unitool" ]; then
+  ok "browser host answers native messaging and writes nothing unpaired"
+else
+  bad "browser host status: got '$nm_out'"
+fi
+rm -rf "$nm_home"
+if ./gradlew --quiet :apps:passwords:desktopTest --tests 'cx.m42.apps.passwords.BrowserE2eTest' --rerun >> "$out/browser.log" 2>&1; then
+  if grep -qs '<skipped' apps/passwords/build/test-results/desktopTest/TEST-cx.m42.apps.passwords.BrowserE2eTest.xml; then
+    skip "end-to-end (phone app ↔ real host ↔ Chromium with the extension): a tool is missing — see the test's SKIP line in $out/browser.log"
+  else
+    ok "end-to-end: pairing by the popup's QR, a password into the page through Chromium, a denial that fills nothing"
+  fi
+else
+  bad "end-to-end — see $out/browser.log"
+fi
+find services/link unitool-cli/apps/browser apps/passwords -path '*/build/test-results/*' -name '*.xml' -exec cp {} "$out/junit/" \; 2>/dev/null
 
 # ---------------------------------------------------------------- 3. screenshots
 step "3. Screenshots"

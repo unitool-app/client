@@ -1,9 +1,9 @@
 package cx.m42.services.ssh.agent
 
-import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.ssh.key.PrivateKey
-import cx.m42.services.ssh.wire.WireReader
-import cx.m42.services.ssh.wire.WireWriter
+import cx.m42.unitool.kit.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.PrivateKey
+import cx.m42.unitool.kit.ssh.WireReader
+import cx.m42.unitool.kit.ssh.WireWriter
 import cx.m42.superizer.ssh.AgentConstraint
 import cx.m42.superizer.ssh.ImportOutcome
 import cx.m42.superizer.ssh.SshAgent

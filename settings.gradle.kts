@@ -64,6 +64,7 @@ include(":services:vault")
 include(":services:ssh")
 include(":services:file-picker")
 include(":services:backup")
+include(":services:link")
 
 // Code the phone and the console tool share (.ai-notes/done/cli D273): one copy, used by both.
 include(":unitool-kit")
@@ -74,4 +75,5 @@ include(":unitool-cli:core")
 include(":unitool-cli:testing")
 include(":unitool-cli:apps:qr")
 include(":unitool-cli:apps:split")
+include(":unitool-cli:apps:browser")
 include(":unitool-cli:app")

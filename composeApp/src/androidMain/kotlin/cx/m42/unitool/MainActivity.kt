@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
 import androidx.fragment.app.FragmentActivity
+import cx.m42.services.link.AndroidLocalLink
 import cx.m42.services.qr.AndroidQrScanner
 import cx.m42.services.share.AndroidFileSharer
 import cx.m42.services.files.AndroidFilePicker
@@ -136,6 +137,7 @@ class MainActivity : FragmentActivity() {
                 null
             },
             sharer = AndroidFileSharer(applicationContext),
+            link = AndroidLocalLink(applicationContext),
         )
         return buildUnitool(scope, debug = BuildConfig.DEBUG, security = security, tools = tools) {
             notifier(notifier)

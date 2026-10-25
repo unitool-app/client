@@ -1,7 +1,7 @@
 package cx.m42.services.ssh.keyring
 
-import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.ssh.key.PrivateKey
+import cx.m42.unitool.kit.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.KeyStorage
 import cx.m42.superizer.ssh.KeyringDevice

@@ -16,7 +16,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  *   Ed25519, RSA, bcrypt), `SecretBytes` and the CSPRNG, moved from `services/ssh` (.ai-notes/done/cli
  *   02 §3.1);
  * - `split`: Shamir's secret sharing, a part's 48-byte form and its link (.ai-notes/done/split);
- * - `crypt`: the core of the `ucrypt` file format with the split recipient (.ai-notes/crypt 01).
+ * - `crypt`: the core of the `ucrypt` file format with the split recipient (.ai-notes/crypt 01);
+ * - `ssh`: the SSH wire format, moved from `services/ssh` (passwords-browser D545);
+ * - `link`: Noise KK / XXpsk3, frames, the pairing code, the link's messages and an mDNS codec — the
+ *   channel between a computer and a phone (usb-sign D310, passwords-browser 01);
+ * - `json`: the flat JSON of the link and the browser host, in bytes so a password is never a String.
  */
 plugins {
     alias(libs.plugins.kotlinMultiplatform)

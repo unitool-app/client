@@ -47,6 +47,9 @@ kotlin {
             // SSH public keys and age, for the export, and the platform's secure random for the
             // generator (unitool-kit, through this module's api).
             implementation(project(":services:ssh"))
+            // Listening for a paired computer in the same network, and the link's protocol
+            // (.ai-notes/passwords-browser): the contract here, the sockets in the host.
+            implementation(project(":services:link"))
         }
         val desktopTest by getting
         desktopTest.dependencies {
@@ -54,8 +57,17 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.compose.ui.test)
             implementation(kotlin("test"))
+            // BrowserE2eTest's camera: it reads the QR code off a picture of the extension's popup.
+            implementation(libs.zxing.core)
         }
     }
+}
+
+tasks.withType<Test>().configureEach {
+    // BrowserE2eTest (passwords-browser step 7): the real binary, the built extension, its driver.
+    systemProperty("unitool.binary", rootProject.file("unitool-cli/app/build/dist/unitool").absolutePath)
+    systemProperty("unitool.extension", rootProject.file("unitool-browser/dist/chrome").absolutePath)
+    systemProperty("unitool.driver", rootProject.file("unitool-browser/e2e/drive.mjs").absolutePath)
 }
 
 android {

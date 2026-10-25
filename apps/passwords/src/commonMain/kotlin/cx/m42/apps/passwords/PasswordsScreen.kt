@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +87,11 @@ internal fun PasswordsScreen(instance: PasswordsInstance) {
     val loaded by instance.loaded.collectAsState()
 
     SystemBackHandler(enabled = page != Page.List) { instance.back() }
+    // The phone listens only while this screen is composed — and in front, which the instance knows (D538).
+    DisposableEffect(instance) {
+        instance.browser.screenShown(true)
+        onDispose { instance.browser.screenShown(false) }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(AppTheme.pageBackground)) {
         // The moment it takes the Keystore to open the list: blank, not "no passwords yet".
@@ -97,7 +103,10 @@ internal fun PasswordsScreen(instance: PasswordsInstance) {
             Page.Export -> ExportPage(instance, strings)
             Page.ImportFrom -> ImportFromPage(instance, strings)
             Page.Import -> ImportPage(instance, strings)
+            Page.Computers -> ComputersPage(instance)
         }
+        // Over any page: a computer asks, the sheet answers (README §5).
+        RequestSheet(instance)
     }
 }
 
@@ -187,6 +196,7 @@ private fun ListPage(instance: PasswordsInstance, strings: PasswordsStrings) {
                         modifier = Modifier.weight(1f).testTag("pw:export"),
                     )
                 }
+                ComputersButton(instance)
             }
         }
 
@@ -251,6 +261,7 @@ private fun EmptyState(instance: PasswordsInstance, strings: PasswordsStrings) {
             variant = ButtonVariant.Secondary,
             modifier = Modifier.testTag("pw:import"),
         )
+        ComputersButton(instance)
     }
 }
 
@@ -910,12 +921,12 @@ private fun SavedKeyRow(key: KnownKey, checked: Boolean, index: Int, onToggle: (
 // -------------------------------------------------------------------- bits
 
 @Composable
-private fun FieldLabel(text: String) {
+internal fun FieldLabel(text: String) {
     Text(text = text, style = AppTheme.label, color = AppTheme.foreground, modifier = Modifier.padding(bottom = 6.dp))
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun Hint(text: String) {
     Text(text = text, style = AppTheme.footnote, color = AppTheme.muted, modifier = Modifier.padding(top = 6.dp))
 }
 
@@ -931,7 +942,7 @@ private fun ErrorLine(error: DraftError?, strings: PasswordsStrings) {
 }
 
 @Composable
-private fun Card(content: @Composable () -> Unit) {
+internal fun Card(content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -941,7 +952,7 @@ private fun Card(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+internal fun InfoRow(label: String, value: String) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
         Text(text = label, style = AppTheme.footnote, color = AppTheme.muted)
         Spacer(Modifier.height(4.dp))

@@ -14,14 +14,14 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.security.keystore.KeyProtection
-import cx.m42.services.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.SshPublicKey
 import cx.m42.services.ssh.SshSig
 import cx.m42.services.ssh.crypto.EcdsaDer
-import cx.m42.services.ssh.key.PrivateKey
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.services.ssh.probe.HandMadeCertificate
 import cx.m42.services.ssh.probe.RawPrivateKey
-import cx.m42.services.ssh.wire.WireReader
-import cx.m42.services.ssh.wire.wire
+import cx.m42.unitool.kit.ssh.WireReader
+import cx.m42.unitool.kit.ssh.wire
 import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.Chip
 import cx.m42.superizer.ssh.GeneratedKind
@@ -341,7 +341,7 @@ internal class KeystoreBackend(
                             when (key.kind) {
                                 is SshPublicKey.Kind.Ecdsa -> {
                                     val (r, s) = EcdsaDer.decode(raw) ?: return@withContext ChipResult.Failed("der")
-                                    wire { string(key.type); string(cx.m42.services.ssh.wire.WireWriter().mpint(r).mpint(s).toByteArray()) }
+                                    wire { string(key.type); string(cx.m42.unitool.kit.ssh.WireWriter().mpint(r).mpint(s).toByteArray()) }
                                 }
                                 is SshPublicKey.Kind.Rsa -> wire { string(if (rsaHash == Hash.SHA256) SshSig.RSA_SHA256 else SshSig.RSA_SHA512); string(raw) }
                                 else -> wire { string(SshPublicKey.ED25519); string(raw) }

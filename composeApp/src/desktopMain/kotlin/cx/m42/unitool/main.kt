@@ -1,6 +1,7 @@
 package cx.m42.unitool
 
 import androidx.compose.runtime.remember
+import cx.m42.services.link.DesktopLocalLink
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.keyring.FileRecordStore
 import cx.m42.superizer.host.SystemClock
@@ -28,7 +29,7 @@ import kotlinx.coroutines.SupervisorJob
 fun main(args: Array<String>) = application {
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
     val security = remember { desktopSecurity(scope) }
-    val superizer = remember { buildUnitool(scope, debug = true, security = security, tools = HostTools(files = DesktopFilePicker(), sharer = DesktopFileSharer())) }
+    val superizer = remember { buildUnitool(scope, debug = true, security = security, tools = HostTools(files = DesktopFilePicker(), sharer = DesktopFileSharer(), link = DesktopLocalLink())) }
 
     remember {
         args.firstOrNull { it.startsWith("--link=") || it.startsWith("--activate=") }

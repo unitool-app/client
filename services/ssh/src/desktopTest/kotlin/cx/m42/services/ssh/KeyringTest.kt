@@ -1,7 +1,9 @@
 package cx.m42.services.ssh
 
+import cx.m42.unitool.kit.ssh.PrivateKey
+import cx.m42.unitool.kit.ssh.SshPublicKey
 import cx.m42.services.ssh.diagnostics.KeyFindings
-import cx.m42.services.ssh.key.OpenSshKeyFile
+import cx.m42.unitool.kit.ssh.OpenSshKeyFile
 import cx.m42.superizer.app.AppId
 import cx.m42.superizer.diagnostics.DiagnosticsCode
 import cx.m42.superizer.ssh.Chip

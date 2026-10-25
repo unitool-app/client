@@ -1,9 +1,10 @@
 package cx.m42.services.ssh
 
+import cx.m42.unitool.kit.ssh.SshPublicKey
 import cx.m42.services.ssh.crypto.PlatformEcdsa
-import cx.m42.services.ssh.wire.WireReader
-import cx.m42.services.ssh.wire.WireWriter
-import cx.m42.services.ssh.wire.wire
+import cx.m42.unitool.kit.ssh.WireReader
+import cx.m42.unitool.kit.ssh.WireWriter
+import cx.m42.unitool.kit.ssh.wire
 import cx.m42.unitool.kit.crypto.Ed25519
 import cx.m42.unitool.kit.crypto.Hash
 import cx.m42.unitool.kit.crypto.Rsa

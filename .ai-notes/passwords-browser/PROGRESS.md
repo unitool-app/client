@@ -1,0 +1,23 @@
+# passwords-browser — ход работ
+
+План — README.md (контракт). Здесь — что сделано по шагам из задачи владельца и чем проверено.
+🟢 — сделано, тесты зелёные, не закоммичено (коммит — по просьбе владельца) · — не начато.
+
+| Шаг | Что | Статус | Проверка |
+|---|---|---|---|
+| 0 | Разведка native messaging: Chromium, Chrome, Firefox .deb, Firefox snap | 🟢 2026-10-25 | 00-recon.md: все четыре запускают host и получают ответ; snap — через портал (D555) |
+| 1 | `kit.link`: Noise KK / XXpsk3, векторы cacophony, кадры | 🟢 2026-10-25 | `NoiseVectorsTest` (cacophony, оба шаблона, все 6 сообщений + hash) и `LinkTest` (кадры, преамбула, сообщения, QR, JSON, mDNS, привязка и сеанс в памяти) — desktop и linuxX64 зелёные. SSH wire переехал в `kit.ssh`. Протокол — 01-protocol.md (D556–D561) |
+| 2 | `Age` + `OpenSshKeyFile` в `:unitool-kit` (linuxX64) | 🟢 2026-10-25 | `kit.ssh`: `SshPublicKey`, `Age` (синхронная расшифровка + части для suspend-цепочки чипа), `OpenSshKeyFile`, `PrivateKey`, `KeyFileRefusal`. `services/ssh` — typealias `SshPublicKey`, фасад `Age`, отказы → `ImportRefusal`. Тесты: `KitSshTest` на фикстурах настоящих ssh-keygen/age (desktop + linuxX64), `AgeInteropTest` и `OpenSshKeyFileInteropTest` с живыми `age` 1.1.1 и OpenSSH 9.6 (desktop); `services/ssh` 63, 2FA, «Пароли», backup — зелёные |
+| 3 | `services/link`: TCP :47370 + mDNS, Android и iOS | 🟢 2026-10-25 | Контракт `LocalLink` + `LinkResponder` (половина протокола телефона). Android: сокет + `NsdManager` + `MulticastLock`, `CHANGE_WIFI_MULTICAST_STATE` в манифесте модуля (D552). iOS: POSIX + `NSNetService`, Info.plist `NSLocalNetworkUsageDescription` и `NSBonjourServices` (D551) — только компилируется, не запускалось. Desktop: сокет + свой mDNS-ответчик. Хост регистрирует `LocalLink.Key` на всех трёх. `LinkOverSocketsTest`: тест-«компьютер» находит телефон по mDNS, привязка, сеанс, чужой ключ и мусор — закрытие |
+| 4 | «Пароли»: «Компьютеры», лист запроса | 🟢 2026-10-25 | `BrowserLink` (слушает только на экране, впереди, со списком и привязками — D538), «Компьютеры» (привязать по QR с отпечатком SSH-ключа, журнал 20 строк, «Забыть» через устройство), лист запроса поверх любой страницы: сайт в Unicode и `xn--`, «по словам компьютера», подбор по eTLD+1 (снимок PSL 2026-10-22, `scripts/update-psl.sh`), поиск по всем и красное предупреждение (D543), `UserPresence` на каждый пароль (D544), ответ — age на SSH-ключ компьютера без заметки (D542). Отказы: часы ±5 мин, повтор id, занят, список закрыт. `BrowserLinkTest` (6, настоящий сокет, тест — «компьютер», расшифровывает ответ своим ключом), `SitesTest` (4) |
+| 5 | CLI `unitool browser` | 🟢 2026-10-25 | `unitool-cli/apps/browser`: `install` (обёртка D566 + манифесты Chrome/Chromium/Brave/Edge/Firefox, `--extension-id`, подсказка для snap), `pair` (QR в терминал, ключ под фразой — отказ до QR, D545), `devices`, `forget`, `host` (native messaging, 01 §5). mDNS — свой UDP (5353 в группе + свой порт, D547), запасной путь — последний адрес. Расшифровка age ключом из `~/.ssh` в host, проверка `req` и `origin`. `BrowserHostTest` 10×2 (JVM и linuxX64, «телефон» на kit). `NativeHostTest` (в `services/link`): настоящий бинарь ↔ JVM-телефон по сети — привязка и пароль, файлы 0600 |
+| 6 | Расширение `unitool-browser/` | 🟢 2026-10-25 | TypeScript, MV3, Chrome + Firefox из одного кода; права ровно `nativeMessaging`/`activeTab`/`scripting`/`storage` (D549); попап (поиск, «подтвердите», вставлено/отказ, QR привязки от host, телефоны), Ctrl+Shift+L, вставка в вкладку запроса с тем же origin, без отправки формы, иначе «Копировать» с честной строкой про буфер. vitest 23 (вставка в jsdom, фон на поддельных `chrome.*`, собранные манифесты); `web-ext lint` — 0 замечаний. Пароль — только в памяти фона |
+| 7 | Сквозной тест + список ручной проверки | 🟢 2026-10-25 (авто) · ⏸ телефоны | `BrowserE2eTest` (~10 с): «Пароли» на desktop-слушателе ↔ настоящий бинарь после `unitool browser install` ↔ Chromium 145 с `dist/chrome`; настоящее Ctrl+Shift+L (xdotool, Xvfb); QR читается ZXing со снимка попапа; пароль в форме, форма не отправлена, отказ не вставляет. Нашёл и закрыл ошибку попапа (после «Привязано» следующее открытие не начинало запрос). Ручная проверка — 02-manual-check.md, **не проведена** |
+
+## Чего нет в этой работе
+
+- USB (D548) и пуш-будильник (D550) — по заданию.
+- Телефоны: на настоящих Android и iPhone ничего не запускалось (02-manual-check.md).
+- Firefox в сквозном тесте: только разведка механизма (00-recon, в том числе snap) и `web-ext lint`;
+  вставку через Firefox руками — пункт 22 списка.
+- Публикация расширения (магазины, подпись AMO) и страница приватности — вопрос `twofa-browser` 197.

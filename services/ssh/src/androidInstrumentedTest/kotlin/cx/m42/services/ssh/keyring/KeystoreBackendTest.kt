@@ -1,5 +1,6 @@
 package cx.m42.services.ssh.keyring
 
+import cx.m42.services.ssh.id
 import android.app.KeyguardManager
 import android.content.Context
 import android.os.Debug
@@ -9,9 +10,9 @@ import android.security.keystore.KeyProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import cx.m42.services.ssh.SshKeyringHost
-import cx.m42.services.ssh.SshPublicKey
-import cx.m42.services.ssh.key.OpenSshKeyFile
-import cx.m42.services.ssh.key.PrivateKey
+import cx.m42.unitool.kit.ssh.SshPublicKey
+import cx.m42.unitool.kit.ssh.OpenSshKeyFile
+import cx.m42.unitool.kit.ssh.PrivateKey
 import cx.m42.superizer.runtime.Clock
 import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.ImportOptions

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The listener for a computer in the same Wi-Fi (passwords-browser D538). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      A "normal" permission, granted at install without a prompt (D552). The lock is taken only while
+      the Passwords screen listens: without it many phones drop the multicast queries a computer
+      sends to find them.
+    -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+</manifest>

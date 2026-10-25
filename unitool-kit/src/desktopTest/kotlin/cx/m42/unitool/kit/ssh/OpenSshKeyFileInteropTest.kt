@@ -1,8 +1,5 @@
-package cx.m42.services.ssh
+package cx.m42.unitool.kit.ssh
 
-import cx.m42.services.ssh.key.OpenSshKeyFile
-import cx.m42.services.ssh.key.PrivateKey
-import cx.m42.superizer.ssh.ImportRefusal
 import cx.m42.unitool.kit.crypto.SecretBytes
 import java.io.File
 import kotlin.test.Test
@@ -85,7 +82,8 @@ class OpenSshKeyFileInteropTest {
     fun aCanaryKeyWrittenInTheClearIsEncryptedByTheRealSshKeygen() = Tools.tempDir { dir ->
         // 03 §3.1: our writer makes the clear file, OpenSSH encrypts it, and we import what OpenSSH made.
         Tools.require("ssh-keygen")
-        val seed = cx.m42.superizer.testing.Canary.ED25519_SEED.reveal()
+        // Superizer's canary seed, masked the way its `Canary` masks it (XOR 0x5a): the kit depends on no Superizer, tests included.
+        val seed = "090f0a1f0813001f0877191b141b0803771f1e686f6f6b6377091f1f1e776a6b".chunked(2).map { (it.toInt(16) xor 0x5a).toByte() }.toByteArray()
         val file = File(dir, "canary")
         file.writeBytes(PrivateKey.ed25519(seed, "canary").use { OpenSshKeyFile.write(it, null) })
         Tools.ownerOnly(file)
@@ -101,15 +99,15 @@ class OpenSshKeyFileInteropTest {
         fun refusal(bytes: ByteArray) = (OpenSshKeyFile.parse(bytes) as? OpenSshKeyFile.Parsed.Refused)?.refusal
 
         val chacha = Tools.keygen(dir, "chacha", listOf("-t", "ed25519"), passphrase, listOf("-Z", "chacha20-poly1305@openssh.com", "-a", "4"))
-        assertEquals(ImportRefusal.UnsupportedCipher, refusal(chacha.readBytes()))
+        assertEquals(KeyFileRefusal.UnsupportedCipher, refusal(chacha.readBytes()))
         val pem = Tools.keygen(dir, "pem", listOf("-t", "rsa", "-b", "2048"), "", listOf("-m", "PEM"))
-        assertEquals(ImportRefusal.OldFormat, refusal(pem.readBytes()))
-        assertEquals(ImportRefusal.PublicKeyOnly, refusal(File(chacha.path + ".pub").readBytes()))
+        assertEquals(KeyFileRefusal.OldFormat, refusal(pem.readBytes()))
+        assertEquals(KeyFileRefusal.PublicKeyOnly, refusal(File(chacha.path + ".pub").readBytes()))
         val short = Tools.keygen(dir, "short", listOf("-t", "rsa", "-b", "1024"))
-        assertEquals(ImportRefusal.RsaTooShort, refusal(short.readBytes()))
-        assertEquals(ImportRefusal.PuttyFormat, refusal("PuTTY-User-Key-File-3: ssh-ed25519\n".toByteArray()))
-        assertEquals(ImportRefusal.NotAKey, refusal("hello".toByteArray()))
-        assertEquals(ImportRefusal.NotAKey, refusal(byteArrayOf(0, -1, 3)))
+        assertEquals(KeyFileRefusal.RsaTooShort, refusal(short.readBytes()))
+        assertEquals(KeyFileRefusal.PuttyFormat, refusal("PuTTY-User-Key-File-3: ssh-ed25519\n".toByteArray()))
+        assertEquals(KeyFileRefusal.NotAKey, refusal("hello".toByteArray()))
+        assertEquals(KeyFileRefusal.NotAKey, refusal(byteArrayOf(0, -1, 3)))
         val broken = String(chacha.readBytes()).replace("-----END", "AAAA-----END").toByteArray()
         assertTrue(refusal(broken) != null)
     }
