@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
 import cx.m42.superizer.app.AppConfigSpec
 import cx.m42.superizer.app.AppIcon
@@ -87,7 +88,7 @@ class ExtensibilityTest : UnitoolTest() {
         // tap there — the same path every other app takes, and nothing in `composeApp` names it.
         onNodeWithTag("home:add").performClick()
         waitForIdle()
-        onNodeWithTag("catalog:row-weather").performClick()
+        onNodeWithTag("catalog:row-weather").performScrollTo().performClick()
         waitForIdle()
         onNodeWithContentDescription("Назад").performClick()
         waitForIdle()

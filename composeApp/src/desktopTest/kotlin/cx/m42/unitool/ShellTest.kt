@@ -241,13 +241,13 @@ class ShellTest : UnitoolTest() {
         // Unlocked is unlocked: the catalog lists it, and no second promo code is needed.
         onNodeWithTag("home:add").performClick()
         waitForIdle()
-        onNodeWithTag("catalog:row-test-app").assertIsDisplayed()
+        onNodeWithTag("catalog:row-test-app").performScrollTo().assertIsDisplayed()
     }
 
     private fun ComposeUiTest.addFromCatalog(id: String) {
         onNodeWithTag("home:add").performClick()
         waitForIdle()
-        onNodeWithTag("catalog:row-$id").performClick()
+        onNodeWithTag("catalog:row-$id").performScrollTo().performClick()
         waitForIdle()
         onNodeWithContentDescription("Назад").performClick()
         waitForIdle()
