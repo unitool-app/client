@@ -150,7 +150,7 @@ internal class BrowserLink(
         val current = listener
         when {
             want && current == null -> {
-                val opened = link!!.open(runtime.scope, names) { pipe -> serve(pipe) }
+                val opened = link.open(runtime.scope, names) { pipe -> serve(pipe) }
                 listener = opened
                 listenerState = runtime.scope.launch {
                     opened.state.collect { state ->
