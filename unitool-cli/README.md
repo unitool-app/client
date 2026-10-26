@@ -18,8 +18,18 @@ ln -s "$PWD/unitool-cli/bin/unitool" ~/bin/     # optional: `unitool` from anywh
 
 `unitool` is a native Linux executable (Kotlin/Native, `linuxX64`). It is one file of about 1.4 MB,
 needs no JVM and starts in about 30 ms. Copy `build/dist/unitool` anywhere and it runs. It links only
-glibc 2.19 or newer, which every Linux has, so it is not *statically* linked: a fully static glibc
-build from Kotlin/Native's toolchain crashes at start (`.ai-notes/done/cli`, D291).
+glibc 2.19 or newer, which every Linux has.
+
+A fully static file, with nothing from the system at all, is a second task:
+
+```sh
+./gradlew :unitool-cli:app:installStatic       # build/dist-static/unitool-linux-x86_64 + .sha256
+```
+
+Kotlin/Native cannot link that by itself, so `app/static-ld.sh` stands in for its linker and
+rewrites the link line. The file is about 2.6 MB. CI builds it on every push that touches the CLI or
+the kit (`.github/workflows/cli.yml`) and keeps it as the run's artifact, with the SHA-256 in the
+artifact and in the run's summary.
 
 Building it needs the same setup as the phone build (a JDK for Gradle, the Android SDK in
 `local.properties`), because Gradle configures the whole project. The first build downloads

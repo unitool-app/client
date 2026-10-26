@@ -1,0 +1,97 @@
+# The console tool as one static file: `unitool-linux-x86_64`, with nothing from the system at all,
+# and its SHA-256 next to it (`:unitool-cli:app:installStatic`, unitool-cli/app/static-ld.sh). The
+# pair is kept as the run's artifact. The hash is also printed in the run's summary, so a downloaded
+# file can be checked against the page and not only against a file that came in the same zip.
+name: Build the static unitool CLI
+
+on:
+  push:
+    # Only a change the binary is built from builds it (.ai-notes/done/cli D284 runs the other way:
+    # a CLI-only commit ships no phone build).
+    paths:
+      - 'unitool-cli/**'
+      - 'unitool-kit/**'
+      - 'gradle/**'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - '.github/workflows/cli.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cli-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gradle configures the whole project, the phone included, so the library has to be there,
+      # next door as on a developer's machine (the same as verify.yml).
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
+          ref: ${{ vars.SUPERIZER_REF || '' }}
+          token: ${{ secrets.SUPERIZER_TOKEN || github.token }}
+          path: superizer-checkout
+
+      - name: Put the library where settings.gradle.kts looks for it
+        run: mv superizer-checkout ../superizer
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # Not used by the CLI, but configuring the phone's modules needs an SDK (unitool-cli/README.md).
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Link the static binary
+        run: ./gradlew --no-daemon :unitool-cli:app:installStatic
+
+      # The tests that run the real binary (NativeBinaryTest, BrowserHostTest) read
+      # dist/unitool, so the static file goes there and they run against what is published.
+      - name: Test the static binary
+        run: |
+          set -euo pipefail
+          dist=unitool-cli/app/build/dist-static
+          (cd "$dist" && sha256sum -c unitool-linux-x86_64.sha256)
+          file "$dist/unitool-linux-x86_64" | tee /dev/stderr | grep -q 'statically linked'
+          mkdir -p unitool-cli/app/build/dist
+          cp "$dist/unitool-linux-x86_64" unitool-cli/app/build/dist/unitool
+          ./gradlew --no-daemon :unitool-cli:core:jvmTest :unitool-cli:apps:qr:jvmTest \
+            :unitool-cli:apps:split:jvmTest :unitool-cli:apps:browser:jvmTest
+
+      - name: Write the SHA-256 into the summary
+        run: |
+          set -euo pipefail
+          line=$(cat unitool-cli/app/build/dist-static/unitool-linux-x86_64.sha256)
+          {
+            echo '### unitool-linux-x86_64'
+            echo
+            echo "Commit \`${GITHUB_SHA}\`, $(stat -c %s unitool-cli/app/build/dist-static/unitool-linux-x86_64) bytes, static."
+            echo
+            echo '```'
+            echo "$line"
+            echo '```'
+            echo
+            echo 'Check a download with `sha256sum -c unitool-linux-x86_64.sha256`, then `chmod +x`:'
+            echo 'the artifact zip does not keep the executable bit.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unitool-linux-x86_64-${{ github.sha }}
+          path: unitool-cli/app/build/dist-static/
+          if-no-files-found: error
