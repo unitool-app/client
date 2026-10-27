@@ -9,6 +9,7 @@ import cx.m42.unitool.security.KeyPrompts
 import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.unitool.settings.HostTools
 import cx.m42.services.files.WebFilePicker
+import cx.m42.services.files.WebFileSaver
 import cx.m42.services.share.WebFileSharer
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
@@ -26,7 +27,7 @@ fun main() {
             val prompts = KeyPrompts()
             UnitoolSecurity(SshKeyringHost.passphraseOnly(LocalStorageRecordStore(), prompts, SystemClock, Platform.Web, scope), prompts)
         }
-        val superizer = remember { buildUnitool(scope, debug = true, security = security, tools = HostTools(files = WebFilePicker(), sharer = WebFileSharer())) }
+        val superizer = remember { buildUnitool(scope, debug = true, security = security, tools = HostTools(files = WebFilePicker(), sharer = WebFileSharer(), saver = WebFileSaver())) }
 
         remember {
             // `?activate=` and `?link=` are the browser's version of a QR code and a notification

@@ -53,11 +53,19 @@ public object Age {
     public fun encrypt(plaintext: ByteArray, recipients: List<SshPublicKey>, random: (Int) -> ByteArray): ByteArray {
         val usable = recipients.filter(::supports)
         require(usable.isNotEmpty()) { "no recipient age can encrypt to" }
+        return write(plaintext, random) { fileKey -> usable.map { stanza(it, fileKey, random) } }
+    }
+
+    /**
+     * The file around whatever stanzas [stanzas] makes of a fresh file key — the SSH ones above, and
+     * age's own X25519 and scrypt in [AgeKeys]. The key is wiped after.
+     */
+    internal fun write(plaintext: ByteArray, random: (Int) -> ByteArray, stanzas: (ByteArray) -> List<String>): ByteArray {
         val fileKey = random(16)
         try {
             val header = buildString {
                 append(INTRO).append('\n')
-                usable.forEach { append(stanza(it, fileKey, random)) }
+                stanzas(fileKey).forEach { append(it) }
                 append("---")
             }
             val macKey = hkdfSha256(fileKey, ByteArray(0), "header".encodeToByteArray(), 32)
@@ -138,19 +146,31 @@ public object Age {
     }
 
     /** With the file key a stanza gave: the MAC, then every chunk. [fileKey] is wiped either way. */
-    public fun openPayload(header: Header, fileKey: ByteArray, opener: SshPublicKey): Opened {
+    public fun openPayload(header: Header, fileKey: ByteArray, opener: SshPublicKey): Opened =
+        when (val body = openBody(header, fileKey)) {
+            is Body.Ok -> Opened.Ok(body.plaintext, opener)
+            is Body.Failed -> Opened.Failed(body.code)
+        }
+
+    internal sealed interface Body {
+        class Ok(val plaintext: ByteArray) : Body
+        class Failed(val code: String) : Body
+    }
+
+    /** [openPayload] for any kind of stanza: `unwrap`, `mac` or `payload` when it fails. */
+    internal fun openBody(header: Header, fileKey: ByteArray): Body {
         try {
-            if (fileKey.size != 16) return Opened.Failed("unwrap")
+            if (fileKey.size != 16) return Body.Failed("unwrap")
             val macKey = hkdfSha256(fileKey, ByteArray(0), "header".encodeToByteArray(), 32)
             val mac = hmac(Hash.SHA256, macKey, header.macInput)
-            if (!constantTimeEquals(mac, header.mac)) return Opened.Failed("mac")
+            if (!constantTimeEquals(mac, header.mac)) return Body.Failed("mac")
             val binary = header.binary
-            if (binary.size - header.payloadStart < 16) return Opened.Failed("payload")
+            if (binary.size - header.payloadStart < 16) return Body.Failed("payload")
             val nonce = binary.copyOfRange(header.payloadStart, header.payloadStart + 16)
             val payloadKey = hkdfSha256(fileKey, nonce, "payload".encodeToByteArray(), 32)
             val plaintext = open(payloadKey, binary, header.payloadStart + 16)
             payloadKey.fill(0)
-            return if (plaintext == null) Opened.Failed("payload") else Opened.Ok(plaintext, opener)
+            return if (plaintext == null) Body.Failed("payload") else Body.Ok(plaintext)
         } finally {
             fileKey.fill(0)
         }
@@ -240,7 +260,7 @@ public object Age {
     }
 
     /** `-> type args…`, then the body in 64-column lines, the last always shorter — empty if need be. */
-    private fun stanzaText(type: String, args: List<String>, body: ByteArray): String = buildString {
+    internal fun stanzaText(type: String, args: List<String>, body: ByteArray): String = buildString {
         append("-> ").append(type)
         args.forEach { append(' ').append(it) }
         append('\n')

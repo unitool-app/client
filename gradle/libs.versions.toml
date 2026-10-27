@@ -33,7 +33,7 @@ googleServices = "4.5.0"
 # The library, as a dependency. Bumped by an explicit commit ("bump superizer to 0.2.0") so the
 # version this host is built against is a decision in the history rather than whatever was in
 # mavenLocal that afternoon.
-superizer = "0.6.1"
+superizer = "0.7.0"
 
 [libraries]
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }

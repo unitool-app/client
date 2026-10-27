@@ -3,6 +3,7 @@ package cx.m42.unitool
 import cx.m42.services.link.IosLocalLink
 import cx.m42.services.qr.IosQrScanner
 import cx.m42.services.files.IosFilePicker
+import cx.m42.services.files.IosFileSaver
 import cx.m42.unitool.settings.HostTools
 import cx.m42.services.share.IosFileSharer
 import cx.m42.services.vault.IosKeychainVault
@@ -83,6 +84,7 @@ object UnitoolIos {
         // the 2FA app draws its scan button from whether it is there.
         val tools = HostTools(
             files = IosFilePicker(),
+            saver = IosFileSaver(),
             qr = if (IosQrScanner.available()) IosQrScanner { superizer?.settings?.langTag?.value ?: "en" } else null,
             sharer = IosFileSharer(),
             link = IosLocalLink(),

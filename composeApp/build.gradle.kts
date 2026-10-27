@@ -156,6 +156,7 @@ kotlin {
             implementation(project(":apps:date-diff"))
             implementation(project(":apps:counters"))
             implementation(project(":apps:passwords"))
+            implementation(project(":apps:cr-restore"))
             implementation(project(":services:qr-scanner"))
             implementation(project(":services:share"))
             implementation(project(":services:vault"))

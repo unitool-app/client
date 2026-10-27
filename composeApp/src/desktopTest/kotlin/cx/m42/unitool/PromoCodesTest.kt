@@ -54,4 +54,18 @@ class PromoCodesTest : UnitoolTest() {
         }
         assertIs<SshKeysScreen>(superizer.codeScreens[SshKeysScreen.ID])
     }
+
+    @Test
+    fun theCrRestoreCodeOpensItForOneVisitAndNothingNearItDoes() = runBlocking<Unit> {
+        val activation = testSuperizer().activation
+        // Exact, in either bracket (.ai-notes/cr-restore D596) — and a secret app's one visit: no unlock.
+        listOf("[cr-restore]", "{cr-restore}", " [cr-restore] ").forEach { code ->
+            val result = assertIs<ActivationResult.Success>(activation.fromPromo(code), code)
+            assertEquals(AppId("cr-restore"), result.activation.appId)
+            assertEquals(false, result.activation.unlock, code)
+        }
+        listOf("cr-restore", "CR-RESTORE", "crrestore", "[CR-RESTORE]", "[cr restore]", "(cr-restore)").forEach { code ->
+            assertEquals(ActivationResult.Rejected(ActivationResult.Reason.UnknownCode), activation.fromPromo(code), code)
+        }
+    }
 }

@@ -12,6 +12,7 @@ import cx.m42.services.link.AndroidLocalLink
 import cx.m42.services.qr.AndroidQrScanner
 import cx.m42.services.share.AndroidFileSharer
 import cx.m42.services.files.AndroidFilePicker
+import cx.m42.services.files.AndroidFileSaver
 import cx.m42.unitool.settings.HostTools
 import cx.m42.services.vault.AndroidKeystoreVault
 import cx.m42.services.ssh.SshKeyringHost
@@ -131,6 +132,7 @@ class MainActivity : FragmentActivity() {
         // 2FA export; the system's picker opens a key file or a backup.
         val tools = HostTools(
             files = AndroidFilePicker(applicationContext),
+            saver = AndroidFileSaver(applicationContext),
             qr = if (AndroidQrScanner.available(applicationContext)) {
                 AndroidQrScanner(applicationContext) { Holder.superizer?.settings?.langTag?.value ?: "en" }
             } else {

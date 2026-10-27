@@ -1,8 +1,9 @@
 package cx.m42.unitool.kit.crypto
 
 /**
- * AES-128/192/256 (FIPS 197), the encrypting direction only — which is all CTR and GCM need — for
- * the ciphers `ssh-keygen` puts private keys under: `aes*-ctr` and `aes256-gcm@openssh.com` (02 §8).
+ * AES-128/192/256 (FIPS 197): the encrypting direction for the ciphers `ssh-keygen` puts private
+ * keys under, `aes*-ctr` and `aes256-gcm@openssh.com` (02 §8), and since cr-restore (D610) the
+ * decrypting one too, for `openssl enc`'s CBC and ECB.
  *
  * Byte-oriented and table-driven. That is a timing channel in principle; here the operation runs
  * once per import or unlock, on the device, over a file the person handed over (04 step 2), and
@@ -11,7 +12,9 @@ package cx.m42.unitool.kit.crypto
  *
  * Checked against the JDK's `Cipher` and the NIST SP 800-38A / GCM vectors in `desktopTest`.
  */
-public class Aes(key: ByteArray) {
+public class Aes(key: ByteArray) : BlockCipher {
+
+    override val blockSize: Int get() = 16
 
     private val rounds: Int
     private val w: IntArray
@@ -36,7 +39,7 @@ public class Aes(key: ByteArray) {
     }
 
     /** One 16-byte block from [input] at [inOffset] to [output] at [outOffset]. */
-    public fun encryptBlock(input: ByteArray, inOffset: Int, output: ByteArray, outOffset: Int) {
+    override fun encryptBlock(input: ByteArray, inOffset: Int, output: ByteArray, outOffset: Int) {
         val s = IntArray(16) { input[inOffset + it].toInt() and 0xff }
         addRoundKey(s, 0)
         for (round in 1 until rounds) {
@@ -51,8 +54,46 @@ public class Aes(key: ByteArray) {
         for (i in 0 until 16) output[outOffset + i] = s[i].toByte()
     }
 
+    /** FIPS 197 §5.3, the inverse cipher: the rounds backwards with the inverse steps. */
+    override fun decryptBlock(input: ByteArray, inOffset: Int, output: ByteArray, outOffset: Int) {
+        val s = IntArray(16) { input[inOffset + it].toInt() and 0xff }
+        addRoundKey(s, rounds)
+        for (round in rounds - 1 downTo 1) {
+            invShiftRows(s)
+            invSubBytes(s)
+            addRoundKey(s, round)
+            invMixColumns(s)
+        }
+        invShiftRows(s)
+        invSubBytes(s)
+        addRoundKey(s, 0)
+        for (i in 0 until 16) output[outOffset + i] = s[i].toByte()
+    }
+
     /** The key schedule, gone. */
-    public fun wipe(): Unit = w.fill(0)
+    override fun wipe(): Unit = w.fill(0)
+
+    private fun invSubBytes(s: IntArray) {
+        for (i in 0 until 16) s[i] = INV_SBOX[s[i]]
+    }
+
+    private fun invShiftRows(s: IntArray) {
+        for (r in 1 until 4) {
+            val row = IntArray(4) { s[r + 4 * it] }
+            for (c in 0 until 4) s[r + 4 * ((c + r) % 4)] = row[c]
+        }
+    }
+
+    /** Each column times {0b}x³ + {0d}x² + {09}x + {0e} (§5.3.3). */
+    private fun invMixColumns(s: IntArray) {
+        for (c in 0 until 4) {
+            val a0 = s[4 * c]; val a1 = s[4 * c + 1]; val a2 = s[4 * c + 2]; val a3 = s[4 * c + 3]
+            s[4 * c] = mul(a0, 14) xor mul(a1, 11) xor mul(a2, 13) xor mul(a3, 9)
+            s[4 * c + 1] = mul(a0, 9) xor mul(a1, 14) xor mul(a2, 11) xor mul(a3, 13)
+            s[4 * c + 2] = mul(a0, 13) xor mul(a1, 9) xor mul(a2, 14) xor mul(a3, 11)
+            s[4 * c + 3] = mul(a0, 11) xor mul(a1, 13) xor mul(a2, 9) xor mul(a3, 14)
+        }
+    }
 
     private fun addRoundKey(s: IntArray, round: Int) {
         for (c in 0 until 4) {
@@ -106,6 +147,21 @@ public class Aes(key: ByteArray) {
                 box[p] = (x xor 0x63) and 0xff
             } while (p != 1)
             box[0] = 0x63
+        }
+
+        private val INV_SBOX: IntArray = IntArray(256).also { inv -> for (i in 0 until 256) inv[SBOX[i]] = i }
+
+        /** [a] · [b] in GF(2⁸) with AES's polynomial, [b] small. */
+        private fun mul(a: Int, b: Int): Int {
+            var x = a
+            var y = b
+            var r = 0
+            while (y != 0) {
+                if (y and 1 != 0) r = r xor x
+                x = xtime(x)
+                y = y ushr 1
+            }
+            return r
         }
 
         private fun rotl8(x: Int, n: Int): Int = ((x shl n) or (x ushr (8 - n))) and 0xff

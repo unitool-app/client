@@ -33,10 +33,15 @@ internal object Tools {
         dir?.let { builder.directory(it) }
         if (input == null) builder.redirectInput(ProcessBuilder.Redirect.from(File("/dev/null")))
         val process = builder.start()
-        if (input != null) process.outputStream.use { it.write(input) }
+        // Input and error on their own threads: a tool that writes as it reads fills its stdout pipe
+        // long before a large input is all in, and would wait on us while we wait on it.
+        val writer = input?.let { bytes -> Thread { runCatching { process.outputStream.use { it.write(bytes) } } }.apply { start() } }
+        var err = ""
+        val errors = Thread { err = process.errorStream.readAllBytes().decodeToString() }.apply { start() }
         val out = process.inputStream.readAllBytes()
-        val err = process.errorStream.readAllBytes().decodeToString()
         check(process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) { "$command timed out" }
+        writer?.join()
+        errors.join()
         return Result(process.exitValue(), out, err)
     }
 

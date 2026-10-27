@@ -4,6 +4,7 @@ import cx.m42.services.link.LocalLink
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.PublicKeyBookAdmin
+import cx.m42.services.files.FileSaver
 import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.ssh.KeyId
@@ -52,6 +53,8 @@ public class HostTools(
     public val opened: OpenedSections? = null,
     /** Listening for a computer in the same network, for the passwords in a browser (.ai-notes/passwords-browser). */
     public val link: LocalLink? = null,
+    /** The platform's "Save as", for what cr-restore decrypted (.ai-notes/cr-restore D603). */
+    public val saver: FileSaver? = null,
 ) {
-    internal fun with(network: NetworkService, opened: OpenedSections): HostTools = HostTools(files, qr, sharer, network, opened, link)
+    internal fun with(network: NetworkService, opened: OpenedSections): HostTools = HostTools(files, qr, sharer, network, opened, link, saver)
 }

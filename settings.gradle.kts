@@ -56,6 +56,7 @@ include(":apps:twofa")
 include(":apps:date-diff")
 include(":apps:counters")
 include(":apps:passwords")
+include(":apps:cr-restore")
 
 // Platform capabilities an app may ask for by key (D19), each with its host-side implementation.
 include(":services:qr-scanner")

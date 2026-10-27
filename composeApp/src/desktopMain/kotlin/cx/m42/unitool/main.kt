@@ -10,6 +10,7 @@ import cx.m42.unitool.security.KeyPrompts
 import cx.m42.unitool.security.UnitoolSecurity
 import cx.m42.unitool.settings.HostTools
 import cx.m42.services.files.DesktopFilePicker
+import cx.m42.services.files.DesktopFileSaver
 import cx.m42.services.share.DesktopFileSharer
 import java.io.File
 import androidx.compose.ui.unit.dp
@@ -29,7 +30,7 @@ import kotlinx.coroutines.SupervisorJob
 fun main(args: Array<String>) = application {
     val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
     val security = remember { desktopSecurity(scope) }
-    val superizer = remember { buildUnitool(scope, debug = true, security = security, tools = HostTools(files = DesktopFilePicker(), sharer = DesktopFileSharer(), link = DesktopLocalLink())) }
+    val superizer = remember { buildUnitool(scope, debug = true, security = security, tools = HostTools(files = DesktopFilePicker(), sharer = DesktopFileSharer(), link = DesktopLocalLink(), saver = DesktopFileSaver())) }
 
     remember {
         args.firstOrNull { it.startsWith("--link=") || it.startsWith("--activate=") }

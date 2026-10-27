@@ -70,7 +70,7 @@ fi
 
 # ---------------------------------------------------------------- 2. tests
 step "2. Unit and UI tests (desktop)"
-if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest :apps:twofa:desktopTest :apps:date-diff:desktopTest :apps:counters:desktopTest :apps:passwords:desktopTest \
+if ./gradlew --quiet :composeApp:desktopTest :apps:calculator:desktopTest :apps:currency-converter:desktopTest :apps:twofa:desktopTest :apps:date-diff:desktopTest :apps:counters:desktopTest :apps:passwords:desktopTest :apps:cr-restore:desktopTest \
     :services:ssh:desktopTest :services:link:desktopTest :services:backup:desktopTest :services:qr-scanner:testDebugUnitTest --continue > "$out/test.log" 2>&1; then
   ok "host and app tests"
 else
@@ -80,7 +80,7 @@ mkdir -p "$out/junit"
 find . -path '*/build/test-results/*' -name '*.xml' -not -path "./$out/*" -exec cp {} "$out/junit/" \; 2>/dev/null
 say "  ($(ls "$out/junit" 2>/dev/null | wc -l) result files)"
 # The interop tests skip rather than pass when a tool is missing (03 §4, D158); say which, by name.
-for tool in ssh-keygen ssh-add age; do
+for tool in ssh-keygen ssh-add age age-keygen openssl script; do
   command -v "$tool" > /dev/null || skip "interop tests that need $tool: not installed here"
 done
 

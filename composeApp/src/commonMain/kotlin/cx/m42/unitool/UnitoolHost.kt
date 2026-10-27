@@ -14,6 +14,7 @@ import cx.m42.apps.calculator.CalculatorApp
 import cx.m42.apps.calculator.CalculatorConfig
 import cx.m42.apps.converter.ConverterApp
 import cx.m42.apps.counters.CountersApp
+import cx.m42.apps.crrestore.CrRestoreApp
 import cx.m42.apps.passwords.PasswordsApp
 import cx.m42.apps.dates.DatesApp
 import cx.m42.apps.testapp.SecretTestApp
@@ -42,6 +43,7 @@ import cx.m42.unitool.web.WebSignIn
 import cx.m42.services.link.LocalLink
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
+import cx.m42.services.files.FileSaver
 import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.host.net.KtorNetworkService
@@ -137,6 +139,9 @@ private fun buildHost(
     // Secret (done/idea/09): never listed anywhere, opened by its code for one visit at a time. A test
     // piece, to see what the type looks like; its code goes to the stores' reviewers with the rest.
     register(SecretTestApp())
+    // Secret too (.ai-notes/cr-restore): opens what age, `openssl enc` and a split secret sealed, from
+    // QR codes or a file, and keeps none of it. No lock to come in; the lock while it holds a result.
+    register(CrRestoreApp())
 
     // What a fresh install has on Home (D48): the calculator, because that is what Unitool was.
     // The converter is one tap away in the catalog; the bench app gets there by its promo code.
@@ -174,6 +179,9 @@ private fun buildHost(
                 // and there the code is simply unknown.
                 "f458affb8d674cd1effa3e6429cfe36901c0890602fd4153a95f939f6741f2c1" to ActivationResult.OpenHostScreen(SshKeysScreen.ID),
                 "b9666358dbb806fbfafde72c98e46c2b92bca3fa811e6a23280c123d8cce657e" to ActivationResult.OpenHostScreen(SshKeysScreen.ID),
+                // cr-restore, the same way: bracketed and exact, with either bracket (.ai-notes/cr-restore D596).
+                "f6c3354b5f9a7045c1bf196bab55fee4a4ff1b99cd3ece40e643356101ea6a7e" to ActivationResult.Success(Activation(AppId(CrRestoreApp.ID))),
+                "e3865e28654ae6c36b8c0b095c339129e1b268e0bec1c5537a4ac6d414f26983" to ActivationResult.Success(Activation(AppId(CrRestoreApp.ID))),
             ),
         ),
     )
@@ -195,6 +203,7 @@ private fun buildHost(
     // The phone's side of a computer's browser asking for a password (passwords-browser D538).
     tools.link?.let { service(LocalLink.Key, it) }
     tools.files?.let { service(FilePicker.Key, it) }
+    tools.saver?.let { service(FileSaver.Key, it) }
 
     // Keys, the vault behind runtime.secrets, and the diagnostics of both (ssh-new 07 §2.2): what
     // the platform brought, handed to the host. A test builds without it and gets a host with none.
