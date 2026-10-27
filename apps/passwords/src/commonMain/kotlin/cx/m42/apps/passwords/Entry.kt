@@ -1,6 +1,7 @@
 package cx.m42.apps.passwords
 
-import cx.m42.unitool.kit.crypto.secureRandomBytes
+import cx.m42.unitool.kit.password.PasswordMode
+import cx.m42.unitool.kit.password.PasswordRules
 import kotlinx.serialization.Serializable
 
 /**
@@ -25,8 +26,11 @@ internal data class PasswordEntry(
     val subtitle: String get() = username.takeIf { it != shownTitle }.orEmpty()
 
     /** The same login twice: same password and login, and the same site under whichever name it has. */
-    fun sameAs(other: PasswordEntry): Boolean =
-        password == other.password && username == other.username &&
+    fun sameAs(other: PasswordEntry): Boolean = password == other.password && sameLogin(other)
+
+    /** The same login on the same site, whatever its password — an import that may change it. */
+    fun sameLogin(other: PasswordEntry): Boolean =
+        username == other.username &&
             (Site.host(url) == Site.host(other.url) || shownTitle.equals(other.shownTitle, ignoreCase = true))
 
     /** Where [query] can be found: the names a person searches by, never the password or the note. */
@@ -80,36 +84,39 @@ internal object Site {
 }
 
 /**
- * The form's "Generate" (D529): [LENGTH] characters from the platform's secure random, with at
- * least one of each kind — a site that wants "a digit and a symbol" takes it as it is.
- *
- * The symbols leave out quotes, the comma and the backslash, so a password can be pasted into a
- * CSV file or a shell without anyone thinking about escaping. Letters and digits that look alike
- * (l, I, O, 0, 1) are left out too: a password is sometimes typed by hand off this screen.
+ * The generator's settings as the app stores them (plain storage: they are no secret), one
+ * `key=value` per `;`. Anything unreadable falls back to the default, so an older or a damaged
+ * value never stops the form from opening.
  */
-internal object Generator {
-    const val LENGTH = 20
+internal object GeneratorSettings {
+    fun encode(rules: PasswordRules): String = listOf(
+        "mode" to rules.mode.name,
+        "length" to rules.length,
+        "words" to rules.words,
+        "kinds" to buildString {
+            if (rules.lower) append('l')
+            if (rules.upper) append('u')
+            if (rules.digits) append('d')
+            if (rules.symbols) append('s')
+        },
+        "lookalike" to rules.lookAlike,
+    ).joinToString(";") { (k, v) -> "$k=$v" }
 
-    private const val LOWER = "abcdefghijkmnopqrstuvwxyz"
-    private const val UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-    private const val DIGITS = "23456789"
-    private const val SYMBOLS = "!#$%&*+-=?@^_"
-    private val KINDS = listOf(LOWER, UPPER, DIGITS, SYMBOLS)
-    private val ALL = KINDS.joinToString("")
-
-    fun password(random: (Int) -> ByteArray = ::secureRandomBytes): String {
-        while (true) {
-            val chars = CharArray(LENGTH) { ALL[uniform(ALL.length, random)] }
-            if (KINDS.all { kind -> chars.any { it in kind } }) return chars.concatToString()
-        }
-    }
-
-    /** 0 until [bound], with no bias: bytes past the last whole multiple of [bound] are drawn again. */
-    private fun uniform(bound: Int, random: (Int) -> ByteArray): Int {
-        val limit = 256 - 256 % bound
-        while (true) {
-            val b = random(1)[0].toInt() and 0xFF
-            if (b < limit) return b % bound
-        }
+    fun decode(text: String?): PasswordRules {
+        val fields = text.orEmpty().split(';').mapNotNull { it.split('=', limit = 2).takeIf { p -> p.size == 2 } }
+            .associate { (k, v) -> k to v }
+        val default = PasswordRules()
+        val kinds = fields["kinds"]
+        val rules = PasswordRules(
+            mode = PasswordMode.entries.firstOrNull { it.name == fields["mode"] } ?: default.mode,
+            length = fields["length"]?.toIntOrNull() ?: default.length,
+            words = fields["words"]?.toIntOrNull() ?: default.words,
+            lower = kinds?.let { 'l' in it } ?: default.lower,
+            upper = kinds?.let { 'u' in it } ?: default.upper,
+            digits = kinds?.let { 'd' in it } ?: default.digits,
+            symbols = kinds?.let { 's' in it } ?: default.symbols,
+            lookAlike = fields["lookalike"]?.toBooleanStrictOrNull() ?: default.lookAlike,
+        )
+        return if (rules.problem == null && rules.kinds.isNotEmpty()) rules else default
     }
 }

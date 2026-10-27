@@ -68,14 +68,34 @@ internal data class ImportBatch(
      */
     val columns: Columns? = null,
 ) {
-    /** [entry] has no id yet; it gets one when it is added. */
-    data class Found(val entry: PasswordEntry, val known: Boolean)
+    /**
+     * [entry] has no id yet; it gets one when it is added. [replaces] is the stored entry with the
+     * same login on the same site and another password: the import changes it, or sits beside it.
+     */
+    data class Found(val entry: PasswordEntry, val known: Boolean, val replaces: String? = null)
 
     /** [line] counts records from 1, the header included, the way a spreadsheet numbers rows. */
     data class Failed(val line: Int, val error: DraftError, val title: String = "")
 
     val addable: List<Int> get() = found.indices.filter { !found[it].known }
+
+    /** The addable ones whose password differs from a stored one. */
+    val differing: List<Int> get() = addable.filter { found[it].replaces != null }
+
+    /** The rows [filter] leaves on the import page. */
+    fun shown(filter: ImportFilter): List<Int> = found.indices.filter {
+        val row = found[it]
+        when (filter) {
+            ImportFilter.All -> true
+            ImportFilter.New -> !row.known && row.replaces == null
+            ImportFilter.Differing -> row.replaces != null
+            ImportFilter.Known -> row.known
+        }
+    }
 }
+
+/** Which rows the import page shows: a long file is easier to go through a kind at a time. */
+internal enum class ImportFilter { All, New, Differing, Known }
 
 /** Where each field is in a file's rows; -1 for a field the file does not have. */
 internal data class Columns(
@@ -123,8 +143,9 @@ internal object Import {
     }
 
     /**
-     * [text]'s rows, added to [into]. An entry the device has already is marked known; one already
-     * in the batch — the same QR code scanned twice — is left out. Null when [text] is not a CSV
+     * [text]'s rows, added to [into]. An entry the device has already is marked known, one whose
+     * password differs from a stored login's points at it; one already in the batch — the same QR
+     * code scanned twice — is left out. Null when [text] is not a CSV
      * of logins at all: no header and fewer columns than the export writes.
      */
     fun read(text: String, have: List<PasswordEntry>, into: ImportBatch = ImportBatch()): ImportBatch? {
@@ -142,7 +163,11 @@ internal object Import {
             val draft = EntryDraft(at(columns.title), at(columns.username), at(columns.password), at(columns.url), at(columns.note))
             draft.validate(id = "", now = 0)
                 .onSuccess { read ->
-                    if (found.none { it.entry.sameAs(read) }) found += ImportBatch.Found(read, known = have.any { it.sameAs(read) })
+                    if (found.none { it.entry.sameAs(read) }) {
+                        val known = have.any { it.sameAs(read) }
+                        val replaces = if (known) null else have.firstOrNull { it.sameLogin(read) }?.id
+                        found += ImportBatch.Found(read, known, replaces)
+                    }
                 }
                 .onFailure {
                     val title = draft.title.ifBlank { Site.host(draft.url) }.ifBlank { draft.username }

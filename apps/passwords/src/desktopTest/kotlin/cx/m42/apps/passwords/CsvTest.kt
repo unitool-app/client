@@ -1,5 +1,7 @@
 package cx.m42.apps.passwords
 
+import cx.m42.unitool.kit.password.PasswordMode
+import cx.m42.unitool.kit.password.PasswordRules
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -83,7 +85,17 @@ class CsvTest {
         val batch = assertNotNull(Import.read(csv, have))
         assertTrue(batch.found.single().known)
         assertEquals(emptyList(), batch.addable)
+        assertEquals(emptyList(), batch.differing)
         assertEquals(ImportBatch.Failed(3, DraftError.NoPassword, "Empty"), batch.failed.single())
+    }
+
+    @Test
+    fun anotherPasswordForAStoredLoginPointsAtIt() {
+        val have = listOf(PasswordEntry("a", "GitHub", "octocat", "s3cret", "https://github.com"))
+        val csv = "name,url,username,password\nGitHub,https://www.github.com/login,octocat,n3w\nGitHub,https://github.com,other,x\n"
+        val batch = assertNotNull(Import.read(csv, have))
+        assertEquals(listOf("a", null), batch.found.map { it.replaces })
+        assertEquals(listOf(0), batch.differing)
     }
 
     @Test
@@ -93,14 +105,14 @@ class CsvTest {
     }
 
     @Test
-    fun theGeneratorMakesTwentyCharactersOfEveryKind() {
-        repeat(200) {
-            val password = Generator.password()
-            assertEquals(Generator.LENGTH, password.length)
-            assertTrue(password.any { it.isLowerCase() } && password.any { it.isUpperCase() } && password.any { it.isDigit() })
-            assertTrue(password.any { !it.isLetterOrDigit() })
-            assertTrue(password.none { it in "lIO01\"',\\ " }, password)
-        }
+    fun theGeneratorsSettingsReadBackAndFallBackToTheDefault() {
+        val rules = PasswordRules(PasswordMode.Mixed, length = 32, words = 8, upper = false, lookAlike = true)
+        assertEquals(rules, GeneratorSettings.decode(GeneratorSettings.encode(rules)))
+        assertEquals(PasswordRules(), GeneratorSettings.decode(null))
+        assertEquals(PasswordRules(), GeneratorSettings.decode("garbage"))
+        assertEquals(PasswordRules(), GeneratorSettings.decode("mode=Words;kinds="), "no character set: the default")
+        assertEquals(PasswordRules(), GeneratorSettings.decode("length=2"), "out of range: the default")
+        assertEquals(PasswordRules(length = 30), GeneratorSettings.decode("length=30;future=1"))
     }
 
     @Test

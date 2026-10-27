@@ -47,7 +47,7 @@ import cx.m42.superizer.ui.components.RowDivider
 import kotlinx.coroutines.delay
 
 @Composable
-private fun browserStrings(): BrowserStrings {
+internal fun browserStrings(): BrowserStrings {
     val runtime = LocalAppRuntime.current
     val langTag by runtime.locale.langTag.collectAsState()
     return remember(langTag) { runtime.locale.pick(BrowserStringTables, BrowserStringsEn) }

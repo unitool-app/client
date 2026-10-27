@@ -44,9 +44,10 @@ kotlin {
             implementation(project(":services:qr-scanner"))
             // The export's share sheet, likewise: the contract here, the sheet in the host.
             implementation(project(":services:share"))
-            // SSH public keys and age, for the export, and the platform's secure random for the
-            // generator (unitool-kit, through this module's api).
+            // SSH public keys and age, for the export.
             implementation(project(":services:ssh"))
+            // The password generator on the device's secure random, shared with `unitool password`.
+            implementation(project(":unitool-kit"))
             // Listening for a paired computer in the same network, and the link's protocol
             // (.ai-notes/passwords-browser): the contract here, the sockets in the host.
             implementation(project(":services:link"))

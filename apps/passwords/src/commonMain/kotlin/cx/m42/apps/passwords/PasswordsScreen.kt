@@ -1,7 +1,10 @@
 package cx.m42.apps.passwords
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,12 +24,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -50,10 +57,14 @@ import cx.m42.superizer.ui.components.AppButton
 import cx.m42.superizer.ui.components.AppTextField
 import cx.m42.superizer.ui.components.ButtonSize
 import cx.m42.superizer.ui.components.ButtonVariant
+import cx.m42.superizer.ui.components.IconButton
 import cx.m42.superizer.ui.components.RowDivider
 import cx.m42.superizer.ui.components.Switch
 import cx.m42.superizer.ui.i18n.LocalDiagnosticsStrings
 import cx.m42.superizer.ui.platform.SystemBackHandler
+import cx.m42.unitool.kit.password.EntropyPool
+import cx.m42.unitool.kit.password.PasswordGenerator
+import cx.m42.unitool.kit.password.PasswordMode
 
 /** A password field (06 §7): no suggestions over it and nothing learnt from it. */
 private val SecretKeyboard = KeyboardOptions(
@@ -85,8 +96,9 @@ internal fun PasswordsScreen(instance: PasswordsInstance) {
     val strings = remember(langTag) { runtime.locale.pick(PasswordsStringTables, PasswordsStringsEn) }
     val page by instance.page.collectAsState()
     val loaded by instance.loaded.collectAsState()
+    val menuOpen by instance.menuOpen.collectAsState()
 
-    SystemBackHandler(enabled = page != Page.List) { instance.back() }
+    SystemBackHandler(enabled = page != Page.List || menuOpen) { instance.back() }
     // The phone listens only while this screen is composed — and in front, which the instance knows (D538).
     DisposableEffect(instance) {
         instance.browser.screenShown(true)
@@ -121,98 +133,141 @@ private fun ListPage(instance: PasswordsInstance, strings: PasswordsStrings) {
     val problem by instance.storageProblem.collectAsState()
     val clipboard = rememberSecretClipboard()
     val findings by LocalAppRuntime.current.diagnostics.findings.collectAsState()
+    val menuOpen by instance.menuOpen.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize().testTag("pw:list")) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().testTag("pw:list")) {
+            // At the top and staying there: the search, and beside it what used to sit under the
+            // list — import and export ran off the bottom of a long one.
+            if (entries.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        AppTextField(
+                            value = query,
+                            onValueChange = { instance.query.value = it },
+                            placeholder = strings.search,
+                            keyboardOptions = PlainKeyboard,
+                            modifier = Modifier.testTag("pw:search"),
+                        )
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(
+                        onClick = { instance.menuOpen.value = !menuOpen },
+                        label = strings.more,
+                        modifier = Modifier.testTag("pw:menu"),
+                    ) { color -> Text(text = "⋯", style = tokens.subtitle, color = color) }
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+            ) {
+                Protection(findings)
+                problem?.let {
+                    Text(
+                        text = strings.storageProblem(it),
+                        style = tokens.body,
+                        color = tokens.danger,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .clip(RoundedCornerShape(tokens.radius))
+                            .background(tokens.background)
+                            .padding(16.dp)
+                            .testTag("pw:storage-problem"),
+                    )
+                }
+                if (entries.isEmpty()) {
+                    if (problem?.blocksWriting != true) EmptyState(instance, strings)
+                } else {
+                    val visible = instance.visibleEntries()
+                    if (visible.isEmpty()) {
+                        Text(
+                            text = strings.nothingFound,
+                            style = tokens.body,
+                            color = tokens.muted,
+                            modifier = Modifier.padding(8.dp).testTag("pw:nothing-found"),
+                        )
+                    }
+                    Card {
+                        visible.forEachIndexed { index, entry ->
+                            if (index > 0) RowDivider()
+                            EntryRow(
+                                entry = entry,
+                                index = index,
+                                copied = copied == Copied(entry.id, Field.Password),
+                                strings = strings,
+                                onOpen = { instance.openDetails(entry) },
+                                onCopy = { instance.copyTo(clipboard, entry, Field.Password) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (problem == StorageProblem.Locked) {
+                AppButton(
+                    text = strings.unlock,
+                    onClick = instance::unlock,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("pw:unlock"),
+                )
+            }
+            if (problem?.blocksWriting != true) {
+                AppButton(
+                    text = strings.add,
+                    onClick = instance::startAdd,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("pw:add"),
+                )
+            }
+        }
+        if (menuOpen) ListMenu(instance, strings, canImport = problem?.blocksWriting != true)
+    }
+}
+
+/** The "⋯" menu under the button: things done once in a while. A tap outside closes it. */
+@Composable
+private fun ListMenu(instance: PasswordsInstance, strings: PasswordsStrings, canImport: Boolean) {
+    val tokens = AppTheme
+    val close = { instance.menuOpen.value = false }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { close() } })
         Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .align(Alignment.TopEnd)
+                .padding(top = 64.dp, end = 16.dp)
+                .width(240.dp)
+                .shadow(8.dp, RoundedCornerShape(tokens.radius))
+                .clip(RoundedCornerShape(tokens.radius))
+                .background(tokens.pageBackground)
+                .testTag("pw:menu-items"),
         ) {
-            Protection(findings)
-            problem?.let {
+            val items = buildList {
+                if (canImport) add(Triple(strings.import, "pw:import", instance::startImport))
+                add(Triple(strings.export, "pw:export", instance::startExport))
+                if (instance.browser.available) add(Triple(browserStrings().computers, "pw:computers", instance::startComputers))
+            }
+            items.forEachIndexed { index, (text, tag, action) ->
+                if (index > 0) RowDivider()
                 Text(
-                    text = strings.storageProblem(it),
+                    text = text,
                     style = tokens.body,
-                    color = tokens.danger,
+                    color = tokens.foreground,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                        .clip(RoundedCornerShape(tokens.radius))
-                        .background(tokens.background)
-                        .padding(16.dp)
-                        .testTag("pw:storage-problem"),
+                        .clickable(role = Role.Button) {
+                            close()
+                            action()
+                        }
+                        .testTag(tag)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                 )
             }
-            if (entries.isEmpty()) {
-                if (problem?.blocksWriting != true) EmptyState(instance, strings)
-            } else {
-                AppTextField(
-                    value = query,
-                    onValueChange = { instance.query.value = it },
-                    placeholder = strings.search,
-                    keyboardOptions = PlainKeyboard,
-                    modifier = Modifier.testTag("pw:search"),
-                )
-                Spacer(Modifier.height(12.dp))
-                val visible = instance.visibleEntries()
-                if (visible.isEmpty()) {
-                    Text(
-                        text = strings.nothingFound,
-                        style = tokens.body,
-                        color = tokens.muted,
-                        modifier = Modifier.padding(8.dp).testTag("pw:nothing-found"),
-                    )
-                }
-                Card {
-                    visible.forEachIndexed { index, entry ->
-                        if (index > 0) RowDivider()
-                        EntryRow(
-                            entry = entry,
-                            index = index,
-                            copied = copied == Copied(entry.id, Field.Password),
-                            strings = strings,
-                            onOpen = { instance.openDetails(entry) },
-                            onCopy = { instance.copyTo(clipboard, entry, Field.Password) },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                // Below the list rather than beside Add: things done once in a while.
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (problem?.blocksWriting != true) {
-                        AppButton(
-                            text = strings.import,
-                            onClick = instance::startImport,
-                            variant = ButtonVariant.Ghost,
-                            modifier = Modifier.weight(1f).testTag("pw:import"),
-                        )
-                    }
-                    AppButton(
-                        text = strings.export,
-                        onClick = instance::startExport,
-                        variant = ButtonVariant.Ghost,
-                        modifier = Modifier.weight(1f).testTag("pw:export"),
-                    )
-                }
-                ComputersButton(instance)
-            }
-        }
-
-        if (problem == StorageProblem.Locked) {
-            AppButton(
-                text = strings.unlock,
-                onClick = instance::unlock,
-                modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("pw:unlock"),
-            )
-        }
-        if (problem?.blocksWriting != true) {
-            AppButton(
-                text = strings.add,
-                onClick = instance::startAdd,
-                modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("pw:add"),
-            )
         }
     }
 }
@@ -353,14 +408,7 @@ private fun FormPage(instance: PasswordsInstance, strings: PasswordsStrings) {
             modifier = Modifier.testTag("pw:password"),
         )
         Spacer(Modifier.height(8.dp))
-        AppButton(
-            text = strings.generate,
-            onClick = instance::generate,
-            size = ButtonSize.Sm,
-            variant = ButtonVariant.Secondary,
-            modifier = Modifier.testTag("pw:generate"),
-        )
-        Hint(strings.generateHint)
+        GeneratorBlock(instance, strings)
         Spacer(Modifier.height(12.dp))
         FieldLabel(strings.url)
         AppTextField(
@@ -397,6 +445,192 @@ private fun FormPage(instance: PasswordsInstance, strings: PasswordsStrings) {
             variant = ButtonVariant.Ghost,
             modifier = Modifier.fillMaxWidth().testTag("pw:cancel"),
         )
+    }
+}
+
+/**
+ * Generate and its settings, folded under the button: characters, words or words joined by
+ * characters, how many, and of which kinds. The hint says what the password holds in bits.
+ */
+@Composable
+private fun GeneratorBlock(instance: PasswordsInstance, strings: PasswordsStrings) {
+    val rules by instance.generator.collectAsState()
+    val open by instance.generatorOpen.collectAsState()
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AppButton(
+            text = strings.generate,
+            onClick = instance::generate,
+            size = ButtonSize.Sm,
+            variant = ButtonVariant.Secondary,
+            modifier = Modifier.testTag("pw:generate"),
+        )
+        Spacer(Modifier.width(8.dp))
+        AppButton(
+            text = strings.generatorSettings + if (open) " ▴" else " ▾",
+            onClick = { instance.generatorOpen.value = !open },
+            size = ButtonSize.Sm,
+            variant = ButtonVariant.Ghost,
+            modifier = Modifier.testTag("pw:generator-settings"),
+        )
+    }
+    val drawn by instance.drawn.collectAsState()
+    val drawing by instance.drawing.collectAsState()
+    val mixed = if (drawn.samples > 0) strings.withDrawing(drawn.bits) else ""
+    Hint(strings.generateHint(rules, PasswordGenerator.entropyBits(rules).toInt()) + mixed, Modifier.testTag("pw:generate-hint"))
+    if (!open) return
+
+    Spacer(Modifier.height(8.dp))
+    Card {
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("pw:generator")) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PasswordMode.entries.forEach { mode ->
+                    AppButton(
+                        text = strings.mode(mode),
+                        onClick = { instance.changeGenerator { copy(mode = mode) } },
+                        size = ButtonSize.Sm,
+                        variant = if (rules.mode == mode) ButtonVariant.Default else ButtonVariant.Secondary,
+                        modifier = Modifier.testTag("pw:gen-mode-${mode.name.lowercase()}"),
+                    )
+                }
+            }
+            if (rules.mode == PasswordMode.Characters) {
+                CountRow(strings.length, rules.length) { delta -> instance.changeGenerator { copy(length = length + delta) } }
+            } else {
+                CountRow(strings.wordCount, rules.words) { delta -> instance.changeGenerator { copy(words = words + delta) } }
+            }
+            // Words alone are only words; between words go digits and symbols, never letters.
+            if (rules.mode != PasswordMode.Words) RowDivider()
+            if (rules.mode == PasswordMode.Characters) {
+                KindRow(strings.lower, rules.lower, "lower") { instance.changeGenerator { copy(lower = !lower) } }
+                KindRow(strings.upper, rules.upper, "upper") { instance.changeGenerator { copy(upper = !upper) } }
+            }
+            if (rules.mode != PasswordMode.Words) {
+                KindRow(strings.digits, rules.digits, "digits") { instance.changeGenerator { copy(digits = !digits) } }
+                KindRow(strings.symbols, rules.symbols, "symbols") { instance.changeGenerator { copy(symbols = !symbols) } }
+                KindRow(strings.lookAlike, rules.lookAlike, "lookalike") { instance.changeGenerator { copy(lookAlike = !lookAlike) } }
+            }
+            RowDivider()
+            if (drawing) {
+                DrawingField(instance, strings, drawn)
+            } else {
+                AppButton(
+                    text = strings.drawEntropy,
+                    onClick = { instance.drawing.value = true },
+                    size = ButtonSize.Sm,
+                    variant = ButtonVariant.Ghost,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).testTag("pw:gen-draw"),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The field a finger or the mouse draws on (on a computer, moving over it is enough). Every point
+ * goes to the instance's pool; the line is only there so the person sees something happen. The
+ * field takes the events itself, so the form does not scroll under a finger that draws.
+ */
+@Composable
+private fun DrawingField(instance: PasswordsInstance, strings: PasswordsStrings, drawn: Drawn) {
+    val tokens = AppTheme
+    val trail = remember { mutableStateListOf<Offset>() }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(text = strings.drawHint, style = tokens.footnote, color = tokens.muted)
+        Spacer(Modifier.height(8.dp))
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .clip(RoundedCornerShape(tokens.radius))
+                .background(tokens.surface)
+                .testTag("pw:gen-field")
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { change ->
+                                val at = change.position
+                                // Sub-pixel positions say more than whole pixels; a sixteenth is still within what a sensor reports.
+                                instance.addPoint((at.x * 16).toInt(), (at.y * 16).toInt())
+                                trail += at
+                                if (trail.size > TRAIL) trail.removeAt(0)
+                                change.consume()
+                            }
+                        }
+                    }
+                },
+        ) {
+            for (i in 1 until trail.size) drawLine(tokens.primary, trail[i - 1], trail[i], strokeWidth = 3f)
+        }
+        Spacer(Modifier.height(8.dp))
+        val target = EntropyPool.TARGET_BITS
+        Box(modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(tokens.border)) {
+            Box(modifier = Modifier.fillMaxWidth(minOf(drawn.bits, target) / target.toFloat()).height(4.dp).background(tokens.primary))
+        }
+        Text(
+            text = strings.drawProgress(drawn.bits, target, drawn.seconds),
+            style = tokens.footnote,
+            color = tokens.muted,
+            modifier = Modifier.padding(top = 6.dp).testTag("pw:gen-progress"),
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AppButton(text = strings.drawDone, onClick = instance::finishDrawing, size = ButtonSize.Sm, modifier = Modifier.testTag("pw:gen-draw-done"))
+            AppButton(
+                text = strings.drawReset,
+                onClick = {
+                    instance.clearDrawing()
+                    trail.clear()
+                },
+                size = ButtonSize.Sm,
+                variant = ButtonVariant.Secondary,
+                modifier = Modifier.testTag("pw:gen-draw-reset"),
+            )
+        }
+    }
+}
+
+/** How many of the latest points the drawn line keeps. */
+private const val TRAIL = 600
+
+@Composable
+private fun CountRow(label: String, value: Int, onStep: (Int) -> Unit) {
+    val tokens = AppTheme
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, style = tokens.label, color = tokens.foreground, modifier = Modifier.weight(1f))
+        AppButton(text = "−", onClick = { onStep(-1) }, size = ButtonSize.Sm, variant = ButtonVariant.Secondary, modifier = Modifier.testTag("pw:gen-shorter"))
+        Text(
+            text = value.toString(),
+            style = tokens.body.copy(fontFeatureSettings = "tnum"),
+            color = tokens.foreground,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(48.dp).testTag("pw:gen-count"),
+        )
+        AppButton(text = "+", onClick = { onStep(1) }, size = ButtonSize.Sm, variant = ButtonVariant.Secondary, modifier = Modifier.testTag("pw:gen-longer"))
+    }
+}
+
+@Composable
+private fun KindRow(label: String, checked: Boolean, tag: String, onToggle: () -> Unit) {
+    val tokens = AppTheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Switch, onClick = onToggle)
+            .testTag("pw:gen-$tag")
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, style = tokens.label, color = tokens.foreground, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, label = label)
     }
 }
 
@@ -617,6 +851,12 @@ private fun ImportPage(instance: PasswordsInstance, strings: PasswordsStrings) {
     val selected by instance.importSelected.collectAsState()
     val error by instance.draftError.collectAsState()
     val scanning by instance.scanning.collectAsState()
+    val keepBoth by instance.importKeepBoth.collectAsState()
+    val filter by instance.importFilter.collectAsState()
+    val shown = batch.shown(filter)
+    val shownAddable = shown.filter { it in batch.addable }
+    val differing = batch.differing
+    val replacing = if (keepBoth) 0 else differing.count { it in selected }
     val chosen = batch.addable.count { it in selected }
 
     Column(
@@ -627,17 +867,69 @@ private fun ImportPage(instance: PasswordsInstance, strings: PasswordsStrings) {
             .testTag("pw:import-page"),
     ) {
         Text(
-            text = strings.importIntro(batch.found.size, batch.addable.size),
+            text = strings.importIntro(batch.found.size, batch.addable.size - differing.size, differing.size),
             style = tokens.body,
             color = tokens.muted,
             modifier = Modifier.testTag("pw:import-intro"),
         )
-        if (batch.found.isNotEmpty()) {
+        // Same login, same site, another password: said out loud, and what happens to it is a choice.
+        if (differing.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             Card {
-                batch.found.forEachIndexed { index, found ->
-                    if (index > 0) RowDivider()
-                    ImportRow(found, index in selected, index, strings) { instance.toggleImport(index) }
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text(text = strings.differing(differing.size), style = tokens.body, color = tokens.foreground)
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Switch) { instance.importKeepBoth.value = !keepBoth }
+                            .testTag("pw:import-keep-both"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text = strings.keepBoth, style = tokens.label, color = tokens.foreground, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = keepBoth, label = strings.keepBoth)
+                    }
+                    Hint(strings.keepBothHint)
+                }
+            }
+        }
+        if (batch.found.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            // A filter only where there is more than one kind; each with how many it holds.
+            val kinds = ImportFilter.entries.drop(1).filter { batch.shown(it).isNotEmpty() }
+            if (kinds.size > 1) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    (listOf(ImportFilter.All) + kinds).forEach { kind ->
+                        AppButton(
+                            text = "${strings.filter(kind)} ${batch.shown(kind).size}",
+                            onClick = { instance.importFilter.value = kind },
+                            size = ButtonSize.Sm,
+                            variant = if (kind == filter) ButtonVariant.Default else ButtonVariant.Secondary,
+                            modifier = Modifier.testTag("pw:import-filter-${kind.name.lowercase()}"),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+            if (shownAddable.size > 1) {
+                val all = shownAddable.all { it in selected }
+                AppButton(
+                    text = if (all) strings.selectNone else strings.selectAll,
+                    onClick = { instance.selectShown(!all) },
+                    size = ButtonSize.Sm,
+                    variant = ButtonVariant.Ghost,
+                    modifier = Modifier.testTag("pw:import-select-all"),
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            Card {
+                shown.forEachIndexed { position, index ->
+                    if (position > 0) RowDivider()
+                    ImportRow(batch.found[index], index in selected, index, keepBoth, strings) { instance.toggleImport(index) }
                 }
             }
         }
@@ -664,7 +956,7 @@ private fun ImportPage(instance: PasswordsInstance, strings: PasswordsStrings) {
         Spacer(Modifier.height(16.dp))
         if (batch.addable.isNotEmpty()) {
             AppButton(
-                text = strings.importAdd(chosen),
+                text = strings.importAdd(chosen - replacing, replacing),
                 onClick = { instance.importEntries() },
                 enabled = chosen > 0,
                 modifier = Modifier.fillMaxWidth().testTag("pw:import-add"),
@@ -681,7 +973,7 @@ private fun ImportPage(instance: PasswordsInstance, strings: PasswordsStrings) {
 }
 
 @Composable
-private fun ImportRow(found: ImportBatch.Found, checked: Boolean, index: Int, strings: PasswordsStrings, onToggle: () -> Unit) {
+private fun ImportRow(found: ImportBatch.Found, checked: Boolean, index: Int, keepBoth: Boolean, strings: PasswordsStrings, onToggle: () -> Unit) {
     val tokens = AppTheme
     val entry = found.entry
     Row(
@@ -704,6 +996,13 @@ private fun ImportRow(found: ImportBatch.Found, checked: Boolean, index: Int, st
                 Text(text = entry.subtitle, style = tokens.footnote, color = tokens.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (found.known) Text(text = strings.alreadyHere, style = tokens.footnote, color = tokens.muted)
+            if (found.replaces != null) {
+                Text(
+                    text = "${strings.passwordDiffers}: ${if (keepBoth) strings.willAddBeside else strings.willReplace}",
+                    style = tokens.footnote,
+                    color = tokens.accent,
+                )
+            }
         }
         if (!found.known) {
             Spacer(Modifier.width(12.dp))
@@ -926,8 +1225,8 @@ internal fun FieldLabel(text: String) {
 }
 
 @Composable
-internal fun Hint(text: String) {
-    Text(text = text, style = AppTheme.footnote, color = AppTheme.muted, modifier = Modifier.padding(top = 6.dp))
+internal fun Hint(text: String, modifier: Modifier = Modifier) {
+    Text(text = text, style = AppTheme.footnote, color = AppTheme.muted, modifier = modifier.padding(top = 6.dp))
 }
 
 @Composable

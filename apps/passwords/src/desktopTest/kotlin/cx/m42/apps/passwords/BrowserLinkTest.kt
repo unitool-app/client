@@ -146,6 +146,7 @@ class BrowserLinkTest {
 
     private fun AppTestScope<*>.pairWith(computer: Computer, camera: Camera) {
         computer.clock = runtime.clock::now
+        click("pw:menu")
         click("pw:computers")
         assertShown("pw:computers-page")
         assertShown("pw:no-computers")
@@ -317,6 +318,7 @@ class BrowserLinkTest {
     fun aCodeThatIsNotOneOrHasAnEcdsaKeyIsTurnedAway() {
         val camera = Camera()
         runAppTest(PasswordsApp(), prepare = prepared(FakeUserPresence(), camera)) {
+            click("pw:menu")
             click("pw:computers")
             camera.next = "otpauth://totp/x?secret=AAAA"
             click("pw:pair")
@@ -339,6 +341,8 @@ class BrowserLinkTest {
 
     @Test
     fun noLinkNoComputers() = runAppTest(PasswordsApp(), prepare = { it.secrets.entries[KEY_ENTRIES] = stored }) {
+        click("pw:menu")
+        assertShown("pw:export")
         assertAbsent("pw:computers")
     }
 }

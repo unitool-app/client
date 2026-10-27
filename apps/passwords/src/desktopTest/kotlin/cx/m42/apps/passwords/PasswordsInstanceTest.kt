@@ -1,7 +1,13 @@
 package cx.m42.apps.passwords
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.Age
@@ -17,6 +23,9 @@ import cx.m42.superizer.testing.FakeFilePicker
 import cx.m42.superizer.testing.FakeSshKeyring
 import cx.m42.superizer.testing.FakeUserPresence
 import cx.m42.superizer.testing.runAppTest
+import cx.m42.unitool.kit.password.PasswordGenerator
+import cx.m42.unitool.kit.password.PasswordMode
+import cx.m42.unitool.kit.password.PasswordRules
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -77,13 +86,85 @@ class PasswordsInstanceTest {
         type("pw:username", "me@mail")
         click("pw:generate")
         val generated = pw.draft.value.password
-        assertEquals(Generator.LENGTH, generated.length)
+        assertEquals(PasswordGenerator.DEFAULT_LENGTH, generated.length)
         click("pw:save")
         assertShown("pw:list")
         val saved = decode(runtime.secrets.entries.getValue(KEY_ENTRIES)).single()
         assertEquals(listOf("Mail", "me@mail", generated), listOf(saved.title, saved.username, saved.password))
         assertEquals(runtime.clock.now(), saved.changed)
         assertTrue(runtime.storage.entries.values.none { generated in it }, "never in the plain storage")
+    }
+
+    @Test
+    fun theGeneratorsSettingsRemakeThePasswordAndAreKept() = runAppTest(PasswordsApp()) {
+        val pw = instance as PasswordsInstance
+        click("pw:add")
+        assertAbsent("pw:generator")
+        click("pw:generate")
+        click("pw:generator-settings")
+        assertShown("pw:generator")
+
+        click("pw:gen-mode-words")
+        val words = pw.draft.value.password.split(' ')
+        assertEquals(PasswordGenerator.DEFAULT_WORDS, words.size)
+        assertTrue(words.all { it in PasswordGenerator.wordList })
+        assertAbsent("pw:gen-lower")
+        node("pw:generate-hint").assertTextEquals("6 слов · 66 бит энтропии устройства")
+
+        click("pw:gen-mode-mixed")
+        click("pw:gen-longer")
+        click("pw:gen-symbols")
+        val mixed = pw.draft.value.password
+        assertEquals(7, mixed.split(Regex("[^a-z]")).size, mixed)
+        assertTrue(mixed.none { it in "!#$%&*+-=?@^_ " }, mixed)
+
+        click("pw:gen-mode-characters")
+        click("pw:gen-shorter")
+        assertEquals(PasswordGenerator.DEFAULT_LENGTH - 1, pw.draft.value.password.length)
+
+        // A password typed by hand is never replaced by a change of settings.
+        node("pw:password").performTextReplacement("mine")
+        click("pw:gen-shorter")
+        assertEquals("mine", pw.draft.value.password)
+
+        (runtime.scope as TestScope).testScheduler.runCurrent()
+        val kept = GeneratorSettings.decode(runtime.storage.entries[KEY_GENERATOR])
+        assertEquals(PasswordRules(PasswordMode.Characters, length = 18, words = 7, symbols = false), kept)
+    }
+
+    @Test
+    fun drawingIsMixedIntoTheNextPassword() = runAppTest(PasswordsApp()) {
+        val pw = instance as PasswordsInstance
+        click("pw:add")
+        click("pw:generate")
+        val before = pw.draft.value.password
+        click("pw:generator-settings")
+        click("pw:gen-draw")
+        node("pw:gen-field").performScrollTo().performTouchInput {
+            repeat(20) { i -> swipe(Offset(10f + i * 7, 10f + (i * i) % 50), Offset(200f - i * 5, 120f + (i * 13) % 70), durationMillis = 200) }
+        }
+        assertTrue(pw.drawn.value.samples > 50, "${pw.drawn.value}")
+        assertTrue(pw.drawn.value.bits > 0, "${pw.drawn.value}")
+        node("pw:gen-draw-done").performScrollTo().performClick()
+        assertAbsent("pw:gen-field")
+        val after = pw.draft.value.password
+        assertEquals(PasswordGenerator.DEFAULT_LENGTH, after.length)
+        assertTrue(after != before, "made again with the drawing")
+        node("pw:generate-hint").assertTextContains("+ рисование", substring = true)
+
+        node("pw:gen-draw").performScrollTo().performClick()
+        node("pw:gen-draw-reset").performScrollTo().performClick()
+        assertEquals(Drawn(), pw.drawn.value)
+    }
+
+    @Test
+    fun theLastCharacterSetCannotBeTurnedOff() = runAppTest(PasswordsApp()) {
+        val pw = instance as PasswordsInstance
+        pw.changeGenerator { copy(lower = false, upper = false, digits = false) }
+        pw.changeGenerator { copy(symbols = false) }
+        assertTrue(pw.generator.value.symbols)
+        pw.changeGenerator { copy(length = 1000) }
+        assertEquals(PasswordGenerator.LENGTHS.last, pw.generator.value.length)
     }
 
     @Test
@@ -213,6 +294,7 @@ class PasswordsInstanceTest {
         prepare = { it.secrets.entries[KEY_ENTRIES] = stored },
     ) {
         val pw = instance as PasswordsInstance
+        click("pw:menu")
         click("pw:import")
         type("pw:paste", "name,url,username,password,note\nGitHub,https://github.com,octocat,gh-pass,\nForum,https://forum.example,me,f0rum,\n")
         click("pw:read")
@@ -223,6 +305,85 @@ class PasswordsInstanceTest {
         click("pw:import-add")
         assertShown("pw:list")
         assertEquals(listOf("a", "b", "f0rum"), decode(runtime.secrets.entries.getValue(KEY_ENTRIES)).map { if (it.password == "f0rum") it.password else it.id })
+    }
+
+    @Test
+    fun theMenuSitsAtTheTopAndBackClosesIt() = runAppTest(
+        PasswordsApp(),
+        prepare = { it.secrets.entries[KEY_ENTRIES] = stored },
+    ) {
+        val pw = instance as PasswordsInstance
+        assertAbsent("pw:import")
+        assertAbsent("pw:export")
+        click("pw:menu")
+        assertShown("pw:import")
+        assertShown("pw:export")
+        assertTrue(pw.back())
+        assertAbsent("pw:menu-items")
+        assertShown("pw:list")
+        assertFalse(pw.back())
+    }
+
+    @Test
+    fun aDifferentPasswordForAStoredLoginIsShownAndReplacesItUnlessBothAreKept() {
+        val csv = "name,url,username,password\nGitHub,https://github.com,octocat,new-pass\nForum,https://forum.example,me,f0rum\n"
+        runAppTest(PasswordsApp(), prepare = { it.secrets.entries[KEY_ENTRIES] = stored }) {
+            val pw = instance as PasswordsInstance
+            click("pw:menu")
+            click("pw:import")
+            type("pw:paste", csv)
+            click("pw:read")
+            assertEquals(listOf(0), pw.importBatch.value!!.differing)
+            node("pw:import-row-0").assertTextContains("Пароль отличается от сохранённого: заменит сохранённый")
+            node("pw:import-add").assertTextEquals("Добавить 1, заменить 1")
+            click("pw:import-add")
+            val saved = decode(runtime.secrets.entries.getValue(KEY_ENTRIES))
+            assertEquals(listOf("a", "b"), saved.take(2).map { it.id })
+            assertEquals("new-pass", saved.first { it.id == "a" }.password)
+            assertEquals(listOf("f0rum"), saved.drop(2).map { it.password })
+        }
+        runAppTest(PasswordsApp(), prepare = { it.secrets.entries[KEY_ENTRIES] = stored }) {
+            click("pw:menu")
+            click("pw:import")
+            type("pw:paste", csv)
+            click("pw:read")
+            click("pw:import-keep-both")
+            node("pw:import-add").assertTextEquals("Добавить 2 записи")
+            click("pw:import-add")
+            val saved = decode(runtime.secrets.entries.getValue(KEY_ENTRIES))
+            assertEquals(listOf("gh-pass", "bank-pass", "new-pass", "f0rum"), saved.map { it.password })
+        }
+    }
+
+    @Test
+    fun importFiltersByKindAndTicksOrUnticksWhatIsShown() = runAppTest(
+        PasswordsApp(),
+        prepare = { it.secrets.entries[KEY_ENTRIES] = stored },
+    ) {
+        val pw = instance as PasswordsInstance
+        click("pw:menu")
+        click("pw:import")
+        type(
+            "pw:paste",
+            "name,url,username,password\nGitHub,https://github.com,octocat,gh-pass\nGitHub,https://github.com,octocat,new-pass\n" +
+                "Forum,https://forum.example,me,f0rum\nShop,https://shop.example,me,sh0p\n",
+        )
+        click("pw:read")
+        assertEquals(setOf(1, 2, 3), pw.importSelected.value)
+        click("pw:import-filter-new")
+        assertShown("pw:import-row-2")
+        assertAbsent("pw:import-row-0")
+        assertAbsent("pw:import-row-1")
+        node("pw:import-select-all").assertTextEquals("Снять все")
+        click("pw:import-select-all")
+        assertEquals(setOf(1), pw.importSelected.value, "the hidden row keeps its tick")
+        click("pw:import-select-all")
+        assertEquals(setOf(1, 2, 3), pw.importSelected.value)
+        click("pw:import-filter-known")
+        assertShown("pw:import-row-0")
+        assertAbsent("pw:import-select-all")
+        click("pw:import-filter-differing")
+        node("pw:import-row-1").assertTextContains("Пароль отличается от сохранённого: заменит сохранённый")
     }
 
     @Test
@@ -302,9 +463,12 @@ class PasswordsInstanceTest {
             it.network.respond("https://api.github.com/users/octocat/keys", """[{"id":1,"key":"${identity.publicLine.substringBeforeLast(' ')}"}]""")
         }) {
             val pw = instance as PasswordsInstance
+            click("pw:menu")
             click("pw:export")
             assertShown("pw:list")
+            assertAbsent("pw:menu-items")
             presence.answer = true
+            click("pw:menu")
             click("pw:export")
             assertShown("pw:export-page")
             assertEquals(listOf("Экспорт всех паролей", "Экспорт всех паролей"), presence.reasons)

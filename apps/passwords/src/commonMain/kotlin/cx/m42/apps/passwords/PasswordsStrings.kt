@@ -1,5 +1,8 @@
 package cx.m42.apps.passwords
 
+import cx.m42.unitool.kit.password.PasswordMode
+import cx.m42.unitool.kit.password.PasswordRules
+
 /** The Passwords app's own words (D11). */
 internal interface PasswordsStrings {
     val emptyTitle: String
@@ -18,7 +21,24 @@ internal interface PasswordsStrings {
     val username: String
     val password: String
     val generate: String
-    val generateHint: String
+    /** Under the button: how long the password is and how many bits of the device's entropy it holds. */
+    fun generateHint(rules: PasswordRules, bits: Int): String
+    val generatorSettings: String
+    fun mode(mode: PasswordMode): String
+    val length: String
+    val wordCount: String
+    val lower: String
+    val upper: String
+    val digits: String
+    val symbols: String
+    val lookAlike: String
+    val drawEntropy: String
+    val drawHint: String
+    fun drawProgress(bits: Int, target: Int, seconds: Long): String
+    /** Added to the hint under Generate while a drawing is mixed in. */
+    fun withDrawing(bits: Int): String
+    val drawDone: String
+    val drawReset: String
     val url: String
     val note: String
     val save: String
@@ -50,11 +70,21 @@ internal interface PasswordsStrings {
     val pasteHint: String
     val readText: String
     val alreadyHere: String
+    val passwordDiffers: String
+    val willReplace: String
+    val willAddBeside: String
+    fun differing(count: Int): String
+    val keepBoth: String
+    val keepBothHint: String
+    val more: String
+    fun filter(filter: ImportFilter): String
+    val selectAll: String
+    val selectNone: String
     val scanMore: String
     val scanMoreHint: String
     fun fileProblem(problem: FileProblem): String
-    fun importIntro(found: Int, addable: Int): String
-    fun importAdd(count: Int): String
+    fun importIntro(found: Int, fresh: Int, differing: Int): String
+    fun importAdd(add: Int, replace: Int): String
     fun importFailed(failed: ImportBatch.Failed): String
 
     val export: String
@@ -104,7 +134,34 @@ internal object PasswordsStringsRu : PasswordsStrings {
     override val username = "Логин"
     override val password = "Пароль"
     override val generate = "Сгенерировать"
-    override val generateHint = "${Generator.LENGTH} символов: буквы, цифры и знаки"
+    override fun generateHint(rules: PasswordRules, bits: Int): String {
+        val size = when (rules.mode) {
+            PasswordMode.Characters -> count(rules.length, "символ", "символа", "символов")
+            PasswordMode.Words -> count(rules.words, "слово", "слова", "слов")
+            PasswordMode.Mixed -> count(rules.words, "слово", "слова", "слов") + " с цифрами и знаками между ними"
+        }
+        return "$size · ${count(bits, "бит", "бита", "бит")} энтропии устройства"
+    }
+    override val generatorSettings = "Настроить"
+    override fun mode(mode: PasswordMode) = when (mode) {
+        PasswordMode.Characters -> "Символы"
+        PasswordMode.Words -> "Слова"
+        PasswordMode.Mixed -> "Слова и символы"
+    }
+    override val length = "Длина"
+    override val wordCount = "Слов"
+    override val lower = "Строчные a–z"
+    override val upper = "Заглавные A–Z"
+    override val digits = "Цифры 0–9"
+    override val symbols = "Знаки ! # $ % & * + - = ? @ ^ _"
+    override val lookAlike = "Похожие l, I, O, 0, 1"
+    override val drawEntropy = "Добавить энтропию рисованием"
+    override val drawHint = "Водите пальцем или мышью по полю — чем дольше и неровнее, тем больше. Основа остаётся системной: рисунок подмешивается к ней и ослабить пароль не может."
+    override fun drawProgress(bits: Int, target: Int, seconds: Long) =
+        "≈ ${minOf(bits, target)} из $target бит" + (if (bits >= target) " — достаточно" else "") + " · ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+    override fun withDrawing(bits: Int) = " + рисование ≈ ${count(bits, "бит", "бита", "бит")}"
+    override val drawDone = "Готово"
+    override val drawReset = "Сбросить"
     override val url = "Сайт"
     override val note = "Заметка"
     override val save = "Сохранить"
@@ -135,6 +192,21 @@ internal object PasswordsStringsRu : PasswordsStrings {
     override val pasteHint = "Первая строка — заголовок: name,url,username,password,note"
     override val readText = "Прочитать"
     override val alreadyHere = "Уже есть на этом устройстве"
+    override val passwordDiffers = "Пароль отличается от сохранённого"
+    override val willReplace = "заменит сохранённый"
+    override val willAddBeside = "добавится второй записью"
+    override fun differing(count: Int) = "У ${entries(count)} пароль не такой, как на устройстве."
+    override val keepBoth = "Оставить оба пароля"
+    override val keepBothHint = "Выключено — сохранённый пароль заменится прочитанным. Включено — прочитанный добавится рядом, отдельной записью."
+    override val more = "Ещё"
+    override fun filter(filter: ImportFilter) = when (filter) {
+        ImportFilter.All -> "Все"
+        ImportFilter.New -> "Новые"
+        ImportFilter.Differing -> "Другой пароль"
+        ImportFilter.Known -> "Уже есть"
+    }
+    override val selectAll = "Отметить все"
+    override val selectNone = "Снять все"
     override val scanMore = "Сканировать ещё"
     override val scanMoreHint = "Длинный экспорт показывается несколькими кодами: отсканируйте все, записи соберутся в один список."
     override fun fileProblem(problem: FileProblem) = when (problem) {
@@ -142,22 +214,28 @@ internal object PasswordsStringsRu : PasswordsStrings {
         FileProblem.NotOpened -> "Файл не открылся."
         FileProblem.NoEntries -> "В файле не нашлось ни одного пароля."
     }
-    override fun importIntro(found: Int, addable: Int) = when {
+    override fun importIntro(found: Int, fresh: Int, differing: Int) = when {
         found == 0 -> "Не прочиталось ни одной записи."
-        addable == 0 -> "Найдено ${entries(found)}, все уже есть на этом устройстве."
-        addable == found -> "Найдено ${entries(found)}. Отмеченные будут добавлены."
-        else -> "Найдено ${entries(found)}, из них новых $addable. Отмеченные будут добавлены."
+        fresh == 0 && differing == 0 -> "Найдено ${entries(found)}, все уже есть на этом устройстве."
+        fresh == found -> "Найдено ${entries(found)}. Отмеченные будут добавлены."
+        else -> "Найдено ${entries(found)}, из них новых $fresh. Отмеченные будут сохранены."
     }
-    override fun importAdd(count: Int) = "Добавить ${entries(count)}"
+    override fun importAdd(add: Int, replace: Int) = when {
+        replace == 0 -> "Добавить ${entries(add)}"
+        add == 0 -> "Заменить ${entries(replace)}"
+        else -> "Добавить $add, заменить $replace"
+    }
     override fun importFailed(failed: ImportBatch.Failed) =
         "${failed.title.ifEmpty { "Строка ${failed.line}" }}: ${error(failed.error)}"
 
-    private fun entries(n: Int): String {
+    private fun entries(n: Int): String = count(n, "запись", "записи", "записей")
+
+    private fun count(n: Int, one: String, few: String, many: String): String {
         val word = when {
-            n % 100 in 11..14 -> "записей"
-            n % 10 == 1 -> "запись"
-            n % 10 in 2..4 -> "записи"
-            else -> "записей"
+            n % 100 in 11..14 -> many
+            n % 10 == 1 -> one
+            n % 10 in 2..4 -> few
+            else -> many
         }
         return "$n $word"
     }
@@ -235,7 +313,34 @@ internal object PasswordsStringsEn : PasswordsStrings {
     override val username = "Username"
     override val password = "Password"
     override val generate = "Generate"
-    override val generateHint = "${Generator.LENGTH} characters: letters, digits and symbols"
+    override fun generateHint(rules: PasswordRules, bits: Int): String {
+        val size = when (rules.mode) {
+            PasswordMode.Characters -> "${rules.length} characters"
+            PasswordMode.Words -> "${rules.words} words"
+            PasswordMode.Mixed -> "${rules.words} words with digits and symbols between them"
+        }
+        return "$size · $bits bits of the device's entropy"
+    }
+    override val generatorSettings = "Settings"
+    override fun mode(mode: PasswordMode) = when (mode) {
+        PasswordMode.Characters -> "Characters"
+        PasswordMode.Words -> "Words"
+        PasswordMode.Mixed -> "Words and characters"
+    }
+    override val length = "Length"
+    override val wordCount = "Words"
+    override val lower = "Lower case a–z"
+    override val upper = "Upper case A–Z"
+    override val digits = "Digits 0–9"
+    override val symbols = "Symbols ! # $ % & * + - = ? @ ^ _"
+    override val lookAlike = "Look-alikes l, I, O, 0, 1"
+    override val drawEntropy = "Add entropy by drawing"
+    override val drawHint = "Move a finger or the mouse over the field — the longer and the less even, the more. The system's random stays the base: the drawing is mixed into it and cannot weaken the password."
+    override fun drawProgress(bits: Int, target: Int, seconds: Long) =
+        "≈ ${minOf(bits, target)} of $target bits" + (if (bits >= target) " — enough" else "") + " · ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+    override fun withDrawing(bits: Int) = " + drawing ≈ $bits bits"
+    override val drawDone = "Done"
+    override val drawReset = "Reset"
     override val url = "Website"
     override val note = "Note"
     override val save = "Save"
@@ -266,6 +371,21 @@ internal object PasswordsStringsEn : PasswordsStrings {
     override val pasteHint = "The first line is the header: name,url,username,password,note"
     override val readText = "Read"
     override val alreadyHere = "Already on this device"
+    override val passwordDiffers = "The password differs from the saved one"
+    override val willReplace = "replaces the saved one"
+    override val willAddBeside = "added as a second entry"
+    override fun differing(count: Int) = if (count == 1) "1 entry has a password unlike the one on this device." else "$count entries have a password unlike the one on this device."
+    override val keepBoth = "Keep both passwords"
+    override val keepBothHint = "Off: the saved password is replaced with the one read. On: the one read is added beside it as a separate entry."
+    override val more = "More"
+    override fun filter(filter: ImportFilter) = when (filter) {
+        ImportFilter.All -> "All"
+        ImportFilter.New -> "New"
+        ImportFilter.Differing -> "Other password"
+        ImportFilter.Known -> "Already here"
+    }
+    override val selectAll = "Tick all"
+    override val selectNone = "Untick all"
     override val scanMore = "Scan another"
     override val scanMoreHint = "A long export is shown as several codes: scan them all and the entries join one list."
     override fun fileProblem(problem: FileProblem) = when (problem) {
@@ -273,13 +393,17 @@ internal object PasswordsStringsEn : PasswordsStrings {
         FileProblem.NotOpened -> "The file didn't open."
         FileProblem.NoEntries -> "Not one password was found in the file."
     }
-    override fun importIntro(found: Int, addable: Int) = when {
+    override fun importIntro(found: Int, fresh: Int, differing: Int) = when {
         found == 0 -> "Not one entry could be read."
-        addable == 0 -> "Found ${entries(found)}, all of them already on this device."
-        addable == found -> "Found ${entries(found)}. The ticked ones will be added."
-        else -> "Found ${entries(found)}, $addable of them new. The ticked ones will be added."
+        fresh == 0 && differing == 0 -> "Found ${entries(found)}, all of them already on this device."
+        fresh == found -> "Found ${entries(found)}. The ticked ones will be added."
+        else -> "Found ${entries(found)}, $fresh of them new. The ticked ones will be saved."
     }
-    override fun importAdd(count: Int) = "Add ${entries(count)}"
+    override fun importAdd(add: Int, replace: Int) = when {
+        replace == 0 -> "Add ${entries(add)}"
+        add == 0 -> "Replace ${entries(replace)}"
+        else -> "Add $add, replace $replace"
+    }
     override fun importFailed(failed: ImportBatch.Failed) =
         "${failed.title.ifEmpty { "Line ${failed.line}" }}: ${error(failed.error)}"
 

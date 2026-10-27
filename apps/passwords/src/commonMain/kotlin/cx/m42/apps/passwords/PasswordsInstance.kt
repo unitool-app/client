@@ -15,7 +15,13 @@ import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.InstanceRuntime
 import cx.m42.superizer.ssh.SshKeyring
 import cx.m42.superizer.ssh.SshOutcome
+import cx.m42.unitool.kit.crypto.secureRandomBytes
+import cx.m42.unitool.kit.password.EntropyPool
+import cx.m42.unitool.kit.password.PasswordGenerator
+import cx.m42.unitool.kit.password.PasswordMode
+import cx.m42.unitool.kit.password.PasswordRules
 import kotlin.random.Random
+import kotlin.time.TimeSource
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -63,8 +69,16 @@ internal enum class Field { Username, Password }
 
 internal data class Copied(val id: String, val field: Field)
 
+/** The drawing so far: points taken, the bits they are guessed to hold, and how long it went on. */
+internal data class Drawn(val samples: Int = 0, val bits: Int = 0, val startedAt: Long? = null, val lastAt: Long? = null) {
+    val seconds: Long get() = if (startedAt == null || lastAt == null) 0 else (lastAt - startedAt) / 1000
+}
+
 /** The GitHub login the last export went to — a public name, remembered so a second export is one tap. */
 internal const val KEY_EXPORT_LOGIN = "export.github"
+
+/** The generator's settings ([GeneratorSettings]): what the last person chose is what Generate makes. */
+internal const val KEY_GENERATOR = "generator"
 
 /** What the export is shared as: armored age is text, but no app should try to open it as text. */
 internal const val EXPORT_MIME = "application/octet-stream"
@@ -109,6 +123,28 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
     val draft = MutableStateFlow(EntryDraft())
     val draftError = MutableStateFlow<DraftError?>(null)
 
+    /** How Generate makes a password: characters, words or both, and of what. */
+    val generator = MutableStateFlow(PasswordRules())
+
+    /** Whether the generator's settings are open under the button. */
+    val generatorOpen = MutableStateFlow(false)
+
+    /** The password Generate put into the form last; a change of settings makes it again while it is still there. */
+    private var generated: String? = null
+
+    /**
+     * What a finger or the mouse drew on the generator's field, mixed into every password while it
+     * holds anything. In memory only, gone with the app.
+     */
+    private val pool = EntropyPool()
+    private val poolClock = TimeSource.Monotonic.markNow()
+
+    /** Whether the drawing field is open. */
+    val drawing = MutableStateFlow(false)
+
+    /** How much has been drawn, for the field's progress and the hint. */
+    val drawn = MutableStateFlow(Drawn())
+
     /**
      * The host's "is this still the owner?" (06 §5.5), before everything that shows a stored
      * password or gives the list away: Show, Edit (the form has the password in it), Export and
@@ -142,6 +178,14 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
     val importText = MutableStateFlow("")
     val importBatch = MutableStateFlow<ImportBatch?>(null)
     val importSelected = MutableStateFlow<Set<Int>>(emptySet())
+
+    val importFilter = MutableStateFlow(ImportFilter.All)
+
+    /** An entry whose password differs from a stored one goes in beside it rather than over it. */
+    val importKeepBoth = MutableStateFlow(false)
+
+    /** The list's "⋯": import, export, computers — kept off the bottom of a long list. */
+    val menuOpen = MutableStateFlow(false)
 
     // ---- export, as in 2FA
 
@@ -177,6 +221,7 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
     override suspend fun onLaunch() {
         runtime.analytics.screen("passwords")
         if (exportLogin.value.isEmpty()) exportLogin.value = runtime.storage.get(KEY_EXPORT_LOGIN).orEmpty()
+        generator.value = GeneratorSettings.decode(runtime.storage.get(KEY_GENERATOR))
         // In the instance's scope, as in 2FA: opening the list is a trip to the Keystore, and a
         // launch that suspends can be cancelled under it by the host's link route.
         runtime.scope.launch { load() }
@@ -260,6 +305,10 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
 
     /** Back inside the app. False at the root, which is where the host takes over and closes it. */
     fun back(): Boolean {
+        if (menuOpen.value) {
+            menuOpen.value = false
+            return true
+        }
         when (val current = _page.value) {
             Page.List -> return false
             is Page.Edit -> go(Page.Details(current.id))
@@ -271,10 +320,13 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
 
     private fun go(page: Page) {
         _page.value = page
+        menuOpen.value = false
         hidePassword()
         if (page != Page.Import) {
             importBatch.value = null
             importSelected.value = emptySet()
+            importKeepBoth.value = false
+            importFilter.value = ImportFilter.All
         }
         // The draft holds a stored password while editing; it goes when the form does.
         if (page != Page.Add && page !is Page.Edit) draft.value = EntryDraft()
@@ -369,8 +421,55 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
     }
 
     fun generate() {
-        editDraft { copy(password = Generator.password()) }
+        fill()
         runtime.analytics.event("passwords_generate")
+    }
+
+    /**
+     * A change of the generator's settings, kept for next time. One that leaves no character set,
+     * or words and characters with nothing to put between the words, is refused: a switch of mode
+     * must always find something to draw. Switching to words and characters turns digits on when
+     * neither digits nor symbols are.
+     */
+    fun changeGenerator(change: PasswordRules.() -> PasswordRules) {
+        val current = generator.value
+        var next = current.change().let {
+            it.copy(
+                length = it.length.coerceIn(PasswordGenerator.LENGTHS),
+                words = it.words.coerceIn(PasswordGenerator.WORD_COUNTS),
+            )
+        }
+        if (next.mode == PasswordMode.Mixed && next.joints.isEmpty() && current.mode != PasswordMode.Mixed) next = next.copy(digits = true)
+        if (next == current || next.kinds.isEmpty() || next.problem != null) return
+        generator.value = next
+        runtime.scope.launch { runtime.storage.set(KEY_GENERATOR, GeneratorSettings.encode(next)) }
+        if (generated != null && draft.value.password == generated) fill()
+    }
+
+    /** One point under the finger or the mouse, in the field's own pixels. */
+    fun addPoint(x: Int, y: Int) {
+        pool.add(x, y, poolClock.elapsedNow().inWholeNanoseconds)
+        val now = runtime.clock.now()
+        drawn.value = Drawn(pool.samples, pool.bits.toInt(), drawn.value.startedAt ?: now, now)
+    }
+
+    /** Closes the field; a generated password still in the form is made again, now with the drawing in it. */
+    fun finishDrawing() {
+        drawing.value = false
+        if (generated != null && draft.value.password == generated) fill()
+        if (pool.samples > 0) runtime.analytics.event("passwords_generate_drawn")
+    }
+
+    fun clearDrawing() {
+        pool.clear()
+        drawn.value = Drawn()
+    }
+
+    private fun fill() {
+        val random = if (pool.samples > 0) pool.source() else ::secureRandomBytes
+        val password = PasswordGenerator.generate(generator.value, random)
+        generated = password
+        editDraft { copy(password = password) }
     }
 
     /** Saves the form: a new entry on the add page, the same one changed on the edit page. */
@@ -488,15 +587,36 @@ internal class PasswordsInstance(val runtime: InstanceRuntime) : AppInstance() {
         importSelected.value = importSelected.value.let { if (index in it) it - index else it + index }
     }
 
-    /** The ticked entries, added in one write. */
+    /** Ticks every row the filter shows that can be added, or unticks them; the hidden ones stay as they are. */
+    fun selectShown(on: Boolean) {
+        val batch = importBatch.value ?: return
+        val shown = batch.shown(importFilter.value).filter { it in batch.addable }
+        importSelected.value = if (on) importSelected.value + shown else importSelected.value - shown.toSet()
+    }
+
+    /**
+     * The ticked entries, in one write. One whose password differs takes the stored entry's place —
+     * the same id, the new password — unless [importKeepBoth] is on; a second one for the same
+     * stored entry is added beside it, so nothing read is dropped.
+     */
     fun importEntries(): Boolean {
         val batch = importBatch.value ?: return false
         val selected = importSelected.value
         val now = runtime.clock.now()
-        val chosen = batch.addable.filter { it in selected }.map { batch.found[it].entry.copy(id = newId(), changed = now) }
+        val chosen = batch.addable.filter { it in selected }.map { batch.found[it] }
         if (chosen.isEmpty()) return false
-        if (!persist(_entries.value + chosen)) return false
-        runtime.analytics.event("passwords_import", mapOf("entries" to chosen.size.toString()))
+        val replaced = mutableMapOf<String, PasswordEntry>()
+        val added = mutableListOf<PasswordEntry>()
+        for (found in chosen) {
+            val target = found.replaces?.takeIf { !importKeepBoth.value && it !in replaced && entry(it) != null }
+            if (target != null) replaced[target] = found.entry.copy(id = target, changed = now)
+            else added += found.entry.copy(id = newId(), changed = now)
+        }
+        if (!persist(_entries.value.map { replaced[it.id] ?: it } + added)) return false
+        runtime.analytics.event(
+            "passwords_import",
+            mapOf("entries" to added.size.toString(), "replaced" to replaced.size.toString()),
+        )
         go(Page.List)
         return true
     }
