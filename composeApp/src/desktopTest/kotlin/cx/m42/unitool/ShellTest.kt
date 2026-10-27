@@ -155,26 +155,8 @@ class ShellTest : UnitoolTest() {
         onNodeWithTag(CONVERTER_TILE).performClick()
         waitForIdle()
 
-        onNodeWithTag("currency-converter:result").assertIsDisplayed()
+        onNodeWithTag("currency-converter:pair-USD-EUR:result").assertIsDisplayed()
         onNodeWithText("Курс от Exchange Rate API на 2026-09-19 · сеть").assertIsDisplayed()
-    }
-
-    @Test
-    fun anAppsOwnBlockAppearsOnTheHostsSettingsPage() = runComposeUiTest {
-        // `ctx.settingsSection` (03): the host draws the page and the app's title, the app draws
-        // what is inside, and neither knows what the other put there.
-        setContent { UnitoolApp(testSuperizer()) }
-        waitForIdle()
-
-        onNodeWithContentDescription("Открыть меню").performClick()
-        waitForIdle()
-        onNodeWithContentDescription("Настройки").performClick()
-        waitForIdle()
-
-        onNodeWithTag("settings:section-currency-converter").assertExists()
-        onNodeWithTag("currency-converter:settings").assertExists()
-        // Under the app's own title, which comes from its manifest rather than from the host.
-        onNodeWithText("Конвертер валют").assertExists()
     }
 
     /**

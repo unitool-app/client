@@ -127,20 +127,6 @@ class ActivationTest : UnitoolTest() {
     }
 
     @Test
-    fun aDeepLinkPathTheAppDeclaredArrivesAsItsConfig() = runComposeUiTest {
-        val superizer = testSuperizer()
-        superizer.route.deliver("unitool://app/currency-converter/rate?pair=EUR-RUB")
-        setContent { UnitoolApp(superizer) }
-        waitForIdle()
-
-        // `setup` turned the query into a config; the app read it in `launch` and has no idea a
-        // link was involved.
-        onNodeWithTag("currency-converter:root").assertIsDisplayed()
-        onNodeWithText("EUR").assertIsDisplayed()
-        onNodeWithText("RUB").assertIsDisplayed()
-    }
-
-    @Test
     fun aLinkThatMerelyNamesTheHiddenAppDoesNotRevealIt() = runComposeUiTest {
         // D25: naming an app is not knowing a secret about it. Only an activation with a payload,
         // or a promo code, unlocks — otherwise "hidden" would mean "hidden from people who have

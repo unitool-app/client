@@ -43,24 +43,23 @@ import kotlin.math.abs
 import kotlin.math.round
 
 /**
- * Amount at the top, the two currencies under it, the answer below, and one grey line saying where
- * the number came from.
+ * The person's pairs, one card each — an amount, the two currencies and the answer under them —
+ * then «Добавить пару», and one grey line saying where the numbers came from.
  *
  * That last line is the screen's real subject. A converter that silently shows yesterday's rate is
  * indistinguishable from one that is working, so "· кэш, офлайн" is not a detail — it is what makes
- * the offline path honest.
+ * the offline path honest. It is said once, because every card is answered by the same table.
  */
 @Composable
 internal fun ConverterScreen(instance: ConverterInstance) {
     val tokens = AppTheme
     val strings = LocalAppRuntime.current.locale.pick(ConverterStringTables, ConverterStringsEn)
-    val amount by instance.amount.collectAsState()
-    val from by instance.from.collectAsState()
-    val to by instance.to.collectAsState()
+    val rows by instance.rows.collectAsState()
     val state by instance.rates.collectAsState()
     val online by instance.runtime.network.online.collectAsState()
 
-    var picking by remember { mutableStateOf<Side?>(null) }
+    var picking by remember { mutableStateOf<Picking?>(null) }
+    var editing by remember { mutableStateOf(false) }
 
     // The first request of the app's life happens here and not in `onLaunch`: the container gets a
     // frame immediately, and the contract test can hold `onLaunch` to its 200 ms budget.
@@ -73,65 +72,84 @@ internal fun ConverterScreen(instance: ConverterInstance) {
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
-        AppTextField(
-            value = amount,
-            onValueChange = instance::setAmount,
-            placeholder = "0",
-            label = strings.amount,
-            textStyle = tokens.display,
-            minHeight = 88.dp,
-            modifier = Modifier.testTag("currency-converter:amount"),
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CurrencyTile(
-                label = strings.fromLabel,
-                code = from,
-                tag = "currency-converter:from",
-                onClick = { picking = Side.From },
-                modifier = Modifier.weight(1f),
+        rows.forEach { row ->
+            PairCard(
+                row = row,
+                result = instance.result(row),
+                ready = state is RatesState.Ready,
+                editing = editing,
+                strings = strings,
+                onAmount = { instance.setAmount(row.id, it) },
+                onFrom = { picking = Picking.Row(row.id, Side.From) },
+                onTo = { picking = Picking.Row(row.id, Side.To) },
+                onSwap = { instance.swap(row.id) },
+                onRemove = { instance.remove(row.id) },
             )
-            CurrencyTile(
-                label = strings.toLabel,
-                code = to,
-                tag = "currency-converter:to",
-                onClick = { picking = Side.To },
-                modifier = Modifier.weight(1f),
-            )
+            val current = picking
+            if (current is Picking.Row && current.id == row.id) {
+                Spacer(Modifier.height(8.dp))
+                CurrencyPicker(
+                    title = if (current.side == Side.From) strings.fromLabel else strings.toLabel,
+                    codes = instance.currencies(),
+                    selected = if (current.side == Side.From) row.from else row.to,
+                    onPick = { code ->
+                        if (current.side == Side.From) instance.pickFrom(row.id, code) else instance.pickTo(row.id, code)
+                        picking = null
+                    },
+                )
+            }
+            Spacer(Modifier.height(12.dp))
         }
 
-        Spacer(Modifier.height(12.dp))
-        AppButton(
-            text = strings.swap,
-            onClick = instance::swap,
-            size = ButtonSize.Sm,
-            variant = ButtonVariant.Secondary,
-            modifier = Modifier.testTag("currency-converter:swap"),
-        )
+        // Two steps, the same list both times: first what to convert from, then into.
+        when (val current = picking) {
+            Picking.NewFrom -> CurrencyPicker(
+                title = strings.fromLabel,
+                codes = instance.currencies(),
+                selected = null,
+                onPick = { picking = Picking.NewTo(it) },
+            )
+            is Picking.NewTo -> CurrencyPicker(
+                title = "${current.from} → ${strings.toLabel}",
+                codes = instance.currencies().filter { it != current.from },
+                selected = null,
+                onPick = {
+                    instance.add(current.from, it)
+                    picking = null
+                },
+            )
+            else -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppButton(
+                    text = "+ ${strings.addPair}",
+                    onClick = {
+                        editing = false
+                        picking = Picking.NewFrom
+                    },
+                    size = ButtonSize.Sm,
+                    variant = ButtonVariant.Secondary,
+                    modifier = Modifier.testTag("currency-converter:add"),
+                )
+                if (rows.isNotEmpty()) {
+                    AppButton(
+                        text = if (editing) strings.done else strings.edit,
+                        onClick = { editing = !editing },
+                        size = ButtonSize.Sm,
+                        variant = ButtonVariant.Ghost,
+                        modifier = Modifier.testTag("currency-converter:edit"),
+                    )
+                }
+            }
+        }
 
         Spacer(Modifier.height(20.dp))
 
         when (val current = state) {
-            is RatesState.Ready -> {
-                val result = instance.result
-                Text(
-                    text = result?.let { "${formatMoney(it)} $to" } ?: "—",
-                    style = tokens.title,
-                    color = tokens.foreground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().testTag("currency-converter:result"),
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = strings.source(current.rates.date, current.fromCache || !online, current.rates.credit),
-                    style = tokens.footnote,
-                    color = tokens.muted,
-                    modifier = Modifier.testTag("currency-converter:source"),
-                )
-            }
+            is RatesState.Ready -> Text(
+                text = strings.source(current.rates.date, current.fromCache || !online, current.rates.credit),
+                style = tokens.footnote,
+                color = tokens.muted,
+                modifier = Modifier.testTag("currency-converter:source"),
+            )
 
             RatesState.Loading -> Text(
                 text = if (online) strings.loading else strings.offline,
@@ -157,45 +175,101 @@ internal fun ConverterScreen(instance: ConverterInstance) {
                 )
             }
         }
-
-        val side = picking
-        if (side != null) {
-            Spacer(Modifier.height(20.dp))
-            CurrencyPicker(
-                title = if (side == Side.From) strings.fromLabel else strings.toLabel,
-                codes = instance.currencies(),
-                selected = if (side == Side.From) from else to,
-                onPick = { code ->
-                    if (side == Side.From) instance.pickFrom(code) else instance.pickTo(code)
-                    picking = null
-                },
-            )
-        }
     }
 }
 
 private enum class Side { From, To }
 
+/** Which list of currencies is open, and what a tap in it will change. */
+private sealed interface Picking {
+    data class Row(val id: Int, val side: Side) : Picking
+    data object NewFrom : Picking
+    data class NewTo(val from: String) : Picking
+}
+
 @Composable
-private fun CurrencyTile(
-    label: String,
-    code: String,
-    tag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun PairCard(
+    row: PairRow,
+    result: Double?,
+    ready: Boolean,
+    editing: Boolean,
+    strings: ConverterStrings,
+    onAmount: (String) -> Unit,
+    onFrom: () -> Unit,
+    onTo: () -> Unit,
+    onSwap: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val tokens = AppTheme
+    val tag = "currency-converter:pair-${row.from}-${row.to}"
     Column(
-        modifier = modifier
+        modifier = Modifier
+            .fillMaxWidth()
             .clip(RoundedCornerShape(tokens.radius))
             .background(tokens.background)
+            .testTag(tag)
+            .padding(12.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // The field fills whatever it is given, so it is given only what the chips leave.
+            Box(modifier = Modifier.weight(1f)) {
+                AppTextField(
+                    value = row.amount,
+                    onValueChange = onAmount,
+                    placeholder = "0",
+                    textStyle = tokens.header,
+                    modifier = Modifier.testTag("$tag:amount"),
+                )
+            }
+            CurrencyChip(row.from, "$tag:from", onFrom)
+            AppButton(
+                text = "⇄",
+                onClick = onSwap,
+                size = ButtonSize.Sm,
+                variant = ButtonVariant.Ghost,
+                modifier = Modifier.testTag("$tag:swap"),
+            )
+            CurrencyChip(row.to, "$tag:to", onTo)
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = if (ready && result != null) "${formatMoney(result)} ${row.to}" else "—",
+                style = tokens.title,
+                color = tokens.foreground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).testTag("$tag:result"),
+            )
+            if (editing) {
+                AppButton(
+                    text = strings.removePair,
+                    onClick = onRemove,
+                    size = ButtonSize.Sm,
+                    variant = ButtonVariant.Destructive,
+                    modifier = Modifier.testTag("$tag:remove"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurrencyChip(code: String, tag: String, onClick: () -> Unit) {
+    val tokens = AppTheme
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(tokens.radius))
+            .background(tokens.surface)
             .clickable(role = Role.Button, onClick = onClick)
             .testTag(tag)
-            .padding(16.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text(text = label, style = tokens.footnote, color = tokens.muted)
-        Spacer(Modifier.height(4.dp))
-        Text(text = code, style = tokens.header, color = tokens.foreground)
+        Text(text = code, style = tokens.label, color = tokens.foreground)
     }
 }
 
@@ -203,7 +277,7 @@ private fun CurrencyTile(
 private fun CurrencyPicker(
     title: String,
     codes: List<String>,
-    selected: String,
+    selected: String?,
     onPick: (String) -> Unit,
 ) {
     val tokens = AppTheme
@@ -223,14 +297,17 @@ private fun CurrencyPicker(
         Column(modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
             codes.forEachIndexed { index, code ->
                 if (index > 0) RowDivider()
-                ChoiceRow(label = code, selected = code == selected, onClick = { onPick(code) })
+                Box(modifier = Modifier.testTag("currency-converter:pick-$code")) {
+                    ChoiceRow(label = code, selected = code == selected, onClick = { onPick(code) })
+                }
             }
         }
     }
 }
 
 /**
- * Two decimals, by hand.
+ * Two decimals, by hand — and, below a cent, enough of them to keep three significant digits:
+ * one dong is 0.0000385 dollars, and "0.00" would say the rate is nothing.
  *
  * `commonMain` has no number formatter, and the same string has to come out on all three targets
  * — the desktop test suite included. The calculator's `format` solves the same problem for the
@@ -238,9 +315,22 @@ private fun CurrencyPicker(
  */
 internal fun formatMoney(value: Double): String {
     if (!value.isFinite()) return "—"
+    if (value != 0.0 && abs(value) < 0.005) return formatSmall(value)
     val rounded = round(abs(value) * 100) / 100
     val whole = rounded.toLong()
     val cents = round((rounded - whole) * 100).toLong()
     val sign = if (value < 0) "-" else ""
     return "$sign$whole.${cents.toString().padStart(2, '0')}"
+}
+
+private fun formatSmall(value: Double): String {
+    var decimals = 2
+    var scaled = abs(value) * 100
+    while (scaled < 100 && decimals < 12) {
+        scaled *= 10
+        decimals++
+    }
+    val digits = round(scaled).toLong().toString().padStart(decimals, '0').trimEnd('0')
+    val sign = if (value < 0) "-" else ""
+    return if (digits.isEmpty()) "0.00" else "${sign}0.$digits"
 }

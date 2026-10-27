@@ -6,7 +6,6 @@ import cx.m42.superizer.app.AppId
 import cx.m42.superizer.app.AppInstance
 import cx.m42.superizer.app.AppManifest
 import cx.m42.superizer.app.AppMetadata
-import cx.m42.superizer.app.AppSetupContext
 import cx.m42.superizer.app.SuperizerApp
 import cx.m42.superizer.app.localized
 import cx.m42.superizer.backup.BackupPolicy
@@ -25,9 +24,6 @@ public data class ConverterConfig(
     val base: String = "USD",
     val favorites: List<String> = listOf("EUR", "RUB", "GBP", "VND"),
     val ratesUrl: String = DEFAULT_RATES_URL,
-    /** Which currency a deep link asked to start on, if any. */
-    val from: String? = null,
-    val to: String? = null,
 ) {
     public companion object {
         /**
@@ -52,8 +48,7 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
 
     override val manifest: AppManifest = AppManifest(
         id = AppId("currency-converter"),
-        version = "1.0.0",
-        // Contract 3 brought `backup`; a host of contract 1 or 2 would carry the pair regardless.
+        version = "1.1.0",
         minHostContract = 3,
         metadata = AppMetadata(
             title = localized("ru" to "Конвертер валют", "en" to "Currency converter"),
@@ -71,36 +66,13 @@ public class ConverterApp : SuperizerApp<ConverterConfig>() {
             ),
             category = "Finance",
         ),
-        deepLinks = setOf("rate"),
         networkHosts = setOf("open.er-api.com", "api.frankfurter.app"),
-        // The last pair is this device's habit, not the person's data: a new phone opens on the
-        // default rather than on whatever the old one was converting last.
-        backup = BackupPolicy.Except(setOf(KEY_BASE, KEY_TO)),
+        // The set of pairs is the person's own list, so the backup carries all of it (D591).
+        backup = BackupPolicy.All,
     )
 
     override val configSpec: AppConfigSpec<ConverterConfig> =
         AppConfigSpec(ConverterConfig.serializer(), ConverterConfig())
-
-    override fun setup(ctx: AppSetupContext) {
-        // The app's own block on the host's Settings page (03). The host draws the frame and the
-        // title; what is inside is the app's, and the host never learns what.
-        ctx.settingsSection { runtime ->
-            ConverterSettingsSection(runtime, configSpec.default.favorites)
-        }
-
-        // `unitool://app/currency-converter/rate?pair=USD-RUB` — the path a QR code or a pasted URL
-        // carries. The converter takes no pushes (push-opt-in D428), so it is never a push's `link`.
-        // The app turns the query into a config and never learns where it came from.
-        ctx.deepLink("rate") { params ->
-            val pair = params["pair"].orEmpty().split('-')
-            configSpec.encode(
-                ConverterConfig(
-                    from = pair.getOrNull(0)?.takeIf { it.length == 3 },
-                    to = pair.getOrNull(1)?.takeIf { it.length == 3 },
-                ),
-            )
-        }
-    }
 
     override fun launch(runtime: InstanceRuntime, config: ConverterConfig): AppInstance =
         ConverterInstance(runtime, config)

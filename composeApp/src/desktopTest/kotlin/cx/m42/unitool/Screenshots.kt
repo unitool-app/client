@@ -242,7 +242,16 @@ class Screenshots {
             typeInto("activate:promo", "SCI")
             tapTag("activate:apply")
         },
-        Screen("05-converter") { addConverter(); tapTag(CONVERTER_TILE) },
+        Screen("05-converter") {
+            addConverter()
+            tapTag(CONVERTER_TILE)
+            // The owner's own set: rubles into dongs, dongs into dollars, under the default pair.
+            for ((from, to) in listOf("RUB" to "VND", "VND" to "USD")) {
+                tapTag("currency-converter:add")
+                tapTag("currency-converter:pick-$from")
+                tapTag("currency-converter:pick-$to")
+            }
+        },
         Screen("06-converter-offline", offline = true) { addConverter(); tapTag(CONVERTER_TILE) },
         Screen("07-activate") {
             tapIcon("Открыть меню")
