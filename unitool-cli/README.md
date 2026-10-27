@@ -5,7 +5,7 @@ line with commands under it: `unitool qr encode …`. It lives in this repositor
 and the terminal are one codebase and cannot drift apart. The design is in
 [`.ai-notes/done/cli`](../.ai-notes/done/cli/README.md).
 
-Today there are three apps: `qr`, `split` and `browser`.
+Today there are four apps: `qr`, `split`, `password` and `browser`.
 
 ## Running it
 

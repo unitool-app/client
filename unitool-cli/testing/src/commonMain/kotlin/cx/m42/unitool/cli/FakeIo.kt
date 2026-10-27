@@ -14,6 +14,8 @@ public class FakeIo(
     private val environment: Map<String, String> = emptyMap(),
     /** Whether a path can be written; false makes [writeFile] fail the way a missing directory does. */
     private val writable: (String) -> Boolean = { true },
+    /** What the mouse does over the terminal, cell by cell, before Enter; null when there is no terminal to track. */
+    private val mouse: List<Pair<Int, Int>>? = null,
 ) : Io {
     private val queue = ArrayDeque(answers.orEmpty())
     private val out = ArrayList<Byte>()
@@ -87,6 +89,14 @@ public class FakeIo(
     }
 
     override fun readStdinHidden(): ByteArray = stdin
+
+    /** Feeds [mouse] to [point], then shows the last [status] as the line left on the screen. */
+    override fun trackMouse(point: (x: Int, y: Int) -> Unit, status: () -> String): Boolean {
+        val moves = mouse ?: return false
+        moves.forEach { (x, y) -> point(x, y) }
+        err.append(status()).append('\n')
+        return true
+    }
 
     override fun readFile(path: String): ByteArray =
         files[path]?.copyOf() ?: fail("cannot read $path: No such file or directory")

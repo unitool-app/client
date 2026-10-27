@@ -48,6 +48,14 @@ public interface Io {
     /** [readStdin], with the typing hidden when stdin is a terminal: secret text up to Ctrl-D. */
     public fun readStdinHidden(): ByteArray = readStdin()
 
+    /**
+     * Reports the mouse moving over the terminal window (xterm's any-motion tracking, which every
+     * common terminal speaks) until Enter: [point] gets the cell's column and row for each report,
+     * and [status] is redrawn on one line of stderr as it goes. Ctrl-C cancels. False when there
+     * is no terminal to track on.
+     */
+    public fun trackMouse(point: (x: Int, y: Int) -> Unit, status: () -> String): Boolean = false
+
     /** The whole file at [path]. On failure it throws [CommandFailure] carrying the system's reason. */
     public fun readFile(path: String): ByteArray
 

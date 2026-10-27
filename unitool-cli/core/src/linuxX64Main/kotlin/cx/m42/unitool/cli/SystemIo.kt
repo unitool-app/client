@@ -157,13 +157,56 @@ public class SystemIo : Io {
         }
     }
 
-    /**
-     * Reads [fd], a terminal, with echo, line editing and signals off, and does the little editing
-     * itself: Backspace takes back a character, Ctrl-U the line, Ctrl-C cancels (with the terminal
-     * put back first — a signal would leave it without echo), Ctrl-D ends. One line, or with
-     * [lines] everything up to Ctrl-D. Null at Ctrl-D before anything was typed in one-line mode.
-     */
-    private fun hiddenInput(fd: Int, lines: Boolean): ByteArray? = memScoped {
+    override fun trackMouse(point: (x: Int, y: Int) -> Unit, status: () -> String): Boolean {
+        flush()
+        val fd = open("/dev/tty", O_RDWR)
+        if (fd < 0) return false
+        try {
+            rawTerminal(fd) {
+                toTerminal(fd, MOUSE_ON)
+                try {
+                    var shown = ""
+                    fun show() {
+                        val line = status()
+                        if (line == shown) return
+                        shown = line
+                        fputs("\r\u001b[K$line", stderr)
+                        fflush(stderr)
+                    }
+                    show()
+                    val reader = MouseReports(point)
+                    memScoped {
+                        val one = allocArray<ByteVar>(1)
+                        while (true) {
+                            val count = read(fd, one, 1u)
+                            if (count < 0L && errno == EINTR) continue
+                            if (count <= 0L) break
+                            when (reader.feed(one[0].toInt() and 0xff)) {
+                                MouseReports.Key.Enter -> break
+                                MouseReports.Key.Cancel -> throw Cancelled()
+                                MouseReports.Key.None -> show()
+                            }
+                        }
+                    }
+                } finally {
+                    toTerminal(fd, MOUSE_OFF)
+                    fputs("\n", stderr)
+                    fflush(stderr)
+                }
+            }
+        } finally {
+            close(fd)
+        }
+        return true
+    }
+
+    private fun toTerminal(fd: Int, text: String) {
+        val bytes = text.encodeToByteArray()
+        bytes.usePinned { platform.posix.write(fd, it.addressOf(0), bytes.size.convert()) }
+    }
+
+    /** Runs [block] with [fd], a terminal, in raw mode (no echo, no line editing, no signals), and puts it back after. */
+    private inline fun <T> rawTerminal(fd: Int, block: () -> T): T = memScoped {
         val saved = alloc<termios>()
         if (tcgetattr(fd, saved.ptr) != 0) fail("cannot read the terminal: ${reason()}")
         val raw = alloc<termios>()
@@ -172,8 +215,22 @@ public class SystemIo : Io {
         raw.c_cc[VMIN] = 1u
         raw.c_cc[VTIME] = 0u
         if (tcsetattr(fd, TCSAFLUSH, raw.ptr) != 0) fail("cannot set the terminal: ${reason()}")
-        val typed = ArrayList<Byte>()
         try {
+            block()
+        } finally {
+            tcsetattr(fd, TCSAFLUSH, saved.ptr)
+        }
+    }
+
+    /**
+     * Reads [fd], a terminal, with echo, line editing and signals off, and does the little editing
+     * itself: Backspace takes back a character, Ctrl-U the line, Ctrl-C cancels (with the terminal
+     * put back first — a signal would leave it without echo), Ctrl-D ends. One line, or with
+     * [lines] everything up to Ctrl-D. Null at Ctrl-D before anything was typed in one-line mode.
+     */
+    private fun hiddenInput(fd: Int, lines: Boolean): ByteArray? = rawTerminal(fd) {
+        memScoped {
+            val typed = ArrayList<Byte>()
             val one = allocArray<ByteVar>(1)
             while (true) {
                 val count = read(fd, one, 1u)
@@ -193,8 +250,6 @@ public class SystemIo : Io {
                 }
             }
             typed.toByteArray()
-        } finally {
-            tcsetattr(fd, TCSAFLUSH, saved.ptr)
         }
     }
 

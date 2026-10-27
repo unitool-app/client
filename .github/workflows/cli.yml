@@ -71,7 +71,7 @@ jobs:
           mkdir -p unitool-cli/app/build/dist
           cp "$dist/unitool-linux-x86_64" unitool-cli/app/build/dist/unitool
           ./gradlew --no-daemon :unitool-cli:core:jvmTest :unitool-cli:apps:qr:jvmTest \
-            :unitool-cli:apps:split:jvmTest :unitool-cli:apps:browser:jvmTest
+            :unitool-cli:apps:split:jvmTest :unitool-cli:apps:password:jvmTest :unitool-cli:apps:browser:jvmTest
 
       - name: Write the SHA-256 into the summary
         run: |
