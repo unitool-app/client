@@ -7,6 +7,8 @@ import cx.m42.unitool.cli.Run
 import cx.m42.unitool.cli.exec
 import cx.m42.unitool.kit.qr.ErrorCorrection
 import cx.m42.unitool.kit.qr.Qr
+import cx.m42.unitool.kit.qr.QrFile
+import cx.m42.unitool.kit.qr.QrFileGathering
 import cx.m42.unitool.kit.qr.QrImage
 import cx.m42.unitool.kit.qr.QrTerminal
 import kotlin.test.Test
@@ -130,6 +132,68 @@ class QrTest {
     }
 
     @Test
+    fun aFileBecomesChunksTheScannerGathersBack() {
+        val bytes = ByteArray(3000) { (it * 31).toByte() }
+        val io = FakeIo()
+        io.files["dir/photo.jpg"] = bytes
+        val result = ok("qr", "--file", "dir/photo.jpg", "--chunk", "500", "-o", "out.svg", io = io)
+        val count = QrFile.count("photo.jpg", 3000, 500).toInt()
+        assertEquals((1..count).map { "out-$it.svg" }, io.files.keys.drop(1))
+        assertTrue("$count codes; scan them in any order" in result.err, result.err)
+    }
+
+    @Test
+    fun fileChunksAreTheKitsAndPutTheFileBack() {
+        val bytes = ByteArray(2500) { it.toByte() }
+        val io = FakeIo()
+        io.files["a.bin"] = bytes
+        val result = ok("qr", "-i", "a.bin", io = io)
+        // The same file cut by the kit gives as many codes, and those gather back into it.
+        val chunks = QrFile.cut("a.bin", bytes)
+        var gathering = QrFileGathering(QrFile.parse(chunks.first())!!)
+        for (chunk in chunks.drop(1)) gathering = (gathering.add(QrFile.parse(chunk)!!) as QrFileGathering.Added.New).gathering
+        assertContentEquals(bytes, (gathering.assemble() as QrFileGathering.Assembled.Ok).bytes)
+        assertTrue("${chunks.size} codes" in result.err, result.err)
+    }
+
+    @Test
+    fun cycleShowsTheCodesInALoopUntilEnter() {
+        val io = FakeIo(stdoutIsTerminal = true, keyboard = true, cycleTicks = 5)
+        io.files["a.bin"] = ByteArray(2500) { it.toByte() }
+        val result = ok("qr", "-i", "a.bin", "--cycle", "--interval", "0.25", io = io)
+        assertEquals(listOf(250), io.cycles)
+        assertEquals(emptyList(), io.pauses, "no Enter between codes")
+        assertEquals(5, result.out.split(CLEAR_SCREEN).size - 1)
+        assertTrue("Code 1 of 3 · Enter stops" in result.out && "Code 2 of 3" in result.out, result.out.takeLast(200))
+    }
+
+    @Test
+    fun cycleWithoutATerminalFallsBackToOnePerEnter() {
+        val io = FakeIo(stdoutIsTerminal = true, keyboard = true)
+        io.files["a.bin"] = ByteArray(2500)
+        ok("qr", "-i", "a.bin", "--cycle", io = io)
+        assertEquals(2, io.pauses.size)
+    }
+
+    @Test
+    fun fileIsRefusedWithTextOrTooBig() {
+        val io = FakeIo()
+        io.files["a.bin"] = ByteArray(10)
+        io.files["big.bin"] = ByteArray(QrFile.MAX_BYTES + 1)
+        assertEquals(2, run("qr", "hello", "-i", "a.bin", io = io).code)
+        assertEquals(2, run("qr", "--split", "-i", "a.bin", io = io).code)
+        assertEquals(2, run("qr", "-i", "a.bin", "--interval", "0", io = io).code)
+        assertEquals(2, run("qr", "-i", "a.bin", "--chunk", "5000", io = io).code)
+        val big = run("qr", "-i", "big.bin", io = io)
+        assertEquals(1, big.code)
+        assertTrue("at most ${QrFile.MAX_BYTES} go into codes" in big.err, big.err)
+        io.files["mid.bin"] = ByteArray(6000)
+        val dense = run("qr", "-i", "mid.bin", "--chunk", "2800", "--ec", "H", io = io)
+        assertEquals(1, dense.code, "2800 bytes do not fit at H")
+        assertTrue("give a smaller --chunk" in dense.err, dense.err)
+    }
+
+    @Test
     fun badInputIsRefused() {
         assertEquals(1, run("qr", io = FakeIo(stdin = ByteArray(0))).code)
         assertEquals(2, run("qr", "hello", "--ec", "X").code)
@@ -151,7 +215,7 @@ class QrTest {
     @Test
     fun theHelpListsEveryParameter() {
         val help = ok("qr", "encode", "--help").out
-        for (name in listOf("TEXT", "-o, --out FILE", "-f, --format FORMAT", "--ec LEVEL", "--split", "--margin N", "--scale N")) {
+        for (name in listOf("TEXT", "-o, --out FILE", "-f, --format FORMAT", "--ec LEVEL", "--split", "--margin N", "--scale N", "-i, --file FILE", "--chunk BYTES", "--cycle", "--interval SECONDS")) {
             assertTrue(name in help, "$name in\n$help")
         }
         assertTrue("(ansi, png, svg)" in help, help)

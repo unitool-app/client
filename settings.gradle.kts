@@ -55,6 +55,7 @@ include(":apps:currency-converter")
 include(":apps:twofa")
 include(":apps:date-diff")
 include(":apps:counters")
+include(":apps:qr-scanner")
 include(":apps:passwords")
 include(":apps:cr-restore")
 

@@ -15,6 +15,7 @@ import cx.m42.apps.calculator.CalculatorConfig
 import cx.m42.apps.converter.ConverterApp
 import cx.m42.apps.counters.CountersApp
 import cx.m42.apps.crrestore.CrRestoreApp
+import cx.m42.apps.qrscanner.QrScannerApp
 import cx.m42.apps.passwords.PasswordsApp
 import cx.m42.apps.dates.DatesApp
 import cx.m42.apps.testapp.SecretTestApp
@@ -131,6 +132,9 @@ private fun buildHost(
     register(DatesApp())
     // Named counters with plus and minus — levels in a board game. Public and offline, in the catalog.
     register(CountersApp())
+    // What a QR code holds, read out; non-text as hex; a file cut into many codes put back
+    // (.ai-notes/qr-scanner). Public and offline, in the catalog.
+    register(QrScannerApp())
     // Logins and passwords, kept like the 2FA keys: sealed, behind the device lock. In the catalog.
     register(PasswordsApp())
     // Hidden (D8). It is a diagnostic instrument, and it stays invisible until someone types the

@@ -25,7 +25,30 @@ public interface QrScanner {
      */
     public suspend fun scan(): String?
 
+    /**
+     * Keeps the camera open for a series of codes (qr-scanner D633): a file cut into 48 codes is not
+     * 48 taps on "Scan". [onCode] gets every code read, on the main thread — the same text again
+     * right after itself is not handed over twice — and answers what to show over the camera next,
+     * or [SeriesStep.Done] to close it. [hint] is the line shown before the first code.
+     *
+     * True when [onCode] ended the series, false when the person closed the scanner or the camera
+     * would not start. This default opens the one-code scanner again after every code; a host
+     * whose camera can stay open overrides it.
+     */
+    public suspend fun scanSeries(hint: String? = null, onCode: (String) -> SeriesStep): Boolean {
+        while (true) {
+            val text = scan() ?: return false
+            if (onCode(text) == SeriesStep.Done) return true
+        }
+    }
+
     public companion object {
         public val Key: ServiceKey<QrScanner> = ServiceKey("qr-scanner")
     }
+}
+
+/** What [QrScanner.scanSeries] does after a code: keep reading with [label] over the camera, or close. */
+public sealed interface SeriesStep {
+    public class Continue(public val label: String) : SeriesStep
+    public data object Done : SeriesStep
 }

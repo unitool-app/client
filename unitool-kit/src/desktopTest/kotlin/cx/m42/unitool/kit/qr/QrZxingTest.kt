@@ -54,6 +54,42 @@ class QrZxingTest {
     }
 
     @Test
+    fun numericAndAlphanumericModesMatchZxingInEveryVersionAndLevel() {
+        val random = Random(7)
+        val capitals = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
+        for (ecc in ErrorCorrection.entries) {
+            for (version in 1..40) {
+                val most = QrEncoder.alphanumericCapacity(version, ecc)
+                val fewest = if (version == 1) 1 else QrEncoder.alphanumericCapacity(version - 1, ecc) + 1
+                for (length in setOf(fewest, most)) {
+                    val text = "A" + String(CharArray(length - 1) { capitals[random.nextInt(capitals.length)] })
+                    val ours = QrEncoder.encode(text, ecc)!!
+                    assertEquals(version, ours.version, "$length characters at $ecc")
+                    assertSame(text, ours, ecc)
+                }
+                val digits = String(CharArray(fewest) { '0' + random.nextInt(10) })
+                assertSame(digits, QrEncoder.encode(digits, ecc)!!, ecc)
+            }
+        }
+    }
+
+    @Test
+    fun fileChunksScanBackIntoTheFile() {
+        val bytes = Random(3).nextBytes(5000)
+        val chunks = QrFile.cut("photo.jpg", bytes, set = byteArrayOf(1, 2, 3, 4))
+        var gathering: QrFileGathering? = null
+        for (chunk in chunks.reversed()) {
+            val text = decode(ImageIO.read(ByteArrayInputStream(QrImage.png(Qr.encode(chunk)!!))))
+            assertEquals(chunk, text)
+            val read = QrFile.parse(text)!!
+            gathering = gathering?.let { (it.add(read) as QrFileGathering.Added.New).gathering } ?: QrFileGathering(read)
+        }
+        val file = gathering!!.assemble() as QrFileGathering.Assembled.Ok
+        assertEquals("photo.jpg", file.name)
+        kotlin.test.assertContentEquals(bytes, file.bytes)
+    }
+
+    @Test
     fun utf8TextCarriesTheEciMarkerAsInZxing() {
         for (text in listOf("Привет, мир", "ёжик — 🦔", "otpauth://totp/Банк:я?secret=JBSWY3DPEHPK3PXP")) {
             for (ecc in ErrorCorrection.entries) assertSame(text, QrEncoder.encode(text, ecc)!!, ecc)

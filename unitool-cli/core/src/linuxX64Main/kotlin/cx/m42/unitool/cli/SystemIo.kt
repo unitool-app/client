@@ -27,6 +27,7 @@ import platform.posix.O_RDONLY
 import platform.posix.O_RDWR
 import platform.posix.O_TRUNC
 import platform.posix.O_WRONLY
+import platform.posix.POLLIN
 import platform.posix.STDERR_FILENO
 import platform.posix.STDIN_FILENO
 import platform.posix.STDOUT_FILENO
@@ -47,6 +48,8 @@ import platform.posix.getenv
 import platform.posix.isatty
 import platform.posix.memcpy
 import platform.posix.open
+import platform.posix.poll
+import platform.posix.pollfd
 import platform.posix.read
 import platform.posix.stderr
 import platform.posix.stdout
@@ -192,6 +195,39 @@ public class SystemIo : Io {
                     toTerminal(fd, MOUSE_OFF)
                     fputs("\n", stderr)
                     fflush(stderr)
+                }
+            }
+        } finally {
+            close(fd)
+        }
+        return true
+    }
+
+    override fun cycle(intervalMs: Int, tick: () -> Unit): Boolean {
+        flush()
+        val fd = open("/dev/tty", O_RDWR)
+        if (fd < 0) return false
+        try {
+            rawTerminal(fd) {
+                memScoped {
+                    val one = allocArray<ByteVar>(1)
+                    val watch = alloc<pollfd>()
+                    watch.fd = fd
+                    watch.events = POLLIN.convert()
+                    while (true) {
+                        tick()
+                        flush()
+                        // A key cuts the wait short; anything but Enter, q and Ctrl-C just shows the next one.
+                        val ready = poll(watch.ptr, 1u, intervalMs)
+                        if (ready < 0 && errno == EINTR) continue
+                        if (ready < 0) break
+                        if (ready == 0) continue
+                        if (read(fd, one, 1u) <= 0L) break
+                        when (one[0].toInt()) {
+                            '\r'.code, '\n'.code, 'q'.code -> break
+                            3 -> throw Cancelled()
+                        }
+                    }
                 }
             }
         } finally {

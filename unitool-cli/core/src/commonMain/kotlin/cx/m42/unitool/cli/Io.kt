@@ -56,6 +56,13 @@ public interface Io {
      */
     public fun trackMouse(point: (x: Int, y: Int) -> Unit, status: () -> String): Boolean = false
 
+    /**
+     * Calls [tick] now and then every [intervalMs] until Enter (or `q`) at the terminal: codes
+     * shown in a loop for a camera to pick up (qr-scanner D631). Ctrl-C cancels. False when there
+     * is no terminal to wait on, and then [tick] is never called.
+     */
+    public fun cycle(intervalMs: Int, tick: () -> Unit): Boolean = false
+
     /** The whole file at [path]. On failure it throws [CommandFailure] carrying the system's reason. */
     public fun readFile(path: String): ByteArray
 

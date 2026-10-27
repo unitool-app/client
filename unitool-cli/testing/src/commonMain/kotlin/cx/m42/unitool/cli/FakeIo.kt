@@ -16,6 +16,8 @@ public class FakeIo(
     private val writable: (String) -> Boolean = { true },
     /** What the mouse does over the terminal, cell by cell, before Enter; null when there is no terminal to track. */
     private val mouse: List<Pair<Int, Int>>? = null,
+    /** How many ticks [cycle] runs before "Enter"; null when there is no terminal to cycle on. */
+    private val cycleTicks: Int? = null,
 ) : Io {
     private val queue = ArrayDeque(answers.orEmpty())
     private val out = ArrayList<Byte>()
@@ -95,6 +97,17 @@ public class FakeIo(
         val moves = mouse ?: return false
         moves.forEach { (x, y) -> point(x, y) }
         err.append(status()).append('\n')
+        return true
+    }
+
+    /** The interval of every [cycle] run, in order. */
+    public val cycles: MutableList<Int> = mutableListOf()
+
+    /** Runs [tick] [cycleTicks] times, as if Enter came after them. */
+    override fun cycle(intervalMs: Int, tick: () -> Unit): Boolean {
+        val ticks = cycleTicks ?: return false
+        cycles += intervalMs
+        repeat(ticks) { tick() }
         return true
     }
 

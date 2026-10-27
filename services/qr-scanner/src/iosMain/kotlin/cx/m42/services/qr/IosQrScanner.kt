@@ -36,6 +36,9 @@ import platform.UIKit.UIButtonTypeSystem
 import platform.UIKit.UIColor
 import platform.UIKit.UIControlEventTouchUpInside
 import platform.UIKit.UIControlStateNormal
+import platform.UIKit.UIFont
+import platform.UIKit.UIImpactFeedbackGenerator
+import platform.UIKit.UIImpactFeedbackStyle
 import platform.UIKit.UILabel
 import platform.UIKit.UIModalPresentationFullScreen
 import platform.UIKit.UINotificationFeedbackGenerator
@@ -63,7 +66,33 @@ import platform.darwin.dispatch_get_main_queue
 @OptIn(ExperimentalForeignApi::class)
 public class IosQrScanner(private val language: () -> String) : QrScanner {
 
-    override suspend fun scan(): String? = withContext(Dispatchers.Main) {
+    override suspend fun scan(): String? = present(label = null, onCode = null)
+
+    /**
+     * The same screen kept open: every new code goes to [onCode] and the scanner closes only on
+     * [SeriesStep.Done] — true — or on Close, a refused camera or no camera — false.
+     */
+    override suspend fun scanSeries(hint: String?, onCode: (String) -> SeriesStep): Boolean {
+        // A throw out of an Objective-C callback would take the app down; it is carried out here
+        // instead and rethrown in the caller.
+        var thrown: Throwable? = null
+        val ended = present(label = hint) { text ->
+            try {
+                onCode(text)
+            } catch (e: Throwable) {
+                thrown = e
+                SeriesStep.Done
+            }
+        }
+        thrown?.let { throw it }
+        return ended != null
+    }
+
+    /**
+     * Shows the scanner until it closes. With [onCode] null, the first code read is the answer;
+     * with it, a series runs and the answer is non-null only when [onCode] said [SeriesStep.Done].
+     */
+    private suspend fun present(label: String?, onCode: ((String) -> SeriesStep)?): String? = withContext(Dispatchers.Main) {
         val strings = ScanStrings.of(language())
         val presenter = topViewController() ?: return@withContext null
         if (!cameraAllowed()) {
@@ -71,7 +100,7 @@ public class IosQrScanner(private val language: () -> String) : QrScanner {
             return@withContext null
         }
         suspendCancellableCoroutine { continuation ->
-            val session = ScanSession(strings) { text -> if (continuation.isActive) continuation.resume(text) }
+            val session = ScanSession(strings, label, onCode) { text -> if (continuation.isActive) continuation.resume(text) }
             if (!session.start()) {
                 continuation.resume(null)
                 return@suspendCancellableCoroutine
@@ -111,7 +140,9 @@ public class IosQrScanner(private val language: () -> String) : QrScanner {
 }
 
 /**
- * One scan: the session, the controller that shows it, and the one answer it gives.
+ * One scan: the session, the controller that shows it, and the one answer it gives. With
+ * [onCode], a series: every new code goes there, [label] shows its answers, and only
+ * [SeriesStep.Done] closes it with an answer.
  *
  * An `NSObject` because it is the metadata delegate and the close button's target, and both of
  * those are Objective-C callbacks.
@@ -119,12 +150,22 @@ public class IosQrScanner(private val language: () -> String) : QrScanner {
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private class ScanSession(
     private val strings: ScanStrings,
+    private val label: String?,
+    private val onCode: ((String) -> SeriesStep)?,
     private val onResult: (String?) -> Unit,
 ) : NSObject(), AVCaptureMetadataOutputObjectsDelegateProtocol {
 
     private val session = AVCaptureSession()
     val controller = UIViewController(nibName = null, bundle = null)
     private var done = false
+
+    /** The series' line over the camera; absent for one code. */
+    private var labelView: UILabel? = null
+    /**
+     * The last text a series handed over. A code stays in view for many frames; only a change of
+     * text is news.
+     */
+    private var last: String? = null
 
     fun start(): Boolean {
         val device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo) ?: return false
@@ -163,6 +204,17 @@ private class ScanSession(
         hint.numberOfLines = 2
         view.addSubview(hint)
 
+        if (onCode != null) {
+            val line = UILabel(frame = CGRectMake(24.0, 128.0, width - 48.0, 56.0))
+            line.text = label
+            line.textColor = UIColor.whiteColor
+            line.textAlignment = NSTextAlignmentCenter
+            line.font = UIFont.boldSystemFontOfSize(22.0)
+            line.numberOfLines = 2
+            view.addSubview(line)
+            labelView = line
+        }
+
         val close = UIButton.buttonWithType(UIButtonTypeSystem)
         close.setTitle(strings.close, forState = UIControlStateNormal)
         close.setTitleColor(UIColor.whiteColor, forState = UIControlStateNormal)
@@ -184,8 +236,28 @@ private class ScanSession(
         val text = didOutputMetadataObjects
             .firstNotNullOfOrNull { (it as? AVMetadataMachineReadableCodeObject)?.stringValue }
             ?: return
+        val series = onCode
+        if (series != null) {
+            seriesCode(series, text)
+            return
+        }
         UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
         finish(text)
+    }
+
+    private fun seriesCode(series: (String) -> SeriesStep, text: String) {
+        if (done || text == last) return
+        last = text
+        when (val step = series(text)) {
+            is SeriesStep.Continue -> {
+                UIImpactFeedbackGenerator(style = UIImpactFeedbackStyle.UIImpactFeedbackStyleLight).impactOccurred()
+                labelView?.text = step.label
+            }
+            SeriesStep.Done -> {
+                UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
+                finish(text)
+            }
+        }
     }
 
     /** Once: a code seen in two frames in a row must not answer twice. */

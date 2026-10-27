@@ -5,9 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color as AndroidColor
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Size as AndroidSize
+import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -71,13 +73,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The scanner's screen: the camera full-screen, a window to aim with, and the first QR code read
- * ends it.
+ * ends it — or, in series mode ([EXTRA_SERIES]), every new code goes to the app, whose answer is
+ * either the next line to show over the camera or the end.
  *
  * An activity rather than a composable inside the app, for the reason [QrScanner] gives — and
  * because only an activity is told the answer to a permission prompt.
  *
  * Every way out answers [AndroidQrScanner]: a code, or null for Close, Back, a refused camera, or
- * the system finishing it. A rotation is none of those; the manifest keeps it from recreating the
+ * the system finishing it; a series hears the same as "closed". A rotation is none of those; the manifest keeps it from recreating the
  * activity, so the camera does not blink.
  */
 public class QrScanActivity : ComponentActivity() {
@@ -89,6 +92,11 @@ public class QrScanActivity : ComponentActivity() {
     private val failed = mutableStateOf(false)
     private val torchOn = mutableStateOf(false)
     private val hasTorch = mutableStateOf(false)
+
+    /** The series this activity reads for, or null for one code. Set before the camera starts. */
+    private var seriesId: Long? = null
+    /** The app's line over the camera in a series: the hint at first, then each answer. */
+    private val label = mutableStateOf<String?>(null)
 
     private val analysis: ExecutorService = Executors.newSingleThreadExecutor()
     private val found = AtomicBoolean(false)
@@ -110,9 +118,25 @@ public class QrScanActivity : ComponentActivity() {
                     ),
                 )
                 .build()
-            setImageAnalysisAnalyzer(analysis, QrAnalyzer { text ->
-                if (found.compareAndSet(false, true)) runOnUiThread { close(text) }
-            })
+            val id = seriesId
+            setImageAnalysisAnalyzer(
+                analysis,
+                if (id == null) {
+                    QrAnalyzer { text ->
+                        if (found.compareAndSet(false, true)) runOnUiThread { close(text) }
+                    }
+                } else {
+                    // A code stays in view for many frames; only a change of text is news. Not
+                    // reset by frames that read nothing, which a held code has plenty of.
+                    var last: String? = null
+                    QrAnalyzer { text ->
+                        if (text != last) {
+                            last = text
+                            runOnUiThread { seriesCode(id, text) }
+                        }
+                    }
+                },
+            )
         }
     }
 
@@ -124,6 +148,10 @@ public class QrScanActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         strings = ScanStrings.of(intent.getStringExtra(EXTRA_LANGUAGE))
+        if (intent.hasExtra(EXTRA_SERIES)) {
+            seriesId = intent.getLongExtra(EXTRA_SERIES, 0L)
+            label.value = intent.getStringExtra(EXTRA_LABEL)
+        }
         granted.value = cameraAllowed()
         setContent { ScanScreen() }
     }
@@ -145,7 +173,40 @@ public class QrScanActivity : ComponentActivity() {
     private fun answer(text: String?) {
         if (answered) return
         answered = true
-        AndroidQrScanner.deliver(text)
+        val id = seriesId
+        if (id == null) AndroidQrScanner.deliver(text) else AndroidQrScanner.seriesClosed(id)
+    }
+
+    /** A new code in a series, on the main thread; the app's answer decides what follows. */
+    private fun seriesCode(id: Long, text: String) {
+        if (answered) return
+        when (val step = AndroidQrScanner.seriesCode(id, text)) {
+            is SeriesStep.Continue -> {
+                tick()
+                label.value = step.label
+            }
+            SeriesStep.Done -> {
+                tick()
+                answered = true
+                finish()
+            }
+            // The series is over without this activity: a newer scan took its place, or the app's
+            // callback threw. Either way it has already been answered.
+            null -> {
+                answered = true
+                finish()
+            }
+        }
+    }
+
+    /** A short tick for a code taken, so a series can be fed without watching the screen. */
+    private fun tick() {
+        val effect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            HapticFeedbackConstants.CONFIRM
+        } else {
+            HapticFeedbackConstants.VIRTUAL_KEY
+        }
+        window.decorView.performHapticFeedback(effect)
     }
 
     private fun close(text: String?) {
@@ -251,6 +312,13 @@ public class QrScanActivity : ComponentActivity() {
             verticalArrangement = Arrangement.Bottom,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            label.value?.let { line ->
+                BasicText(
+                    line,
+                    style = TextStyle(color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center),
+                )
+                Spacer(Modifier.height(12.dp))
+            }
             BasicText(
                 strings.hint,
                 style = TextStyle(color = Color.White, fontSize = 17.sp, textAlign = TextAlign.Center),
@@ -297,6 +365,10 @@ public class QrScanActivity : ComponentActivity() {
 
     internal companion object {
         const val EXTRA_LANGUAGE: String = "cx.m42.services.qr.LANGUAGE"
+        /** The series id from [AndroidQrScanner]; absent for one code. */
+        const val EXTRA_SERIES: String = "cx.m42.services.qr.SERIES"
+        /** The line over the camera before a series' first code. */
+        const val EXTRA_LABEL: String = "cx.m42.services.qr.LABEL"
     }
 }
 

@@ -47,13 +47,15 @@ QrImage.png(code)        // a picture: PNG bytes (deflate included, no zlib need
 QrImage.svg(code)        // a picture: SVG text
 QrTerminal.ansi(code)    // terminal output
 Qr.split(text)           // text too long for one code, cut on line breaks
+QrFile.cut(name, bytes)  // a file as UQR1 chunks; QrFileGathering puts it back
 ```
 
 It also has the cryptography the phone's SSH keyring stands on (`kit.crypto`), the `ucrypt` file
 format (`kit.crypt`) and secret sharing (`kit.split`).
 
 Terminal services every command can use are in `core`: `Io.showScreens(...)` shows several screens
-one at a time (Enter between them, read from `/dev/tty` even behind a pipe), and `CLEAR_SCREEN`.
+one at a time (Enter between them, read from `/dev/tty` even behind a pipe), `Io.cycle(...)` calls a
+tick on an interval until Enter, and `CLEAR_SCREEN`.
 
 ## Tests
 
@@ -87,6 +89,13 @@ unitool qr 'hello' --ec H --scale 12 -o big.png
 # the codes come one at a time, with Enter in between (the keyboard is read from /dev/tty, so the text
 # can come from a pipe). With -o they become export-1.png, export-2.png, …
 age -d -i ~/.ssh/id_ed25519 2fa-export.age | unitool qr --split
+
+# Any file, text or not, up to 1 MiB: cut into UQR1 chunks (base45 in the alphanumeric mode, name and
+# SHA-256 inside) that Unitool's QR scanner gathers in any order. --cycle shows them in a loop until
+# Enter, so the phone just keeps the camera on the screen; --chunk makes the codes smaller or larger.
+unitool qr --file photo.jpg --cycle
+unitool qr --file notes.pdf --chunk 600 --interval 0.3 --cycle
+unitool qr --file notes.pdf -o out/notes.png   # notes-1.png, notes-2.png, …
 ```
 
 `unitool` with no arguments at a terminal opens a menu: pick an app, a command, answer the questions.

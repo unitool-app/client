@@ -1,5 +1,6 @@
 package cx.m42.unitool.cli.qr
 
+import cx.m42.unitool.cli.CLEAR_SCREEN
 import cx.m42.unitool.cli.CliApp
 import cx.m42.unitool.cli.Command
 import cx.m42.unitool.cli.Io
@@ -9,11 +10,13 @@ import cx.m42.unitool.cli.default
 import cx.m42.unitool.cli.fail
 import cx.m42.unitool.cli.int
 import cx.m42.unitool.cli.showScreens
+import cx.m42.unitool.cli.write
 import cx.m42.unitool.cli.usage
 import cx.m42.unitool.kit.qr.ErrorCorrection
 import cx.m42.unitool.kit.qr.LineTooLong
 import cx.m42.unitool.kit.qr.Qr
 import cx.m42.unitool.kit.qr.QrCode
+import cx.m42.unitool.kit.qr.QrFile
 import cx.m42.unitool.kit.qr.QrImage
 import cx.m42.unitool.kit.qr.QrTerminal
 
@@ -22,7 +25,7 @@ import cx.m42.unitool.kit.qr.QrTerminal
  * code is and how it is drawn lives there, shared with the phone. Here are only the parameters,
  * where the result goes, and the messages.
  */
-public class QrApp : CliApp(id = "qr", title = "QR codes", summary = "Make a QR code from text: to the terminal, PNG or SVG") {
+public class QrApp : CliApp(id = "qr", title = "QR codes", summary = "Make a QR code from text, or codes from a file: to the terminal, PNG or SVG") {
     private val encode = EncodeCommand()
     override val commands: List<Command> = listOf(encode)
     override val default: Command = encode
@@ -48,8 +51,10 @@ internal enum class Format(val id: String) {
     }
 }
 
-internal class EncodeCommand : Command("encode", "Make a QR code from text") {
+internal class EncodeCommand : Command("encode", "Make a QR code from text, or codes from a file") {
     private val text by argument("TEXT", "the text; without it, stdin is read")
+    private val file by option("-i", "--file", help = "cut a file of any kind into codes that Unitool's QR scanner puts back", metavar = "FILE")
+        .advanced()
     private val out by option("-o", "--out", help = "write to a file instead of stdout", metavar = "FILE")
     private val format by option("-f", "--format", help = "the format; without it, the extension of FILE, otherwise ansi", metavar = "FORMAT")
         .choice("ansi", "png", "svg")
@@ -60,30 +65,68 @@ internal class EncodeCommand : Command("encode", "Make a QR code from text") {
         .int(0..40).advanced()
     private val scale by option("--scale", help = "pixels per module in PNG and SVG", metavar = "N")
         .int(1..100).default(8).advanced()
+    private val chunk by option("--chunk", help = "bytes of the file in each code: fewer make smaller codes and more of them", metavar = "BYTES")
+        .int(QrFile.CHUNK_SIZES).default(QrFile.DEFAULT_CHUNK).advanced()
+    private val cycle by flag("--cycle", help = "on the terminal, show the codes in a loop until Enter instead of one per Enter").advanced()
+    private val interval by option("--interval", help = "seconds each code stays on the screen with --cycle", metavar = "SECONDS")
+        .default("0.4").advanced()
 
     override fun run(io: Io): Int {
-        val content = text ?: readStdin(io)
-        if (content.isEmpty()) fail("empty text: nothing to encode")
+        val path = file
+        if (path != null && (text != null || split)) usage("--file takes neither TEXT nor --split: the file is cut into codes by itself")
         val target = out
         val kind = format?.let(Format::of) ?: target?.let(Format::byExtension) ?: Format.Ansi
         if (kind == Format.Png && target == null && io.stdoutIsTerminal) {
             usage("PNG is not printed to a terminal: give -o FILE or redirect stdout")
         }
+        val seconds = interval.toDoubleOrNull()?.takeIf { it in 0.1..10.0 } ?: usage("--interval is 0.1 to 10 seconds, not $interval")
         val level = ErrorCorrection.valueOf(ec)
-        val parts = if (split) splitByLines(content, level) else listOf(content)
-        val codes = parts.map { Qr.encode(it, level) ?: tooLong(it, level) }
+        val parts = if (path != null) {
+            fileChunks(io, path)
+        } else {
+            val content = text ?: readStdin(io)
+            if (content.isEmpty()) fail("empty text: nothing to encode")
+            if (split) splitByLines(content, level) else listOf(content)
+        }
+        val codes = parts.map { Qr.encode(it, level) ?: if (path != null) chunkTooLong(level) else tooLong(it, level) }
         val margin = margin ?: if (kind == Format.Ansi) 2 else 4
         val images = codes.map { kind.render(it, margin, scale) }
+        if (path != null) io.say("${images.size} codes; scan them in any order with Unitool's QR scanner")
 
         when {
             target != null -> writeFiles(io, target, images)
             images.size == 1 -> io.write(images.single())
             kind != Format.Ansi -> usage("${images.size} codes go to stdout only as ansi; for ${kind.id} give -o FILE")
+            cycle && io.stdoutIsTerminal && showInLoop(io, images, (seconds * 1000).toInt()) -> Unit
             // As the 2FA export did with `split --filter='clear; qrencode …; read _ </dev/tty'`, without GNU.
             else -> io.showScreens(images, next = "Press Enter for the next code") { number, count -> "Code $number of $count" }
         }
         return 0
     }
+
+    /** The file's chunks (qr-scanner D630); over [QrFile.MAX_BYTES] it says how many codes it would have taken. */
+    private fun fileChunks(io: Io, path: String): List<String> {
+        val bytes = io.readFile(path)
+        val name = path.substringAfterLast('/')
+        if (bytes.size > QrFile.MAX_BYTES) {
+            fail("$name is ${bytes.size} bytes; at most ${QrFile.MAX_BYTES} go into codes (it would take ${QrFile.count(name, bytes.size.toLong(), chunk)} of them)")
+        }
+        return QrFile.cut(name, bytes, chunk)
+    }
+
+    /** One code after another until Enter, each replacing the last (D631); false when there is no terminal. */
+    private fun showInLoop(io: Io, images: List<ByteArray>, intervalMs: Int): Boolean {
+        var shown = 0
+        return io.cycle(intervalMs) {
+            val index = shown++ % images.size
+            io.write(CLEAR_SCREEN)
+            io.write(images[index])
+            io.write("Code ${index + 1} of ${images.size} · Enter stops\n")
+        }
+    }
+
+    private fun chunkTooLong(level: ErrorCorrection): Nothing =
+        fail("a chunk of $chunk bytes does not fit one QR code at --ec $level: give a smaller --chunk")
 
     /** stdin as text, minus the one line break `echo` and editors put at the end. */
     private fun readStdin(io: Io): String {

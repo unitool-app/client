@@ -5,11 +5,12 @@ package cx.m42.unitool.kit.qr
  * CLI's native binary, on iOS and in the browser. This is the same reason the phone's age and SHA code
  * are written by hand: wasm has no JCA.
  *
- * It does byte mode only, plus an ECI marker for UTF-8. Byte mode can encode any text, so the only
- * cost is density for text made purely of digits or capitals, which nobody here encodes. Everything
- * else follows ZXing step by step: the version choice, the padding, the block interleaving, where
- * the bits go and the mask penalty. `jvmTest` checks that both produce the same matrix, module for
- * module, for every version and level.
+ * One mode per code, chosen as ZXing chooses it: numeric for digits only, alphanumeric for digits,
+ * capitals and ` $%*+-./:` only, byte mode for anything else, plus an ECI marker for UTF-8. The
+ * alphanumeric mode is what a file cut into codes travels in (`QrFile`, base45): 5.5 bits a
+ * character instead of 8. Everything else follows ZXing step by step: the version choice, the
+ * padding, the block interleaving, where the bits go and the mask penalty. `jvmTest` checks that
+ * both produce the same matrix, module for module, for every version, level and mode.
  *
  * The layout and the tables follow Project Nayuki's QR Code generator (MIT), which describes the
  * symbol most compactly. The penalty rules follow ZXing's `MaskUtil`, so the same mask wins.
@@ -27,10 +28,9 @@ internal object QrEncoder {
      */
     fun encode(text: String, ecc: ErrorCorrection, mask: Int? = null): QrCode? {
         require(mask == null || mask in 0..7) { "a mask is 0..7, not $mask" }
-        val data = text.encodeToByteArray()
-        val eci = text.any { it.code >= 128 }
-        val version = (1..40).firstOrNull { bitsNeeded(data.size, eci, it) <= dataCodewords(it, ecc) * 8 } ?: return null
-        val codewords = interleave(dataCodewords(data, eci, version, ecc), version, ecc)
+        val segment = Segment.of(text)
+        val version = (1..40).firstOrNull { segment.bits(it) <= dataCodewords(it, ecc) * 8 } ?: return null
+        val codewords = interleave(dataCodewords(segment, version, ecc), version, ecc)
 
         var best: Symbol? = null
         var bestPenalty = Int.MAX_VALUE
@@ -52,11 +52,13 @@ internal object QrEncoder {
 
     /** The bytes version [version] holds in byte mode, with the ECI marker or without. */
     fun byteCapacity(version: Int, ecc: ErrorCorrection, eci: Boolean = false): Int =
-        (dataCodewords(version, ecc) * 8 - header(eci, version)) / 8
+        (dataCodewords(version, ecc) * 8 - (if (eci) 12 else 0) - 4 - Mode.Byte.countBits(version)) / 8
 
-    private fun header(eci: Boolean, version: Int): Int = (if (eci) 12 else 0) + 4 + if (version < 10) 8 else 16
-
-    private fun bitsNeeded(bytes: Int, eci: Boolean, version: Int): Int = header(eci, version) + 8 * bytes
+    /** The characters version [version] holds in alphanumeric mode. */
+    fun alphanumericCapacity(version: Int, ecc: ErrorCorrection): Int {
+        val bits = dataCodewords(version, ecc) * 8 - 4 - Mode.Alphanumeric.countBits(version)
+        return bits / 11 * 2 + if (bits % 11 >= 6) 1 else 0
+    }
 
     /** Modules left for data and error correction once every function pattern is drawn. */
     internal fun rawDataModules(version: Int): Int {
@@ -72,16 +74,10 @@ internal object QrEncoder {
     internal fun dataCodewords(version: Int, ecc: ErrorCorrection): Int =
         rawDataModules(version) / 8 - ECC_PER_BLOCK[ecc.ordinal][version] * BLOCKS[ecc.ordinal][version]
 
-    /** Mode, count, bytes, then the terminator, the padding to a byte and the 0xEC 0x11 filler. */
-    private fun dataCodewords(data: ByteArray, eci: Boolean, version: Int, ecc: ErrorCorrection): ByteArray {
+    /** Mode, count, data, then the terminator, the padding to a byte and the 0xEC 0x11 filler. */
+    private fun dataCodewords(segment: Segment, version: Int, ecc: ErrorCorrection): ByteArray {
         val bits = BitBuffer()
-        if (eci) {
-            bits.append(0b0111, 4)
-            bits.append(26, 8) // ECI 26 is UTF-8
-        }
-        bits.append(0b0100, 4)
-        bits.append(data.size, if (version < 10) 8 else 16)
-        data.forEach { bits.append(it.toInt() and 0xFF, 8) }
+        segment.write(bits, version)
         val capacity = dataCodewords(version, ecc) * 8
         bits.append(0, minOf(4, capacity - bits.size))
         bits.append(0, (8 - bits.size % 8) % 8)
@@ -140,6 +136,62 @@ internal object QrEncoder {
     internal fun eccPerBlock(version: Int, ecc: ErrorCorrection): Int = ECC_PER_BLOCK[ecc.ordinal][version]
 
     internal fun blocks(version: Int, ecc: ErrorCorrection): Int = BLOCKS[ecc.ordinal][version]
+}
+
+internal enum class Mode(val indicator: Int, private val counts: IntArray) {
+    Numeric(0b0001, intArrayOf(10, 12, 14)),
+    Alphanumeric(0b0010, intArrayOf(9, 11, 13)),
+    Byte(0b0100, intArrayOf(8, 16, 16));
+
+    /** The width of the character count, which grows at versions 10 and 27. */
+    fun countBits(version: Int): Int = counts[if (version < 10) 0 else if (version < 27) 1 else 2]
+}
+
+/** The text in the one mode it is written in, as ZXing's `Encoder.chooseMode` picks it. */
+private class Segment(val mode: Mode, val text: String) {
+    private val data = text.encodeToByteArray()
+    private val eci = mode == Mode.Byte && text.any { it.code >= 128 }
+
+    /** The characters for numeric and alphanumeric, the bytes for byte mode. */
+    private val count = if (mode == Mode.Byte) data.size else text.length
+
+    fun bits(version: Int): Int = (if (eci) 12 else 0) + 4 + mode.countBits(version) + when (mode) {
+        Mode.Numeric -> count / 3 * 10 + intArrayOf(0, 4, 7)[count % 3]
+        Mode.Alphanumeric -> count / 2 * 11 + count % 2 * 6
+        Mode.Byte -> count * 8
+    }
+
+    fun write(bits: BitBuffer, version: Int) {
+        if (eci) {
+            bits.append(0b0111, 4)
+            bits.append(26, 8) // ECI 26 is UTF-8
+        }
+        bits.append(mode.indicator, 4)
+        bits.append(count, mode.countBits(version))
+        when (mode) {
+            Mode.Numeric -> text.chunked(3).forEach { bits.append(it.toInt(), intArrayOf(0, 4, 7, 10)[it.length]) }
+            Mode.Alphanumeric -> text.chunked(2).forEach { pair ->
+                if (pair.length == 2) bits.append(ALPHANUMERIC.indexOf(pair[0]) * 45 + ALPHANUMERIC.indexOf(pair[1]), 11)
+                else bits.append(ALPHANUMERIC.indexOf(pair[0]), 6)
+            }
+            Mode.Byte -> data.forEach { bits.append(it.toInt() and 0xFF, 8) }
+        }
+    }
+
+    companion object {
+        /** The 45 characters of the alphanumeric mode, in the order of their values. */
+        const val ALPHANUMERIC: String = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
+
+        /** Byte mode for anything outside the alphabet or for nothing at all, as in ZXing. */
+        fun of(text: String): Segment = Segment(
+            when {
+                text.isEmpty() || text.any { it !in ALPHANUMERIC } -> Mode.Byte
+                text.all { it in '0'..'9' } -> Mode.Numeric
+                else -> Mode.Alphanumeric
+            },
+            text,
+        )
+    }
 }
 
 /** One symbol under construction: the modules, and which of them belong to function patterns. */
