@@ -40,15 +40,45 @@ class DatesInstanceTest {
     }
 
     @Test
-    fun theSwitchIsRememberedAndTheConfigIsOnlyTheDefault() {
+    fun theSwitchesAreRememberedAndTheConfigIsOnlyTheDefault() {
         runAppTest(app(), config("""{"inclusive":true}""")) {
-            assertEquals(true, (instance as DatesInstance).state.value.inclusive)
-            click("date-diff:inclusive")
+            assertEquals(true, (instance as DatesInstance).state.value.includeEnd)
+            click("date-diff:include-end")
+            click("date-diff:include-start")
             assertEquals("false", runtime.storage.entries[DatesInstance.KEY_INCLUSIVE])
+            assertEquals("false", runtime.storage.entries[DatesInstance.KEY_INCLUDE_START])
         }
-        runAppTest(app(), config("""{"inclusive":true}"""), prepare = { it.storage.entries[DatesInstance.KEY_INCLUSIVE] = "false" }) {
-            assertEquals(false, (instance as DatesInstance).state.value.inclusive)
+        runAppTest(app(), config("""{"inclusive":true}"""), prepare = {
+            it.storage.entries[DatesInstance.KEY_INCLUSIVE] = "false"
+            it.storage.entries[DatesInstance.KEY_INCLUDE_START] = "false"
+        }) {
+            val state = (instance as DatesInstance).state.value
+            assertEquals(false, state.includeEnd)
+            assertEquals(false, state.includeStart)
         }
+    }
+
+    @Test
+    fun plusSixtyDaysThenMinusNinetyFromThere() = runAppTest(app()) {
+        val instance = instance as DatesInstance
+        click("date-diff:tab-shift")
+        assertShown("date-diff:empty")
+        click("date-diff:amount-60")
+        assertEquals(CalendarDate(2024, 1, 14), instance.state.value.shifted)
+        assertShown("date-diff:result")
+        click("date-diff:continue")
+        assertEquals("14.01.2024", instance.state.value.base)
+        click("date-diff:subtract")
+        click("date-diff:amount-90")
+        assertEquals(CalendarDate(2023, 10, 16), instance.state.value.shifted)
+    }
+
+    @Test
+    fun aBadAmountSaysSo() = runAppTest(app()) {
+        click("date-diff:tab-shift")
+        type("date-diff:amount", "6O")
+        assertShown("date-diff:amount-error")
+        assertEquals(null, (instance as DatesInstance).state.value.shifted)
     }
 
     @Test
@@ -63,6 +93,17 @@ class DatesInstanceTest {
             val state = (instance as DatesInstance).state.value
             assertEquals("15.11.2023", state.end)
             assertEquals(0, state.span!!.days)
+        }
+        runAppTest(app()) {
+            click("date-diff:tab-shift")
+            click("date-diff:unit-months")
+            type("date-diff:amount", "3")
+            saved = instance.saveState()
+        }
+        runAppTest(app(), restore = saved) {
+            val state = (instance as DatesInstance).state.value
+            assertEquals(DatesMode.Shift, state.mode)
+            assertEquals(CalendarDate(2024, 2, 15), state.shifted)
         }
     }
 }

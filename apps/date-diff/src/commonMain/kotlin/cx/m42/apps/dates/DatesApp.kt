@@ -12,14 +12,16 @@ import cx.m42.superizer.runtime.InstanceRuntime
 import kotlinx.serialization.Serializable
 
 /**
- * What the app starts as: whether the last day is counted. A link from an HR page or a holiday
+ * What the app starts as: whether the last day of a difference is counted. A link from an HR page or a holiday
  * planner would ask for `true`; the person can still flip it, and their choice is what sticks.
  */
 @Serializable
 public data class DatesConfig(val inclusive: Boolean = false)
 
 /**
- * Days between two dates: calendar days, weeks, years-months-days, and weekdays against weekends.
+ * Two date tools on tabs. Difference: days between two dates in calendar days, weeks,
+ * years-months-days and weekdays against weekends, each end counted or not. Plus / minus: a date
+ * so many days, weeks, months, years or weekdays later or earlier, one result after another.
  *
  * Public and offline — no network, no secrets, nothing that leaves the device. The arithmetic is in
  * `CalendarDate.kt` and `DateSpan.kt`, pure and tested without a screen.
@@ -33,12 +35,12 @@ public class DatesApp internal constructor(
 
     override val manifest: AppManifest = AppManifest(
         id = AppId(ID),
-        version = "1.0.0",
+        version = "1.1.0",
         metadata = AppMetadata(
             title = localized("ru" to "Разница дат", "en" to "Date difference"),
             description = localized(
-                "ru" to "Сколько дней, недель и месяцев между датами, будни и выходные",
-                "en" to "Days, weeks and months between two dates, weekdays and weekends",
+                "ru" to "Сколько дней между датами и какая дата будет через 60 дней, 3 месяца или 10 будней",
+                "en" to "Days between two dates, and the date 60 days, 3 months or 10 weekdays away",
             ),
             // A calendar sheet: two rings, the page with its header cut out, one day marked.
             icon = AppIcon.Path(

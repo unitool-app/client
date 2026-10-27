@@ -12,7 +12,26 @@ internal interface DatesStrings {
     val placeholder: String
     val today: String
     val notADate: String
-    val inclusive: String
+    val includeStart: String
+    val includeEnd: String
+    val countedDays: String
+    val noDayCounted: String
+    val tabDifference: String
+    val tabShift: String
+    val base: String
+    val add: String
+    val subtract: String
+    val amount: String
+    val countStart: String
+    val enterAmount: String
+    val notAnAmount: String
+    val continueFrom: String
+    val weekdaysHint: String
+
+    fun unit(unit: ShiftUnit): String
+
+    /** "через 92 дня" / "92 дня назад" — how far the result is, whatever unit was asked for. */
+    fun distance(days: Long): String
     val enterBoth: String
     val reversed: String
     val result: String
@@ -37,7 +56,35 @@ internal object DatesStringsEn : DatesStrings {
     override val placeholder = "dd.mm.yyyy"
     override val today = "Today"
     override val notADate = "Not a date — day, month, year: 18.10.2026"
-    override val inclusive = "Count the last day too"
+    override val includeStart = "Count the first day"
+    override val includeEnd = "Count the last day"
+    override val countedDays = "Days counted"
+    override val noDayCounted = "none"
+    override val tabDifference = "Difference"
+    override val tabShift = "Plus / minus"
+    override val base = "Date"
+    override val add = "+ Add"
+    override val subtract = "− Subtract"
+    override val amount = "How many"
+    override val countStart = "The date itself is day one"
+    override val enterAmount = "Enter the date and how many"
+    override val notAnAmount = "A whole number, up to five digits"
+    override val continueFrom = "Continue from this date"
+    override val weekdaysHint = "Weekdays skip Saturdays and Sundays; public holidays are not known."
+
+    override fun unit(unit: ShiftUnit) = when (unit) {
+        ShiftUnit.Days -> "Days"
+        ShiftUnit.Weeks -> "Weeks"
+        ShiftUnit.Months -> "Months"
+        ShiftUnit.Years -> "Years"
+        ShiftUnit.Weekdays -> "Weekdays"
+    }
+
+    override fun distance(days: Long) = when {
+        days > 0 -> "in ${days(days)}"
+        days < 0 -> "${days(-days)} earlier"
+        else -> "the same day"
+    }
     override val enterBoth = "Enter both dates"
     override val reversed = "The end is before the start — counted backwards"
     override val result = "Difference"
@@ -65,7 +112,35 @@ internal object DatesStringsRu : DatesStrings {
     override val placeholder = "дд.мм.гггг"
     override val today = "Сегодня"
     override val notADate = "Не похоже на дату — день, месяц, год: 18.10.2026"
-    override val inclusive = "Включая последний день"
+    override val includeStart = "Включая первый день"
+    override val includeEnd = "Включая последний день"
+    override val countedDays = "Считаются дни"
+    override val noDayCounted = "ни одного"
+    override val tabDifference = "Разница"
+    override val tabShift = "Плюс / минус"
+    override val base = "Дата"
+    override val add = "+ Прибавить"
+    override val subtract = "− Вычесть"
+    override val amount = "Сколько"
+    override val countStart = "Сама дата — первый день"
+    override val enterAmount = "Введите дату и сколько прибавить"
+    override val notAnAmount = "Нужно целое число, до пяти цифр"
+    override val continueFrom = "Продолжить от этой даты"
+    override val weekdaysHint = "Рабочие дни — без суббот и воскресений; государственные праздники не учитываются."
+
+    override fun unit(unit: ShiftUnit) = when (unit) {
+        ShiftUnit.Days -> "Дни"
+        ShiftUnit.Weeks -> "Недели"
+        ShiftUnit.Months -> "Месяцы"
+        ShiftUnit.Years -> "Годы"
+        ShiftUnit.Weekdays -> "Будни"
+    }
+
+    override fun distance(days: Long) = when {
+        days > 0 -> "через ${days(days)}"
+        days < 0 -> "${days(-days)} назад"
+        else -> "тот же день"
+    }
     override val enterBoth = "Введите обе даты"
     override val reversed = "Конец раньше начала — посчитано в обратную сторону"
     override val result = "Разница"
