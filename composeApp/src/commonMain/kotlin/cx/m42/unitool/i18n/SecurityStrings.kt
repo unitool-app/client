@@ -64,6 +64,8 @@ internal interface SecurityStrings {
     val keepUnderPassphrase: String
     val biometricOnly: String
     val biometricOnlyIphone: String
+    /** Who opens a key in the chip, on its row and card: the key's own lock, as it was made. */
+    fun opensWith(iphone: Boolean, biometricOnly: Boolean, passphrase: Boolean, canRemake: Boolean): String
     val passphraseRequired: String
     val noPassphraseInChip: String
     val add: String

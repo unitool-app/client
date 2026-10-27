@@ -98,6 +98,12 @@ internal object SecurityStringsRu : SecurityStrings {
     override val keepUnderPassphrase = "Только под паролем ключа"
     override val biometricOnly = "Только мой отпечаток — не PIN-код телефона"
     override val biometricOnlyIphone = "Только Face ID или Touch ID — не код-пароль"
+    override fun opensWith(iphone: Boolean, biometricOnly: Boolean, passphrase: Boolean, canRemake: Boolean) = when {
+        biometricOnly -> if (iphone) "Открывает только Face ID или Touch ID" else "Открывает только отпечаток"
+        passphrase -> if (iphone) "Face ID или код-пароль, и пароль ключа" else "Отпечаток или PIN-код, и пароль ключа"
+        iphone -> "Открывает и код-пароль iPhone" + if (canRemake) ": создайте ключ заново с «Только Face ID»" else ""
+        else -> "Открывает и PIN-код телефона" + if (canRemake) ": создайте ключ заново с «Только отпечаток»" else ""
+    }
     override val passphraseRequired = "Обязательно без отпечатка или лица: одна блокировка экрана ключ не открывает."
     override val noPassphraseInChip = "Создаётся внутри чипа: файла нет, поэтому и пароля у него нет."
     override val add = "Добавить"

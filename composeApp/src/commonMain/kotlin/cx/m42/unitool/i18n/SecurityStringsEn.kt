@@ -89,6 +89,12 @@ internal object SecurityStringsEn : SecurityStrings {
     override val keepUnderPassphrase = "Under the key's passphrase only"
     override val biometricOnly = "Only my fingerprint — not the screen lock's PIN"
     override val biometricOnlyIphone = "Only Face ID or Touch ID — not the passcode"
+    override fun opensWith(iphone: Boolean, biometricOnly: Boolean, passphrase: Boolean, canRemake: Boolean) = when {
+        biometricOnly -> if (iphone) "Opened only by Face ID or Touch ID" else "Opened only by a fingerprint"
+        passphrase -> if (iphone) "Face ID or the passcode, and the key's passphrase" else "A fingerprint or the PIN, and the key's passphrase"
+        iphone -> "The iPhone's passcode opens it too" + if (canRemake) ": make the key again with \"Only Face ID\"" else ""
+        else -> "The phone's PIN opens it too" + if (canRemake) ": make the key again with \"Only my fingerprint\"" else ""
+    }
     override val passphraseRequired = "Required without a fingerprint or face: the screen lock alone never opens a key."
     override val noPassphraseInChip = "Made inside the chip: there is no file, so there is no passphrase to keep."
     override val add = "Add"

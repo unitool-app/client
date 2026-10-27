@@ -28,6 +28,7 @@ import cx.m42.services.ssh.diagnostics.KeyFindings
 import cx.m42.superizer.HostScreen
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.diagnostics.Finding
+import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.KeyCapability
 import cx.m42.superizer.ssh.KeyId
 import cx.m42.superizer.ssh.MIN_PASSPHRASE
@@ -81,7 +82,7 @@ internal class SshKeysScreen(private val keys: KeysUi, private val tools: HostTo
                 }
                 list.forEachIndexed { i, key ->
                     RowDivider()
-                    KeyRow(key, KeyFindings.of(key, anchor, keys.inBrowser, keys.chipHere).first(), "keys:row-$i") {
+                    KeyRow(key, KeyFindings.of(key, anchor, keys.inBrowser, keys.chipHere).first(), opensWith(key, keys, strings), "keys:row-$i") {
                         open(KeyCardScreen(keys, tools, key.id))
                     }
                 }
@@ -105,7 +106,7 @@ internal class SshKeysScreen(private val keys: KeysUi, private val tools: HostTo
 
 /** A key in the list: its name, its kind and fingerprint, and where it lives in the catalogue's words. */
 @Composable
-private fun KeyRow(key: SshKeyInfo, level: Finding, tag: String, onClick: () -> Unit) {
+private fun KeyRow(key: SshKeyInfo, level: Finding, opens: Pair<String, Boolean>?, tag: String, onClick: () -> Unit) {
     val tokens = AppTheme
     val words = LocalDiagnosticsStrings.current
     Column(
@@ -119,7 +120,21 @@ private fun KeyRow(key: SshKeyInfo, level: Finding, tag: String, onClick: () -> 
         Text(text = "${key.label} · ${shortFingerprint(key.id)}", style = tokens.footnote, color = tokens.muted)
         Spacer(Modifier.height(2.dp))
         Text(text = words.title(level.code).fill(level.facts), style = tokens.footnote, color = statusColor(level.status))
+        opens?.let { (text, weak) ->
+            Text(text = text, style = tokens.footnote, color = if (weak) tokens.danger else tokens.muted, modifier = Modifier.testTag("$tag-opens"))
+        }
     }
+}
+
+/**
+ * Who opens a key in the chip, and whether that is weak — the screen lock alone. Null for a key
+ * under its passphrase only, which the level already says.
+ */
+private fun opensWith(key: SshKeyInfo, keys: KeysUi, strings: SecurityStrings): Pair<String, Boolean>? {
+    if (key.storage.level == 3) return null
+    val device = keys.admin.device
+    val weak = !key.biometricOnly && !key.passphraseKept
+    return strings.opensWith(device.platform == Platform.Ios, key.biometricOnly, key.passphraseKept, device.strongBiometric) to weak
 }
 
 /**
@@ -157,6 +172,10 @@ internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTo
                 KeyFindings.of(key, anchor, keys.inBrowser, keys.chipHere).forEachIndexed { i, finding ->
                     if (i > 0) RowDivider()
                     FindingRow(finding)
+                }
+                opensWith(key, keys, strings)?.let { (text, weak) ->
+                    RowDivider()
+                    RowText(text, Modifier.testTag("key:opens"), small = true, color = if (weak) AppTheme.danger else AppTheme.muted)
                 }
                 RowDivider()
                 RowText("${strings.policy}: ${strings.policyWords(key.policy).replaceFirstChar { it.lowercase() }}", small = true, color = AppTheme.muted)
