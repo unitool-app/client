@@ -1,5 +1,6 @@
 package cx.m42.unitool
 
+import cx.m42.services.ssh.KnownKey
 import cx.m42.superizer.app.AppId
 import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.Chip
@@ -41,6 +42,10 @@ internal class FakeKeys(
     override val inBrowser: Boolean = false
 
     override suspend fun sealSecretsWith(id: KeyId) = Unit
+
+    override suspend fun export(id: KeyId, to: KnownKey): SshOutcome<ByteArray> = SshOutcome.Cancelled
+
+    override suspend fun verify(id: KeyId): SshOutcome<Boolean> = SshOutcome.Cancelled
 }
 
 internal class FakeKeyAdmin(

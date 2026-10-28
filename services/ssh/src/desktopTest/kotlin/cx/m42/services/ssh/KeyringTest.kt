@@ -207,7 +207,9 @@ class KeyringTest {
             }
         }
         val all = listOf(SshKeyring::class, SshKeyAdmin::class, SshAgent::class).flatMap { it.java.methods.toList() }
-        assertTrue(all.none { it.name.contains("export", ignoreCase = true) }, "there is no export of a private key (question 73)")
+        // No export through the contract's doors (question 73): an app never gets one. The host's own —
+        // age to another device of the person's, never level 1 — is `SshKeyringHost.export` (key-share D624).
+        assertTrue(all.none { it.name.contains("export", ignoreCase = true) }, "there is no export of a private key through the contract")
         assertTrue(all.none { m -> "SecretBytes" in m.returnType.name || "PrivateKey" in m.returnType.name })
     }
 

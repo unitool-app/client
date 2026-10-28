@@ -2,6 +2,7 @@ package cx.m42.unitool.i18n
 
 import cx.m42.services.backup.GitHubKeys
 import cx.m42.services.ssh.AddKnownOutcome
+import cx.m42.services.ssh.keyring.HostAction
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -37,6 +38,11 @@ internal object SecurityStringsEn : SecurityStrings {
     }
 
     override fun operation(reason: UseReason, app: String?): String {
+        when (val action = reason.action) {
+            is HostAction.Export -> return "Send the key “${reason.key.comment}” to “${action.to}”"
+            HostAction.Verify -> return "Check the key “${reason.key.comment}”"
+            null -> Unit
+        }
         val who = app?.let { " · app “$it”" } ?: ""
         val what = when (reason.operation) {
             KeyOperation.Sign -> "Sign" + (reason.namespace?.let { " for “$it”" } ?: "")
@@ -171,6 +177,11 @@ internal object SecurityStringsEn : SecurityStrings {
         KeyOperation.Grant -> "allowed"
         KeyOperation.Revoke -> "revoked"
     }
+    override fun actionName(namespace: String?) = when (namespace) {
+        HostAction.EXPORT -> "sent to another device"
+        HostAction.VERIFY -> "checked"
+        else -> null
+    }
     override fun outcomeName(outcome: String) = when {
         outcome == "ok" -> "done"
         outcome == "cancelled" -> "cancelled"
@@ -256,4 +267,17 @@ internal object SecurityStringsEn : SecurityStrings {
         is AddKnownOutcome.OwnKey -> "This is your own key “${outcome.comment}” — it is already here, with its private half."
         is AddKnownOutcome.AlreadySaved -> "Already saved as “${outcome.name}”."
     }
+
+    override val sendKey = "Send to another device"
+    override val sendKeyHint = "The key, encrypted to one of the other devices' public keys, goes out through the share sheet. Only that device opens the file — in cr-restore, or on a computer with age -d -i ~/.ssh/id_ed25519 — and then adds the key from it with “Add a key”."
+    override val sendKeyWarning = "A copy of the key leaves this device. Whoever holds the private half of the key you choose can add it: choose only a device of your own."
+    override val sendKeyNoPassphrase = "Inside the file the key has no passphrase of its own: the other device asks for a new one when it adds the key. Delete the opened file after that."
+    override val sendTo = "Encrypt to"
+    override val noRecipients = "No public keys of other devices yet. On the other device: SSH keys → its key → Show QR code, and add it here."
+    override fun sent(to: String) = "Sent, encrypted to “$to”."
+    override val sendFailed = "The key was not sent."
+    override val verifyKey = "Check the key"
+    override val verifyOk = "The key opens: its lock works."
+    override val verifyMismatch = "The key opened, but the check did not come out right."
+    override val verifyFailed = "The key did not open."
 }

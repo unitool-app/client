@@ -87,6 +87,12 @@ public class SshKeyringHost internal constructor(
         return opened.firstOrNull()?.let { SshOutcome.Ok(it) } ?: SshOutcome.NoKey
     }
 
+    /** A level-2 or level-3 key's file, sealed with age to another device's [to] (.ai-notes/key-share). */
+    public suspend fun export(id: KeyId, to: KnownKey): SshOutcome<ByteArray> = keyring.export(id, to)
+
+    /** Whether the key's lock still opens it: one use, asked whatever session is open (.ai-notes/key-share). */
+    public suspend fun verify(id: KeyId): SshOutcome<Boolean> = keyring.verify(id)
+
     /** The names of the keys, for the backup's hint (D170). */
     public fun keyNames(): List<BackupKeyName> =
         keyring.keys.value.map { BackupKeyName(it.id.fingerprint, it.comment, it.storage.level) }

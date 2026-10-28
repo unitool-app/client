@@ -105,9 +105,12 @@ internal interface SecurityStrings {
     val sessionHint: String
     fun purposeName(purpose: KeyPurpose): String
     fun operationName(operation: KeyOperation): String
+    /** A line the host wrote for one of its own actions ([cx.m42.services.ssh.keyring.HostAction]), by its namespace; null for any other. */
+    fun actionName(namespace: String?): String?
     fun outcomeName(outcome: String): String
     fun journalLine(at: String, who: String, record: UseRecord): String =
-        "$at · $who · " + operationName(record.operation) + (record.namespace?.let { " “$it”" } ?: "") + " · " + outcomeName(record.outcome)
+        "$at · $who · " + (actionName(record.namespace) ?: (operationName(record.operation) + (record.namespace?.let { " “$it”" } ?: ""))) +
+            " · " + outcomeName(record.outcome)
 
     // Storage & security
     val storageSecurity: String
@@ -177,4 +180,19 @@ internal interface SecurityStrings {
     val savedKeysHint: String
     val orGithub: String
     fun knownProblem(outcome: AddKnownOutcome): String
+
+    // Sending a key to another device, and checking it (.ai-notes/key-share)
+    val sendKey: String
+    val sendKeyHint: String
+    val sendKeyWarning: String
+    /** Level 2 without the key's passphrase kept: inside the file the key has none. */
+    val sendKeyNoPassphrase: String
+    val sendTo: String
+    val noRecipients: String
+    fun sent(to: String): String
+    val sendFailed: String
+    val verifyKey: String
+    val verifyOk: String
+    val verifyMismatch: String
+    val verifyFailed: String
 }

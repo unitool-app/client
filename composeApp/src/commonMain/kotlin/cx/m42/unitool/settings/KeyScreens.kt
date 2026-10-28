@@ -24,6 +24,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.composeunstyled.Text
+import cx.m42.services.backup.AgeBackupCipher
+import cx.m42.services.ssh.Age
+import cx.m42.services.ssh.KnownKey
 import cx.m42.services.ssh.diagnostics.KeyFindings
 import cx.m42.superizer.HostScreen
 import cx.m42.superizer.Superizer
@@ -48,6 +51,7 @@ import cx.m42.unitool.security.FindingRow
 import cx.m42.unitool.security.SecretField
 import cx.m42.unitool.security.fill
 import cx.m42.unitool.security.statusColor
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -139,8 +143,8 @@ private fun opensWith(key: SshKeyInfo, keys: KeysUi, strings: SecurityStrings): 
 
 /**
  * One key (02 §5, 06 §7): where it lives and what that means, the public half to copy or send, which
- * apps may use it and what they did, and the actions — change the passphrase, seal the host's
- * secrets with it, delete it.
+ * apps may use it and what they did, and the actions — check that its lock opens it, change the
+ * passphrase, send it to another device, seal the host's secrets with it, delete it.
  */
 internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTools, private val keyId: KeyId) : HostScreen {
     override val id: String = "key"
@@ -165,6 +169,8 @@ internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTo
         val scope = rememberCoroutineScope()
         val clipboard = LocalClipboardManager.current
         var copied by remember { mutableStateOf(false) }
+        var checking by remember { mutableStateOf(false) }
+        var checked by remember { mutableStateOf<SshOutcome<Boolean>?>(null) }
         val line = "${key.publicKey} ${key.comment}".trim()
 
         Page("key:card") {
@@ -188,7 +194,7 @@ internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTo
                     // For another phone to read and keep, to encrypt to this key (.ai-notes/public-keys).
                     add(Triple(strings.showQr, "key:qr") { open(PublicKeyQrScreen(key.comment, line, key.id.fingerprint)) })
                     tools.sharer?.let { sharer ->
-                        add(Triple(strings.share, "key:share") { scope.launch { sharer.share(pubFileName(key), line + "\n", "text/plain", null) } })
+                        add(Triple(strings.share, "key:share") { scope.launch { sharer.share(fileBase(key) + ".pub", line + "\n", "text/plain", null) } })
                     }
                 }
                 SmallButtons(*buttons.toTypedArray())
@@ -227,9 +233,39 @@ internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTo
                 }
             }
 
+            if (key.usable) {
+                // The key's own lock, asked even inside a session; nothing kept (.ai-notes/key-share).
+                PageButton(if (checking) strings.working else strings.verifyKey, "key:verify", enabled = !checking, variant = ButtonVariant.Secondary) {
+                    scope.launch {
+                        checking = true
+                        checked = null
+                        checked = try {
+                            keys.verify(keyId)
+                        } finally {
+                            checking = false
+                        }
+                    }
+                }
+                checked?.let { outcome ->
+                    val (text, color) = when (outcome) {
+                        SshOutcome.Ok(true) -> strings.verifyOk to AppTheme.foreground
+                        SshOutcome.Ok(false) -> strings.verifyMismatch to AppTheme.danger
+                        SshOutcome.Cancelled -> strings.cancelledText to AppTheme.muted
+                        SshOutcome.Unusable -> strings.unusable to AppTheme.danger
+                        else -> strings.verifyFailed to AppTheme.danger
+                    }
+                    Note(text, color = color, tag = "key:verify-said")
+                }
+            }
             if (key.storage.level == 3 && key.usable) {
                 PageButton(strings.changePassphrase, "key:rekey", variant = ButtonVariant.Secondary) {
                     open(PassphraseScreen(keys, keyId))
+                }
+            }
+            // A copy for another device of the person's (.ai-notes/key-share); level 1 never leaves the chip.
+            if (key.storage.level >= 2 && key.usable && (tools.sharer != null || tools.saver != null)) {
+                PageButton(strings.sendKey, "key:send", variant = ButtonVariant.Secondary) {
+                    open(SendKeyScreen(keys, tools, keyId))
                 }
             }
             if (keys.sealsToKey && KeyCapability.DecryptAge in key.can && key.usable) {
@@ -254,13 +290,87 @@ internal class KeyCardScreen(private val keys: KeysUi, private val tools: HostTo
         }
     }
 
-    private fun pubFileName(key: SshKeyInfo): String {
-        val base = key.comment.filter { it.isLetterOrDigit() || it in "-_." }.ifEmpty { "key" }
-        return "$base.pub"
-    }
-
     private companion object {
         const val JOURNAL_LINES = 20
+    }
+}
+
+/** A file name from the key's comment: `ivan@laptop` is `ivanlaptop`. */
+private fun fileBase(key: SshKeyInfo): String = key.comment.filter { it.isLetterOrDigit() || it in "-_." }.ifEmpty { "key" }
+
+/**
+ * "Send to another device" (.ai-notes/key-share): a level-2 or level-3 key sealed with age to one of
+ * the other devices' public keys, out through the share sheet, armored as the backup is. The keyring
+ * asks first — level 2's device prompt, level 3's confirmation — and level 3's file goes as stored,
+ * under its passphrase. Only the saved keys are offered: a line typed in here could be anybody's.
+ */
+internal class SendKeyScreen(private val keys: KeysUi, private val tools: HostTools, private val keyId: KeyId) : HostScreen {
+    override val id: String = "key-send"
+
+    override fun title(langTag: String): String = securityStrings(langTag).sendKey
+
+    @Composable
+    override fun Content(superizer: Superizer, back: () -> Unit, open: (HostScreen) -> Unit) {
+        val langTag by superizer.settings.langTag.collectAsState()
+        val strings = securityStrings(langTag)
+        val list by keys.admin.keys.collectAsState()
+        val key = list.firstOrNull { it.id == keyId }
+        if (key == null) {
+            LaunchedEffect(Unit) { back() }
+            return
+        }
+        val book = keys.publicKeys
+        val known by remember(book) { book?.keys ?: MutableStateFlow<List<KnownKey>>(emptyList()) }.collectAsState()
+        val scope = rememberCoroutineScope()
+        var busy by remember { mutableStateOf(false) }
+        // What happened, and whether it is a problem.
+        var said by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+
+        fun send(to: KnownKey) {
+            if (busy) return
+            scope.launch {
+                busy = true
+                said = null
+                try {
+                    said = when (val sealed = keys.export(keyId, to)) {
+                        is SshOutcome.Ok -> {
+                            val text = Age.armor(sealed.value)
+                            sealed.value.fill(0)
+                            val name = fileBase(key) + ".age"
+                            val delivered = tools.sharer?.share(name, text, AgeBackupCipher.MIME_TYPE, null)
+                                ?: tools.saver?.save(name, text.encodeToByteArray(), AgeBackupCipher.MIME_TYPE)
+                                ?: false
+                            if (delivered) strings.sent(to.name) to false else strings.sendFailed to true
+                        }
+                        SshOutcome.Cancelled -> strings.cancelledText to false
+                        SshOutcome.Unusable -> strings.unusable to true
+                        else -> strings.sendFailed to true
+                    }
+                } finally {
+                    busy = false
+                }
+            }
+        }
+
+        Page("key:send") {
+            Note(strings.sendKeyHint)
+            Note(strings.sendKeyWarning, color = AppTheme.danger, tag = "key-send:warning")
+            if (key.storage.level == 2 && !key.passphraseKept) {
+                Note(strings.sendKeyNoPassphrase, color = AppTheme.danger, tag = "key-send:no-passphrase")
+            }
+            Section(title = strings.sendTo) {
+                if (known.isEmpty()) RowText(strings.noRecipients, Modifier.testTag("key-send:empty"), color = AppTheme.muted)
+                known.forEachIndexed { i, to ->
+                    if (i > 0) RowDivider()
+                    ActionRow(to.name, "key-send:to-$i", "${to.key.label} · ${shortFingerprint(to.id)}") { send(to) }
+                }
+                if (book != null) {
+                    RowDivider()
+                    ActionRow(strings.addPublicKey, "key-send:add") { open(AddPublicKeyScreen(book, tools)) }
+                }
+            }
+            said?.let { (text, problem) -> Note(text, color = if (problem) AppTheme.danger else AppTheme.foreground, tag = "key-send:said") }
+        }
     }
 }
 

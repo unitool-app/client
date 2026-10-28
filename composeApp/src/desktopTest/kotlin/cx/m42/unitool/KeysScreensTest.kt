@@ -16,6 +16,7 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import cx.m42.apps.twofa.TwoFaApp
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.diagnostics.SkipReason
+import cx.m42.services.ssh.keyring.HostAction
 import cx.m42.services.ssh.keyring.InMemoryRecordStore
 import cx.m42.superizer.Superizer
 import cx.m42.superizer.diagnostics.DiagnosticsCode
@@ -303,6 +304,31 @@ class KeysScreensTest : UnitoolTest() {
         tap("keys:confirm-yes")
         assertEquals(listOf("anchor"), security.keyring.admin.keys.value.map { it.comment })
         onNodeWithTag("keys:row-1").assertDoesNotExist()
+    }
+
+    @Test
+    fun checkingAKeyAsksItsPassphraseAndSaysWhetherItOpens() = runComposeUiTest {
+        val security = security()
+        val superizer = host(security)
+        runBlocking { assertIs<ImportOutcome.Imported>(security.keyring.admin.generate(GeneratedKind.Ed25519, ImportOptions(comment = "desk"), GOOD.toCharArray())) }
+        setContent { UnitoolApp(superizer, security) }
+        waitForIdle()
+
+        openKeys()
+        tap("keys:row-0")
+        // No share sheet in this host: nowhere to send a copy through, so no button for it.
+        onNodeWithTag("key:send").assertDoesNotExist()
+        tap("key:verify")
+        onNode(hasText("Check the key “desk”")).assertIsDisplayed()
+        type("keys:passphrase-field", GOOD)
+        tap("keys:passphrase-yes")
+        onNodeWithTag("key:verify-said").assertTextContains("The key opens", substring = true)
+
+        tap("key:verify")
+        tap("keys:passphrase-no")
+        onNodeWithTag("key:verify-said").assertTextContains("Nothing was done", substring = true)
+        val journal = security.keyring.admin.journal(security.keyring.admin.keys.value.single().id).value
+        assertEquals(listOf("ok", "cancelled"), journal.filter { it.namespace == HostAction.VERIFY }.map { it.outcome })
     }
 
     @Test
