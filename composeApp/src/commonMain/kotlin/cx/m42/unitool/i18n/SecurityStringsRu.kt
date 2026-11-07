@@ -2,6 +2,7 @@ package cx.m42.unitool.i18n
 
 import cx.m42.services.backup.GitHubKeys
 import cx.m42.services.ssh.AddKnownOutcome
+import cx.m42.services.ssh.keyring.HostAction
 import cx.m42.services.ssh.keyring.UseReason
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportRefusal
@@ -38,6 +39,11 @@ internal object SecurityStringsRu : SecurityStrings {
     }
 
     override fun operation(reason: UseReason, app: String?): String {
+        when (val action = reason.action) {
+            is HostAction.Export -> return "Отправить ключ «${reason.key.comment}» на «${action.to}»"
+            HostAction.Verify -> return "Проверить ключ «${reason.key.comment}»"
+            null -> Unit
+        }
         val who = app?.let { " · приложение «$it»" } ?: ""
         val what = when (reason.operation) {
             KeyOperation.Sign -> "Подписать" + (reason.namespace?.let { " для «$it»" } ?: "")
@@ -174,8 +180,14 @@ internal object SecurityStringsRu : SecurityStrings {
         KeyOperation.Grant -> "разрешено"
         KeyOperation.Revoke -> "отозвано"
     }
+    override fun actionName(namespace: String?) = when (namespace) {
+        HostAction.EXPORT -> "отправлен на другое устройство"
+        HostAction.VERIFY -> "проверка"
+        else -> null
+    }
     override fun journalLine(at: String, who: String, record: UseRecord) =
-        "$at · $who · " + operationName(record.operation) + (record.namespace?.let { " «$it»" } ?: "") + " · " + outcomeName(record.outcome)
+        "$at · $who · " + (actionName(record.namespace) ?: (operationName(record.operation) + (record.namespace?.let { " «$it»" } ?: ""))) +
+            " · " + outcomeName(record.outcome)
     override fun outcomeName(outcome: String) = when {
         outcome == "ok" -> "готово"
         outcome == "cancelled" -> "отменено"
@@ -261,6 +273,19 @@ internal object SecurityStringsRu : SecurityStrings {
         is AddKnownOutcome.OwnKey -> "Это ваш ключ «${outcome.comment}», он уже здесь вместе с приватной половиной."
         is AddKnownOutcome.AlreadySaved -> "Уже сохранён как «${outcome.name}»."
     }
+
+    override val sendKey = "Отправить на другое устройство"
+    override val sendKeyHint = "Ключ, зашифрованный на открытый ключ другого устройства, уходит через «Поделиться». Открыть файл сможет только то устройство — в cr-restore или на компьютере: age -d -i ~/.ssh/id_ed25519, — а потом добавить из него ключ через «Добавить ключ»."
+    override val sendKeyWarning = "Копия ключа уходит с этого устройства. Добавить её сможет любой, у кого закрытая половина выбранного ключа: выбирайте только своё устройство."
+    override val sendKeyNoPassphrase = "В файле ключ без своего пароля: другое устройство попросит задать новый, когда будет его добавлять. Открытый файл после этого удалите."
+    override val sendTo = "На чей ключ зашифровать"
+    override val noRecipients = "Открытых ключей других устройств пока нет. На другом устройстве: SSH-ключи → его ключ → «Показать QR-код», и добавьте его здесь."
+    override fun sent(to: String) = "Отправлено, зашифровано на «$to»."
+    override val sendFailed = "Ключ не отправлен."
+    override val verifyKey = "Проверить ключ"
+    override val verifyOk = "Ключ открывается: замок работает."
+    override val verifyMismatch = "Ключ открылся, но проверка не сошлась."
+    override val verifyFailed = "Ключ не открылся."
 }
 
 internal fun securityStrings(langTag: String): SecurityStrings =

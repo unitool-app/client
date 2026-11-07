@@ -3,12 +3,14 @@ package cx.m42.unitool.settings
 import cx.m42.services.link.LocalLink
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
+import cx.m42.services.ssh.KnownKey
 import cx.m42.services.ssh.PublicKeyBookAdmin
 import cx.m42.services.files.FileSaver
 import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.ssh.KeyId
 import cx.m42.superizer.ssh.SshKeyAdmin
+import cx.m42.superizer.ssh.SshOutcome
 import cx.m42.unitool.web.OpenedSections
 import kotlinx.coroutines.flow.StateFlow
 
@@ -36,6 +38,12 @@ internal interface KeysUi {
 
     /** Reseals every secret to [id] and makes it the anchor (05 §3). */
     suspend fun sealSecretsWith(id: KeyId)
+
+    /** A level-2 or level-3 key's file, sealed with age to [to] — another device of the person's (.ai-notes/key-share). */
+    suspend fun export(id: KeyId, to: KnownKey): SshOutcome<ByteArray>
+
+    /** Whether the key's lock still opens it, asked whatever session is open (.ai-notes/key-share). */
+    suspend fun verify(id: KeyId): SshOutcome<Boolean>
 }
 
 /**

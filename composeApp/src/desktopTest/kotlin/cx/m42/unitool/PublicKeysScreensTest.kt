@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -16,6 +17,8 @@ import cx.m42.apps.twofa.TwoFaApp
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.SshKeyringHost
+import cx.m42.services.ssh.SshPublicKey
+import cx.m42.services.ssh.keyring.HostAction
 import cx.m42.services.ssh.keyring.InMemoryRecordStore
 import cx.m42.services.ssh.keyring.KeyPrompter
 import cx.m42.services.ssh.keyring.UseReason
@@ -24,6 +27,7 @@ import cx.m42.superizer.app.AppId
 import cx.m42.superizer.runtime.Platform
 import cx.m42.superizer.ssh.GeneratedKind
 import cx.m42.superizer.ssh.ImportOptions
+import cx.m42.superizer.ssh.ImportOutcome
 import cx.m42.superizer.ssh.KeyId
 import cx.m42.superizer.ssh.KeyPurpose
 import cx.m42.superizer.ssh.SshKeyInfo
@@ -173,6 +177,42 @@ class PublicKeysScreensTest : UnitoolTest() {
     }
 
     @Test
+    fun aKeySentToTheOtherPhoneOpensThereAndIsAddedUnderItsPassphrase() = runComposeUiTest {
+        val b = phoneB()
+        val bKey = b.admin.keys.value.single()
+        val security = security()
+        val shared = SharedFiles()
+        val superizer = buildUnitool(scope, debug = true, security = security, tools = HostTools(sharer = shared), network = ratesNetwork())
+        superizer.settings.chooseLanguage("en")
+        runBlocking {
+            security.keyring.admin.generate(GeneratedKind.Ed25519, ImportOptions(comment = "desk"), DESK_PASSPHRASE.toCharArray())
+            security.keyring.publicKeys.add(SshPublicKey.parse(bKey.publicKey)!!, "Ivan's phone")
+        }
+        val desk = security.keyring.admin.keys.value.single()
+        setContent { UnitoolApp(superizer, security) }
+        waitForIdle()
+
+        openKeys()
+        tap("keys:row-0")
+        tap("key:send")
+        onNodeWithTag("key-send:warning").assertIsDisplayed()
+        tap("key-send:to-0")
+        // Asked like a delete (D148), and the sheet says where it goes; the passphrase is not asked, nothing is opened.
+        onNodeWithText("Send the key “desk” to “Ivan's phone”").assertIsDisplayed()
+        tap("keys:confirm-yes")
+        onNodeWithTag("key-send:said").assertTextContains("encrypted to “Ivan's phone”", substring = true)
+        val (name, text) = shared.files.single()
+        assertEquals("desk.age", name)
+        assertTrue(text.startsWith("-----BEGIN AGE ENCRYPTED FILE-----"))
+        assertEquals("ok", security.keyring.admin.journal(desk.id).value.single { it.namespace == HostAction.EXPORT }.outcome)
+
+        // B opens it with its own key and adds the key A had, under the passphrase it had there.
+        val file = assertIs<SshOutcome.Ok<ByteArray>>(runBlocking { b.openForHost(text.encodeToByteArray()) }).value
+        val added = runBlocking { b.admin.import(file, DESK_PASSPHRASE.toCharArray(), ImportOptions()) }
+        assertEquals(desk.id, assertIs<ImportOutcome.Imported>(added).key.id)
+    }
+
+    @Test
     fun whatCannotBeEncryptedToAndAnOwnKeyAreRefusedWithWords() = runComposeUiTest {
         val security = security()
         val superizer = buildUnitool(scope, debug = true, security = security, tools = HostTools(), network = ratesNetwork())
@@ -198,6 +238,7 @@ class PublicKeysScreensTest : UnitoolTest() {
 
     private companion object {
         const val PASSPHRASE = "correct horse battery staple"
+        const val DESK_PASSPHRASE = "the desk's own passphrase"
         const val ECDSA =
             "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEIsMsXqmDgDTtFzJYG8gCJX0455Aa7IlDHEiYA0PtCHVoTPjGzWFYwQgxsQRhLRYXwgEw9EjUXF79TLbDAzMEo="
     }

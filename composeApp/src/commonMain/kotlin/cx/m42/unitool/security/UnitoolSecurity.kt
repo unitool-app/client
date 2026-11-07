@@ -1,5 +1,6 @@
 package cx.m42.unitool.security
 
+import cx.m42.services.ssh.KnownKey
 import cx.m42.services.ssh.PublicKeyBook
 import cx.m42.services.ssh.PublicKeyBookAdmin
 import cx.m42.services.ssh.SshKeyringHost
@@ -23,6 +24,7 @@ import cx.m42.superizer.ssh.KeyCapability
 import cx.m42.superizer.ssh.KeyId
 import cx.m42.superizer.ssh.SshKeyAdmin
 import cx.m42.superizer.ssh.SshKeyring
+import cx.m42.superizer.ssh.SshOutcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.drop
@@ -61,6 +63,10 @@ public class UnitoolSecurity(
             keyring.useForSecrets(id)
             superizer.secrets.reseal(keyring.ageVault(id, ::hostSecretValues))
         }
+
+        override suspend fun export(id: KeyId, to: KnownKey): SshOutcome<ByteArray> = keyring.export(id, to)
+
+        override suspend fun verify(id: KeyId): SshOutcome<Boolean> = keyring.verify(id)
     }
 
     /**

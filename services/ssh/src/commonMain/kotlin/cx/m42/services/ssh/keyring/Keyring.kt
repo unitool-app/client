@@ -191,19 +191,21 @@ internal class Keyring(
      * Opens [record]'s key for one operation and runs it: from a session if one is open; else by the
      * chip's prompt (level 1 runs [chipOp] in the chip; level 2 unseals and runs [softwareOp]); else by
      * the passphrase (level 3). The opened key is closed before this returns, unless a session keeps it.
+     * [session] false: the key's lock is asked even while a session holds it open.
      */
     private suspend fun <T> use(
         record: KeyRecord,
         reason: UseReason,
         softwareOp: suspend (PrivateKey) -> T?,
         chipOp: (suspend (String) -> ChipResult<T>)?,
+        session: Boolean = true,
     ): SshOutcome<T> {
         val info = info(record) ?: return SshOutcome.Failed("record")
         if (!info.usable) {
             markUnusable(record)
             return SshOutcome.Unusable
         }
-        sessionKey(record)?.let { open ->
+        if (session) sessionKey(record)?.let { open ->
             return softwareOp(open)?.let { SshOutcome.Ok(it) } ?: SshOutcome.Failed("operation")
         }
         return when (record.storage.level) {
@@ -320,16 +322,20 @@ internal class Keyring(
     // ------------------------------------------------------------ operations, shared by the doors
 
     /** SSHSIG with [record]'s key. */
-    private suspend fun sshsig(record: KeyRecord, namespace: String, message: ByteArray, reason: UseReason): SshOutcome<SshSignature> {
+    private suspend fun sshsig(record: KeyRecord, namespace: String, message: ByteArray, reason: UseReason): SshOutcome<SshSignature> =
+        armoredSshsig(record, namespace, message, reason).map(::SshSignature)
+
+    /** [sshsig]'s armored block, which [verify] checks itself. */
+    private suspend fun armoredSshsig(record: KeyRecord, namespace: String, message: ByteArray, reason: UseReason, session: Boolean = true): SshOutcome<String> {
         val key = SshPublicKey.parse(record.publicKey) ?: return SshOutcome.Failed("record")
         val data = SshSig.signedData(namespace, Hash.SHA512, message)
         return use(
             record,
             reason,
-            softwareOp = { private -> SoftwareOps.sshsig(private, namespace, message)?.let(::SshSignature) },
+            softwareOp = { private -> SoftwareOps.sshsig(private, namespace, message) },
             chipOp = { alias ->
                 when (val blob = chip!!.sign(alias, key, data, Hash.SHA512, reason)) {
-                    is ChipResult.Ok -> ChipResult.Ok(SshSignature(SshSig.armor(key, namespace, Hash.SHA512, blob.value)))
+                    is ChipResult.Ok -> ChipResult.Ok(SshSig.armor(key, namespace, Hash.SHA512, blob.value))
                     is ChipResult.Cancelled -> ChipResult.Cancelled
                     is ChipResult.Busy -> ChipResult.Busy
                     is ChipResult.Unusable -> ChipResult.Unusable
@@ -337,11 +343,12 @@ internal class Keyring(
                     is ChipResult.Failed -> blob
                 }
             },
+            session = session,
         )
     }
 
     /** age -d with [record]'s key: an identity whose private step is the chip's or the opened key's. */
-    private suspend fun ageDecrypt(record: KeyRecord, fileBytes: ByteArray, reason: UseReason): SshOutcome<ByteArray> {
+    private suspend fun ageDecrypt(record: KeyRecord, fileBytes: ByteArray, reason: UseReason, session: Boolean = true): SshOutcome<ByteArray> {
         val key = SshPublicKey.parse(record.publicKey) ?: return SshOutcome.Failed("record")
         suspend fun open(identity: AgeIdentity): ByteArray? =
             (Age.decrypt(fileBytes, listOf(identity)) as? Age.Opened.Ok)?.plaintext
@@ -363,6 +370,7 @@ internal class Keyring(
                     else -> ChipResult.Failed("age")
                 }
             },
+            session = session,
         )
     }
 
@@ -422,6 +430,80 @@ internal class Keyring(
     }
 
     suspend fun setSecretsKey(id: KeyId?) = update { it.copy(secretsKey = id?.fingerprint) }
+
+    /**
+     * The key's file sealed with age to [to], another device of the person's, to be sent there
+     * (.ai-notes/key-share): level 3's as stored, still under its passphrase — nothing is decrypted —
+     * and level 2's as the chip unseals it, under the passphrase if one was kept. Never level 1's:
+     * that key does not leave the chip. Level 2's unseal is the device's prompt; level 3 is confirmed
+     * the way a delete is (D148). The journal says it left: `Decrypt`, the nearest operation, with
+     * [HostAction.EXPORT].
+     */
+    suspend fun export(id: KeyId, to: KnownKey): SshOutcome<ByteArray> {
+        val record = record(id) ?: return SshOutcome.NoKey
+        val info = info(record) ?: return SshOutcome.Failed("record")
+        if (record.storage.level == 1) return SshOutcome.NotAllowed("in-chip")
+        if (!Age.supports(to.key)) return SshOutcome.NotAllowed("recipient")
+        if (!info.usable) {
+            markUnusable(record)
+            return SshOutcome.Unusable
+        }
+        val reason = UseReason(null, info, KeyOperation.Decrypt, action = HostAction.Export(to.name))
+        val result: SshOutcome<ByteArray> = if (record.storage.level == 2) {
+            val backend = chip ?: return SshOutcome.Failed("no-chip")
+            val alias = record.alias ?: return SshOutcome.Failed("record")
+            val sealed = record.sealed ?: return SshOutcome.Failed("record")
+            when (val unsealed = backend.unseal(alias, sealed, reason)) {
+                is ChipResult.Ok -> try {
+                    SshOutcome.Ok(Age.encrypt(unsealed.value, listOf(to.key), random))
+                } finally {
+                    unsealed.value.fill(0)
+                }
+                else -> chipOutcome(record, unsealed)
+            }
+        } else if (!prompter.confirm(reason)) {
+            SshOutcome.Cancelled
+        } else {
+            val bytes = Base64.decode(record.file ?: return SshOutcome.Failed("record"))
+            try {
+                SshOutcome.Ok(Age.encrypt(bytes, listOf(to.key), random))
+            } finally {
+                bytes.fill(0)
+            }
+        }
+        journal(UseRecord(clock.now(), null, id, KeyOperation.Decrypt, HostAction.EXPORT, null, outcomeText(result)))
+        return result
+    }
+
+    /**
+     * Does the key's lock still open it (.ai-notes/key-share)? Random bytes encrypted to the key and
+     * opened with it — for a key that only signs, signed under [HostAction.VERIFY] and checked — asking
+     * the passphrase or the device as any use does, but never answered by an open session, because
+     * the lock is the question, and nothing kept after, whatever the policy. Ok(false): the key opened
+     * and the answer was wrong.
+     */
+    suspend fun verify(id: KeyId): SshOutcome<Boolean> {
+        val record = record(id)?.copy(policy = UsePolicy.EveryUse) ?: return SshOutcome.NoKey
+        val info = info(record) ?: return SshOutcome.Failed("record")
+        val public = SshPublicKey.parse(record.publicKey) ?: return SshOutcome.Failed("record")
+        val probe = random(32)
+        val decrypts = KeyCapability.DecryptAge in info.can
+        val operation = if (decrypts) KeyOperation.Decrypt else KeyOperation.Sign
+        val result: SshOutcome<Boolean> = if (decrypts) {
+            val sealed = Age.encrypt(probe, listOf(public), random)
+            val reason = UseReason(null, info, operation, digest = digest(sealed), action = HostAction.Verify)
+            ageDecrypt(record, sealed, reason, session = false).map { opened -> opened.contentEquals(probe).also { opened.fill(0) } }
+        } else {
+            val reason = UseReason(null, info, operation, digest = digest(probe), action = HostAction.Verify)
+            // A browser cannot check ECDSA: that the key signed at all is the answer there.
+            armoredSshsig(record, HostAction.VERIFY, probe, reason, session = false)
+                .map { SshSig.verify(it, probe, HostAction.VERIFY, public).let { c -> c == SshSig.SigCheck.Valid || c == SshSig.SigCheck.Unsupported } }
+        }
+        probe.fill(0)
+        val outcome = if (result is SshOutcome.Ok && !result.value) "failed:mismatch" else outcomeText(result)
+        journal(UseRecord(clock.now(), null, id, operation, HostAction.VERIFY, null, outcome))
+        return result
+    }
 
     // ------------------------------------------------------------ SshKeyAdmin
 
@@ -910,3 +992,6 @@ internal class Keyring(
 
 @Suppress("UNCHECKED_CAST")
 internal fun <T> SshOutcome<*>.cast(): SshOutcome<T> = this as SshOutcome<T>
+
+internal inline fun <T, R> SshOutcome<T>.map(transform: (T) -> R): SshOutcome<R> =
+    if (this is SshOutcome.Ok) SshOutcome.Ok(transform(value)) else cast()
