@@ -68,6 +68,9 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+        # With external/app-learn: Learning English goes into the build (.ai-notes/app-learn D644).
+        with:
+          submodules: true
 
       - name: Validate required secrets
         env:

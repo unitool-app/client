@@ -59,6 +59,16 @@ include(":apps:qr-scanner")
 include(":apps:passwords")
 include(":apps:cr-restore")
 
+// Learning English (.ai-notes/app-learn D640–D641): developed in its own repository, here only as the
+// submodule `external/app-learn`, which a plain clone leaves empty. CI checks it out and the app is in;
+// without it Unitool builds as it always did. Only its `apps/learn` is a project here — the rest of that
+// repository is its own host.
+val learnDir = file("external/app-learn/apps/learn")
+if (learnDir.resolve("build.gradle.kts").exists()) {
+    include(":apps:learn")
+    project(":apps:learn").projectDir = learnDir
+}
+
 // Platform capabilities an app may ask for by key (D19), each with its host-side implementation.
 include(":services:qr-scanner")
 include(":services:share")

@@ -1,6 +1,11 @@
 # app-learn в Unitool: модуль, которого нет при разработке
 
-v0.1, 2026-11-07. План, не построено. Решения D640–D648, вопросы Q274–Q277.
+v0.2, 2026-11-07. Построено: сабмодуль на app-learn e372bd6, Unitool на Superizer 0.8.1, learn на Android,
+desktop и iOS, не в web. Решения D640–D648; Q276 (без web) и Q277 (bump, теперь 0.8.1) отвечены; Q274
+и Q275 сделаны по предложенному (папка, закреплённый коммит), пока владелец не скажет иначе.
+
+Обновить app-learn здесь: `git -C external/app-learn pull` (после `git submodule update --init`) и
+коммит изменившегося gitlink'а — «Bump app-learn to <sha>».
 
 ## Что хотим
 
@@ -59,7 +64,7 @@ app-learn попадает в следующую сборку Unitool без к�
 `verify.yml`. `cli.yml` не трогаем: CLI приложений не собирает. Пути `external/app-learn/**`
 в `paths-ignore` не добавляем: bump сабмодуля должен выпускать сборку.
 
-## Что мешает прямо сейчас (это надо менять в app-learn)
+## Что мешало (сделано: app-learn e372bd6, Superizer 0.8.1)
 
 **D645. Нет Android.** У `apps/learn` цели `desktop`, `iosArm64`, `iosSimulatorArm64`, а у Unitool
 главная платформа — Android. Нужно добавить в app-learn `androidTarget` + `android { namespace =

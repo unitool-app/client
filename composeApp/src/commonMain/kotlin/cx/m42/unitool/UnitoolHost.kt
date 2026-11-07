@@ -146,6 +146,8 @@ private fun buildHost(
     // Secret too (.ai-notes/cr-restore): opens what age, `openssl enc` and a split secret sealed, from
     // QR codes or a file, and keeps none of it. No lock to come in; the lock while it holds a result.
     register(CrRestoreApp())
+    // Whatever is in the build only when its module is: Learning English from the app-learn submodule.
+    registerOptionalApps()
 
     // What a fresh install has on Home (D48): the calculator, because that is what Unitool was.
     // The converter is one tap away in the catalog; the bench app gets there by its promo code.

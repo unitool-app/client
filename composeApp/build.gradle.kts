@@ -134,6 +134,18 @@ kotlin {
 
         commonMain.get().kotlin.srcDir(generateBuildInfo)
 
+        // Learning English, when its submodule is checked out (.ai-notes/app-learn D642): the phone, the
+        // desktop and the iPhone get `src/optional/learn`, which registers it; without the module, and
+        // always on the web (D646), `src/optional/none`. Each of these is a compilation of its own, so
+        // the one directory in three source sets is never compiled twice.
+        val learn = findProject(":apps:learn")
+        val optionalApps = if (learn != null) "src/optional/learn/kotlin" else "src/optional/none/kotlin"
+        listOf(androidMain.get(), desktopMain, iosMain.get()).forEach { set ->
+            set.kotlin.srcDir(optionalApps)
+            if (learn != null) set.dependencies { implementation(learn) }
+        }
+        wasmJsMain.get().kotlin.srcDir("src/optional/none/kotlin")
+
         commonMain.dependencies {
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

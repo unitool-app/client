@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        # With external/app-learn: Learning English goes into the build (.ai-notes/app-learn D644).
+        with:
+          submodules: true
 
       # The library, next door, exactly as it is on a developer's machine. Without it the build
       # falls back to Maven coordinates, which is mode C and a different thing to test.
@@ -83,6 +86,9 @@ jobs:
           df -h /
 
       - uses: actions/checkout@v4
+        # With external/app-learn: Learning English goes into the build (.ai-notes/app-learn D644).
+        with:
+          submodules: true
 
       - uses: actions/checkout@v4
         with:
