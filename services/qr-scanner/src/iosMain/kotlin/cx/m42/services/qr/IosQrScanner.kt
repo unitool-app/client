@@ -25,17 +25,34 @@ import platform.AVFoundation.AVMetadataObjectTypeQRCode
 import platform.AVFoundation.authorizationStatusForMediaType
 import platform.AVFoundation.requestAccessForMediaType
 import platform.CoreGraphics.CGRectMake
+import platform.CoreImage.CIDetector
+import platform.CoreImage.CIDetectorAccuracy
+import platform.CoreImage.CIDetectorAccuracyHigh
+import platform.CoreImage.CIDetectorTypeQRCode
+import platform.CoreImage.CIImage
+import platform.CoreImage.CIQRCodeFeature
+import platform.Foundation.NSData
 import platform.Foundation.NSSelectorFromString
+import platform.Foundation.NSURL
+import platform.Foundation.dataWithContentsOfURL
+import platform.PhotosUI.PHPickerConfiguration
+import platform.PhotosUI.PHPickerFilter
+import platform.PhotosUI.PHPickerResult
+import platform.PhotosUI.PHPickerViewController
+import platform.PhotosUI.PHPickerViewControllerDelegateProtocol
 import platform.UIKit.UIAlertAction
 import platform.UIKit.UIAlertActionStyleCancel
+import platform.UIKit.UIAlertActionStyleDefault
 import platform.UIKit.UIAlertController
-import platform.UIKit.UIAlertControllerStyleAlert
+import platform.UIKit.UIAlertControllerStyleActionSheet
 import platform.UIKit.UIApplication
 import platform.UIKit.UIButton
 import platform.UIKit.UIButtonTypeSystem
 import platform.UIKit.UIColor
 import platform.UIKit.UIControlEventTouchUpInside
 import platform.UIKit.UIControlStateNormal
+import platform.UIKit.UIDocumentPickerDelegateProtocol
+import platform.UIKit.UIDocumentPickerViewController
 import platform.UIKit.UIFont
 import platform.UIKit.UIImpactFeedbackGenerator
 import platform.UIKit.UIImpactFeedbackStyle
@@ -45,7 +62,9 @@ import platform.UIKit.UINotificationFeedbackGenerator
 import platform.UIKit.UINotificationFeedbackType
 import platform.UIKit.UIScreen
 import platform.UIKit.UIViewController
+import platform.UIKit.popoverPresentationController
 import platform.UIKit.NSTextAlignmentCenter
+import platform.UniformTypeIdentifiers.UTTypeImage
 import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 import platform.darwin.NSObject
 import platform.darwin.dispatch_async
@@ -57,8 +76,12 @@ import platform.darwin.dispatch_get_main_queue
  * frames never meet a third-party decoder, which is what ZXing was for on Android.
  *
  * Its own full-screen controller on top of the app, like `QrScanActivity`: a preview, one line of
- * help and a close button. The camera question is the system's; a refusal ends in an alert that
- * says the link can be pasted instead, and [scan] answers null.
+ * help, "Photo or file" and a close button. The camera question is the system's; after a refusal
+ * the same screen opens without the camera, so a code can still be read from a picture.
+ *
+ * "Photo or file" (qr-scanner D637) asks which: Photos through `PHPickerViewController`, which needs
+ * no photo-library permission, or Files through the document picker. The picture is read by Core
+ * Image's QR detector, every code in it.
  *
  * Needs `NSCameraUsageDescription` in the app's Info.plist — iOS kills an app that opens the camera
  * without one.
@@ -95,16 +118,10 @@ public class IosQrScanner(private val language: () -> String) : QrScanner {
     private suspend fun present(label: String?, onCode: ((String) -> SeriesStep)?): String? = withContext(Dispatchers.Main) {
         val strings = ScanStrings.of(language())
         val presenter = topViewController() ?: return@withContext null
-        if (!cameraAllowed()) {
-            denied(presenter, strings)
-            return@withContext null
-        }
+        val camera = cameraAllowed()
         suspendCancellableCoroutine { continuation ->
             val session = ScanSession(strings, label, onCode) { text -> if (continuation.isActive) continuation.resume(text) }
-            if (!session.start()) {
-                continuation.resume(null)
-                return@suspendCancellableCoroutine
-            }
+            session.start(camera)
             presenter.presentViewController(session.controller, animated = true, completion = null)
             continuation.invokeOnCancellation { dispatch_async(dispatch_get_main_queue()) { session.finish(null) } }
         }
@@ -121,18 +138,6 @@ public class IosQrScanner(private val language: () -> String) : QrScanner {
             else -> false
         }
 
-    private suspend fun denied(presenter: UIViewController, strings: ScanStrings) {
-        suspendCancellableCoroutine { continuation ->
-            val alert = UIAlertController.alertControllerWithTitle(strings.deniedTitle, strings.deniedText, UIAlertControllerStyleAlert)
-            alert.addAction(
-                UIAlertAction.actionWithTitle(strings.close, UIAlertActionStyleCancel) { _ ->
-                    if (continuation.isActive) continuation.resume(Unit)
-                },
-            )
-            presenter.presentViewController(alert, animated = true, completion = null)
-        }
-    }
-
     public companion object {
         /** Whether this device has a camera at all — the simulator, for one, does not. */
         public fun available(): Boolean = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo) != null
@@ -144,8 +149,8 @@ public class IosQrScanner(private val language: () -> String) : QrScanner {
  * [onCode], a series: every new code goes there, [label] shows its answers, and only
  * [SeriesStep.Done] closes it with an answer.
  *
- * An `NSObject` because it is the metadata delegate and the close button's target, and both of
- * those are Objective-C callbacks.
+ * An `NSObject` because it is the metadata delegate and the buttons' target, and both of those
+ * are Objective-C callbacks.
  */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private class ScanSession(
@@ -161,13 +166,30 @@ private class ScanSession(
 
     /** The series' line over the camera; absent for one code. */
     private var labelView: UILabel? = null
+    /** The help line; also says what came of a picture that gave no code. */
+    private var hintView: UILabel? = null
+    private var pictureButton: UIButton? = null
+    /** The picker's delegate: UIKit holds delegates weakly, so this is what keeps it alive. */
+    private var pictureDelegate: NSObject? = null
     /**
      * The last text a series handed over. A code stays in view for many frames; only a change of
      * text is news.
      */
     private var last: String? = null
 
-    fun start(): Boolean {
+    /**
+     * Builds the screen; with [camera] false (refused) or a camera that will not start, the same
+     * screen without the preview, saying why, with "Photo or file" still there.
+     */
+    fun start(camera: Boolean) {
+        val running = camera && connectCamera()
+        layout(if (running) strings.hint else if (camera) strings.failedText else strings.deniedText)
+        controller.modalPresentationStyle = UIModalPresentationFullScreen
+        // startRunning blocks until the camera is up, which is not a thing to do on the main thread.
+        if (running) dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) { session.startRunning() }
+    }
+
+    private fun connectCamera(): Boolean {
         val device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo) ?: return false
         val input = AVCaptureDeviceInput.deviceInputWithDevice(device, error = null) ?: return false
         if (!session.canAddInput(input)) return false
@@ -178,15 +200,10 @@ private class ScanSession(
         // After addOutput: before it, the output reports no available types and rejects QR.
         output.setMetadataObjectsDelegate(this, queue = dispatch_get_main_queue())
         output.metadataObjectTypes = listOf(AVMetadataObjectTypeQRCode)
-
-        layout()
-        controller.modalPresentationStyle = UIModalPresentationFullScreen
-        // startRunning blocks until the camera is up, which is not a thing to do on the main thread.
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) { session.startRunning() }
         return true
     }
 
-    private fun layout() {
+    private fun layout(help: String) {
         val (width, height) = UIScreen.mainScreen.bounds.useContents { size.width to size.height }
         val view = controller.view
         view.setFrame(CGRectMake(0.0, 0.0, width, height))
@@ -197,12 +214,13 @@ private class ScanSession(
         preview.setFrame(CGRectMake(0.0, 0.0, width, height))
         view.layer.addSublayer(preview)
 
-        val hint = UILabel(frame = CGRectMake(24.0, 72.0, width - 48.0, 48.0))
-        hint.text = strings.hint
+        val hint = UILabel(frame = CGRectMake(24.0, 64.0, width - 48.0, 64.0))
+        hint.text = help
         hint.textColor = UIColor.whiteColor
         hint.textAlignment = NSTextAlignmentCenter
-        hint.numberOfLines = 2
+        hint.numberOfLines = 3
         view.addSubview(hint)
+        hintView = hint
 
         if (onCode != null) {
             val line = UILabel(frame = CGRectMake(24.0, 128.0, width - 48.0, 56.0))
@@ -221,11 +239,91 @@ private class ScanSession(
         close.setFrame(CGRectMake((width - 160.0) / 2, height - 120.0, 160.0, 48.0))
         close.addTarget(this, action = NSSelectorFromString("closeTapped"), forControlEvents = UIControlEventTouchUpInside)
         view.addSubview(close)
+
+        val picture = UIButton.buttonWithType(UIButtonTypeSystem)
+        picture.setTitle(strings.fromPicture, forState = UIControlStateNormal)
+        picture.setTitleColor(UIColor.whiteColor, forState = UIControlStateNormal)
+        picture.backgroundColor = UIColor.whiteColor.colorWithAlphaComponent(0.2)
+        picture.layer.cornerRadius = 24.0
+        picture.setFrame(CGRectMake((width - 220.0) / 2, height - 184.0, 220.0, 48.0))
+        picture.addTarget(this, action = NSSelectorFromString("pictureTapped"), forControlEvents = UIControlEventTouchUpInside)
+        view.addSubview(picture)
+        pictureButton = picture
     }
 
     @ObjCAction
     fun closeTapped() {
         finish(null)
+    }
+
+    /** Photos or Files: two pickers on iOS, where Android's one offers both. */
+    @ObjCAction
+    fun pictureTapped() {
+        val sheet = UIAlertController.alertControllerWithTitle(null, message = null, preferredStyle = UIAlertControllerStyleActionSheet)
+        sheet.addAction(UIAlertAction.actionWithTitle(strings.photo, UIAlertActionStyleDefault) { _ -> pickPhoto() })
+        sheet.addAction(UIAlertAction.actionWithTitle(strings.file, UIAlertActionStyleDefault) { _ -> pickFile() })
+        sheet.addAction(UIAlertAction.actionWithTitle(strings.cancel, UIAlertActionStyleCancel, handler = null))
+        // An iPad shows an action sheet as a popover, and UIKit throws without an anchor for it.
+        pictureButton?.let { button ->
+            sheet.popoverPresentationController?.sourceView = button
+            sheet.popoverPresentationController?.setSourceRect(button.bounds)
+        }
+        controller.presentViewController(sheet, animated = true, completion = null)
+    }
+
+    private fun pickPhoto() {
+        val configuration = PHPickerConfiguration()
+        configuration.filter = PHPickerFilter.imagesFilter
+        configuration.selectionLimit = 1
+        val picker = PHPickerViewController(configuration = configuration)
+        val delegate = PhotoPicked(::picture)
+        pictureDelegate = delegate
+        picker.delegate = delegate
+        controller.presentViewController(picker, animated = true, completion = null)
+    }
+
+    private fun pickFile() {
+        // A copy: the original may sit in iCloud or another app's provider, and a copy needs no
+        // security-scoped access to read.
+        val picker = UIDocumentPickerViewController(forOpeningContentTypes = listOf(UTTypeImage), asCopy = true)
+        val delegate = FilePicked(::picture)
+        pictureDelegate = delegate
+        picker.delegate = delegate
+        controller.presentViewController(picker, animated = true, completion = null)
+    }
+
+    /**
+     * A picked picture's bytes, or null when they would not load. Read off the main thread; the
+     * codes found are then treated as if the camera had seen them.
+     */
+    private fun picture(data: NSData?) {
+        if (done) return
+        hintView?.text = strings.reading
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
+            val codes = data?.let(::qrCodesIn)
+            dispatch_async(dispatch_get_main_queue()) { pictureCodes(codes) }
+        }
+    }
+
+    private fun pictureCodes(codes: List<String>?) {
+        if (done) return
+        when {
+            codes == null -> hintView?.text = strings.pictureUnreadable
+            codes.isEmpty() -> hintView?.text = strings.noCodeInPicture
+            else -> {
+                hintView?.text = strings.hint
+                val series = onCode
+                if (series == null) {
+                    UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
+                    finish(codes.first())
+                } else {
+                    for (code in codes) {
+                        if (done) break
+                        seriesCode(series, code)
+                    }
+                }
+            }
+        }
     }
 
     override fun captureOutput(
@@ -270,12 +368,54 @@ private class ScanSession(
     }
 }
 
+/**
+ * Every QR code Core Image finds in [data], each text once; null when it is not a picture. Tried
+ * again on the negative when the picture gives none, for codes drawn light on dark.
+ */
+private fun qrCodesIn(data: NSData): List<String>? {
+    val image = CIImage.imageWithData(data) ?: return null
+    val detector = CIDetector.detectorOfType(
+        CIDetectorTypeQRCode,
+        context = null,
+        options = mapOf<Any?, Any?>(CIDetectorAccuracy to CIDetectorAccuracyHigh),
+    ) ?: return emptyList()
+    fun read(picture: CIImage): List<String> =
+        detector.featuresInImage(picture).mapNotNull { (it as? CIQRCodeFeature)?.messageString }.distinct()
+    return read(image).ifEmpty { read(image.imageByApplyingFilter("CIColorInvert")) }
+}
+
+/** The photo picker's answer: the first picture's bytes, on the main thread; nothing on Cancel. */
+private class PhotoPicked(private val onData: (NSData?) -> Unit) : NSObject(), PHPickerViewControllerDelegateProtocol {
+    override fun picker(picker: PHPickerViewController, didFinishPicking: List<*>) {
+        picker.dismissViewControllerAnimated(true, completion = null)
+        val result = didFinishPicking.firstOrNull() as? PHPickerResult ?: return
+        result.itemProvider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
+            dispatch_async(dispatch_get_main_queue()) { onData(data) }
+        }
+    }
+}
+
+/** The document picker's answer: the picked file's bytes; nothing on Cancel. */
+private class FilePicked(private val onData: (NSData?) -> Unit) : NSObject(), UIDocumentPickerDelegateProtocol {
+    override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
+        val url = didPickDocumentsAtURLs.firstOrNull() as? NSURL ?: return
+        onData(NSData.dataWithContentsOfURL(url))
+    }
+}
+
 /** The scanner's few words, in the host's language rather than the device's. */
 private class ScanStrings(
     val hint: String,
     val close: String,
-    val deniedTitle: String,
     val deniedText: String,
+    val failedText: String,
+    val fromPicture: String,
+    val photo: String,
+    val file: String,
+    val cancel: String,
+    val reading: String,
+    val noCodeInPicture: String,
+    val pictureUnreadable: String,
 ) {
     companion object {
         fun of(tag: String?): ScanStrings = if (tag?.substringBefore('-')?.lowercase() == "ru") Ru else En
@@ -283,15 +423,29 @@ private class ScanStrings(
         val Ru = ScanStrings(
             hint = "Наведите камеру на QR-код",
             close = "Закрыть",
-            deniedTitle = "Нет доступа к камере",
-            deniedText = "Без камеры QR-код не прочитать. Разрешите её в Настройках или вставьте ссылку из QR-кода вручную.",
+            deniedText = "Нет доступа к камере. Разрешите её в Настройках — или выберите фото или файл с кодом.",
+            failedText = "Камера не запустилась. Выберите фото или файл с кодом.",
+            fromPicture = "Фото или файл",
+            photo = "Фото",
+            file = "Файл",
+            cancel = "Отмена",
+            reading = "Ищу QR-код в картинке…",
+            noCodeInPicture = "В картинке не нашлось QR-кода",
+            pictureUnreadable = "Эту картинку не открыть",
         )
 
         val En = ScanStrings(
             hint = "Point the camera at a QR code",
             close = "Close",
-            deniedTitle = "No camera access",
-            deniedText = "A QR code cannot be read without it. Allow the camera in Settings, or paste the link from the QR code instead.",
+            deniedText = "No camera access. Allow it in Settings, or pick a photo or a file with the code.",
+            failedText = "The camera did not start. Pick a photo or a file with the code.",
+            fromPicture = "Photo or file",
+            photo = "Photo",
+            file = "File",
+            cancel = "Cancel",
+            reading = "Looking for a QR code in the picture…",
+            noCodeInPicture = "No QR code in this picture",
+            pictureUnreadable = "This picture does not open",
         )
     }
 }

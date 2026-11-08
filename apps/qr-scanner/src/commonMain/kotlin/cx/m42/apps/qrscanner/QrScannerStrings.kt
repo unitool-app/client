@@ -74,7 +74,7 @@ internal interface QrScannerStrings {
 internal object QrScannerStringsEn : QrScannerStrings {
     override val scan = "Scan"
     override val paste = "Paste"
-    override val empty = "Point the camera at a QR code. A file cut into many codes is gathered in any order."
+    override val empty = "Point the camera at a QR code, or pick a photo or a file with one on the camera screen. A file cut into many codes is gathered in any order."
     override val emptyNoCamera = "No camera here: paste the text of a code."
     override val aim = "Point at a QR code"
     override val notAChunk = "Not a piece of this file"
@@ -148,7 +148,7 @@ internal object QrScannerStringsEn : QrScannerStrings {
 internal object QrScannerStringsRu : QrScannerStrings {
     override val scan = "Сканировать"
     override val paste = "Вставить"
-    override val empty = "Наведите камеру на QR-код. Файл, разрезанный на много кодов, собирается в любом порядке."
+    override val empty = "Наведите камеру на QR-код или выберите на экране камеры фото или файл с кодом. Файл, разрезанный на много кодов, собирается в любом порядке."
     override val emptyNoCamera = "Камеры нет: вставьте текст кода."
     override val aim = "Наведите на QR-код"
     override val notAChunk = "Это не кусок этого файла"

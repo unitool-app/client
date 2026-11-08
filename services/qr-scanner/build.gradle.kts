@@ -2,7 +2,8 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 /**
- * A camera that reads one QR code — an optional service in the sense of D19.
+ * A camera that reads one QR code — or a picture picked on its screen — an optional service in
+ * the sense of D19.
  *
  * `commonMain` is all an app sees: [cx.m42.services.qr.QrScanner] and its key. `androidMain` is the
  * one implementation there is — CameraX for the frames, ZXing for reading them, and a full-screen

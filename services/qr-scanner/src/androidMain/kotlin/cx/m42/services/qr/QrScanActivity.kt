@@ -3,6 +3,7 @@ package cx.m42.services.qr
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Build
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -76,6 +78,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * ends it — or, in series mode ([EXTRA_SERIES]), every new code goes to the app, whose answer is
  * either the next line to show over the camera or the end.
  *
+ * "Photo or file" (qr-scanner D637) reads the codes out of a picture instead: the system's picker,
+ * which offers the gallery and the files alike, then [QrImageDecoder]. It works without the camera
+ * permission too, so it stays on the refusal screen.
+ *
  * An activity rather than a composable inside the app, for the reason [QrScanner] gives — and
  * because only an activity is told the answer to a permission prompt.
  *
@@ -97,6 +103,8 @@ public class QrScanActivity : ComponentActivity() {
     private var seriesId: Long? = null
     /** The app's line over the camera in a series: the hint at first, then each answer. */
     private val label = mutableStateOf<String?>(null)
+    /** What came of the last picked picture when it gave no code; cleared by the next pick. */
+    private val pictureNote = mutableStateOf<String?>(null)
 
     private val analysis: ExecutorService = Executors.newSingleThreadExecutor()
     private val found = AtomicBoolean(false)
@@ -214,6 +222,62 @@ public class QrScanActivity : ComponentActivity() {
         finish()
     }
 
+    /**
+     * Reads the codes out of a picked picture off the main thread, then treats them as if the
+     * camera had seen them: the first ends a one-code scan, a series takes every one in turn.
+     */
+    private fun readPicture(uri: Uri) {
+        pictureNote.value = null
+        analysis.execute {
+            val codes = loadPixels(uri)?.let { (pixels, width, height) -> QrImageDecoder.decode(pixels, width, height) }
+            runOnUiThread {
+                if (answered || isFinishing) return@runOnUiThread
+                when {
+                    codes == null -> pictureNote.value = strings.pictureUnreadable
+                    codes.isEmpty() -> pictureNote.value = strings.noCodeInPicture
+                    else -> {
+                        val id = seriesId
+                        if (id == null) {
+                            if (found.compareAndSet(false, true)) close(codes.first())
+                        } else {
+                            for (code in codes) {
+                                if (answered) break
+                                seriesCode(id, code)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * The picture's ARGB pixels, scaled down by powers of two until its longer side is at most
+     * [MAX_PICTURE_SIDE] — a 12-megapixel photo would otherwise take 50 MB as ints, and a code that
+     * fills a fair part of it reads just as well at half the size. Null when it does not open.
+     */
+    private fun loadPixels(uri: Uri): Triple<IntArray, Int, Int>? =
+        try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                null
+            } else {
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_PICTURE_SIDE) sample *= 2
+                val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }?.let { bitmap ->
+                    val pixels = IntArray(bitmap.width * bitmap.height)
+                    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                    Triple(pixels, bitmap.width, bitmap.height).also { bitmap.recycle() }
+                }
+            }
+        } catch (_: Exception) {
+            null
+        } catch (_: OutOfMemoryError) {
+            null
+        }
+
     /** Called once the permission is there; binding before it would only fail inside CameraX. */
     private fun startCamera() {
         if (started) return
@@ -251,6 +315,11 @@ public class QrScanActivity : ComponentActivity() {
             granted.value = ok
             asked = true
         }
+        // GetContent rather than the photo picker: it offers the gallery and the file manager both,
+        // and a code saved as a PNG from a computer usually sits in Downloads, not among photos.
+        val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let(::readPicture)
+        }
         LaunchedEffect(Unit) {
             if (!granted.value) prompt.launch(Manifest.permission.CAMERA)
         }
@@ -282,6 +351,25 @@ public class QrScanActivity : ComponentActivity() {
                 if (allowed && hasTorch.value) {
                     Pill(strings.torch, filled = torchOn.value) { controller.enableTorch(!torchOn.value) }
                 }
+            }
+            Column(
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(24.dp),
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                pictureNote.value?.let { note ->
+                    BasicText(
+                        note,
+                        style = TextStyle(color = Color.White, fontSize = 15.sp, textAlign = TextAlign.Center),
+                        modifier = Modifier
+                            .widthIn(max = 360.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+                Pill(strings.fromPicture) { picker.launch("image/*") }
             }
         }
     }
@@ -323,7 +411,8 @@ public class QrScanActivity : ComponentActivity() {
                 strings.hint,
                 style = TextStyle(color = Color.White, fontSize = 17.sp, textAlign = TextAlign.Center),
             )
-            Spacer(Modifier.height(48.dp))
+            // Room for "Photo or file" and its note below.
+            Spacer(Modifier.height(if (pictureNote.value == null) 88.dp else 140.dp))
         }
     }
 
@@ -369,6 +458,8 @@ public class QrScanActivity : ComponentActivity() {
         const val EXTRA_SERIES: String = "cx.m42.services.qr.SERIES"
         /** The line over the camera before a series' first code. */
         const val EXTRA_LABEL: String = "cx.m42.services.qr.LABEL"
+
+        const val MAX_PICTURE_SIDE: Int = 3000
     }
 }
 
@@ -403,6 +494,9 @@ internal class ScanStrings(
     val openSettings: String,
     val failed: String,
     val failedText: String,
+    val fromPicture: String,
+    val noCodeInPicture: String,
+    val pictureUnreadable: String,
 ) {
     companion object {
         fun of(tag: String?): ScanStrings =
@@ -413,11 +507,14 @@ internal class ScanStrings(
             close = "Закрыть",
             torch = "Фонарик",
             deniedTitle = "Нет доступа к камере",
-            deniedText = "Без камеры QR-код не прочитать. Разрешите её — или закройте и вставьте ссылку из QR-кода вручную.",
+            deniedText = "Без камеры QR-код не прочитать. Разрешите её — или выберите фото или файл с кодом, или закройте и вставьте ссылку вручную.",
             allow = "Разрешить",
             openSettings = "Открыть настройки",
             failed = "Камера не запустилась",
-            failedText = "Закройте сканер и вставьте ссылку из QR-кода вручную.",
+            failedText = "Выберите фото или файл с кодом — или закройте сканер и вставьте ссылку вручную.",
+            fromPicture = "Фото или файл",
+            noCodeInPicture = "В картинке не нашлось QR-кода",
+            pictureUnreadable = "Эту картинку не открыть",
         )
 
         private val En = ScanStrings(
@@ -425,11 +522,14 @@ internal class ScanStrings(
             close = "Close",
             torch = "Torch",
             deniedTitle = "No access to the camera",
-            deniedText = "A QR code cannot be read without it. Allow the camera, or close this and paste the link from the QR code instead.",
+            deniedText = "A QR code cannot be read without it. Allow the camera, pick a photo or a file with the code, or close this and paste the link instead.",
             allow = "Allow",
             openSettings = "Open settings",
             failed = "The camera did not start",
-            failedText = "Close the scanner and paste the link from the QR code instead.",
+            failedText = "Pick a photo or a file with the code, or close the scanner and paste the link instead.",
+            fromPicture = "Photo or file",
+            noCodeInPicture = "No QR code in this picture",
+            pictureUnreadable = "This picture does not open",
         )
     }
 }

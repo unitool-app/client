@@ -22,6 +22,10 @@ public interface QrScanner {
      * scanner, refuses the camera, or the camera will not start, all of which answer null. The
      * caller learns nothing about which: each means "no text", and what to say about the camera
      * was the scanner's to say while it was on screen.
+     *
+     * The text may also come from a picture: the scanner's screen has "Photo or file" (qr-scanner
+     * D637), and the first code found in the picked image answers just as a code in view would.
+     * A series takes every code in the picture, one after another.
      */
     public suspend fun scan(): String?
 
