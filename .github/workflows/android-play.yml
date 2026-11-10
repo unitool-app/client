@@ -295,6 +295,7 @@ jobs:
           releaseFiles: composeApp/build/outputs/bundle/release/*.aab
           track: ${{ inputs.track || 'internal' }}
           status: completed
+          changesNotSentForReview: true
           releaseName: ${{ github.run_number }}
           # Edited before a release, not generated: Play shows these to a person. One file per
           # locale, no extension — the action reads the locale out of everything after
