@@ -68,4 +68,18 @@ class PromoCodesTest : UnitoolTest() {
             assertEquals(ActivationResult.Rejected(ActivationResult.Reason.UnknownCode), activation.fromPromo(code), code)
         }
     }
+
+    @Test
+    fun theCrNoteCodeOpensItForOneVisitAndNothingNearItDoes() = runBlocking<Unit> {
+        val activation = testSuperizer().activation
+        // Exact, in either bracket (.ai-notes/cr-note D650) — a secret app's one visit.
+        listOf("[cr-note]", "{cr-note}", " [cr-note] ").forEach { code ->
+            val result = assertIs<ActivationResult.Success>(activation.fromPromo(code), code)
+            assertEquals(AppId("cr-note"), result.activation.appId)
+            assertEquals(false, result.activation.unlock, code)
+        }
+        listOf("cr-note", "CR-NOTE", "crnote", "[CR-NOTE]", "[cr note]", "(cr-note)").forEach { code ->
+            assertEquals(ActivationResult.Rejected(ActivationResult.Reason.UnknownCode), activation.fromPromo(code), code)
+        }
+    }
 }

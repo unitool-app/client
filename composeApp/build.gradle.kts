@@ -170,6 +170,7 @@ kotlin {
             implementation(project(":apps:qr-scanner"))
             implementation(project(":apps:passwords"))
             implementation(project(":apps:cr-restore"))
+            implementation(project(":apps:cr-note"))
             implementation(project(":services:qr-scanner"))
             implementation(project(":services:share"))
             implementation(project(":services:vault"))

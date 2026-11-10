@@ -37,6 +37,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(libs.superizer.core)
+            implementation(libs.kotlinx.coroutines.core)
         }
         iosMain.dependencies {
             // The CoreFoundation glue, shared with the keyring's Secure Enclave backend (07 §3, question 84).

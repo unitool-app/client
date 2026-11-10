@@ -15,6 +15,9 @@ import cx.m42.apps.calculator.CalculatorConfig
 import cx.m42.apps.converter.ConverterApp
 import cx.m42.apps.counters.CountersApp
 import cx.m42.apps.crrestore.CrRestoreApp
+import cx.m42.apps.crnote.CrNoteApp
+import cx.m42.services.vault.BiometricKey
+import cx.m42.services.vault.PrivateFiles
 import cx.m42.apps.qrscanner.QrScannerApp
 import cx.m42.apps.passwords.PasswordsApp
 import cx.m42.apps.dates.DatesApp
@@ -146,6 +149,9 @@ private fun buildHost(
     // Secret too (.ai-notes/cr-restore): opens what age, `openssl enc` and a split secret sealed, from
     // QR codes or a file, and keeps none of it. No lock to come in; the lock while it holds a result.
     register(CrRestoreApp())
+    // Secret too (.ai-notes/cr-note): notes behind a face and a PIN, a directory per PIN, 178500 wipes
+    // them all. On a phone without a strong biometric — and off the phones — its code opens nothing.
+    register(CrNoteApp())
     // Whatever is in the build only when its module is: Learning English from the app-learn submodule.
     registerOptionalApps()
 
@@ -188,6 +194,9 @@ private fun buildHost(
                 // cr-restore, the same way: bracketed and exact, with either bracket (.ai-notes/cr-restore D596).
                 "f6c3354b5f9a7045c1bf196bab55fee4a4ff1b99cd3ece40e643356101ea6a7e" to ActivationResult.Success(Activation(AppId(CrRestoreApp.ID))),
                 "e3865e28654ae6c36b8c0b095c339129e1b268e0bec1c5537a4ac6d414f26983" to ActivationResult.Success(Activation(AppId(CrRestoreApp.ID))),
+                // cr-note, the same way (.ai-notes/cr-note D650).
+                "a18057844f206470946f7dc516e1ba7eb37e8712b9c0a217dafc04995eab4668" to ActivationResult.Success(Activation(AppId(CrNoteApp.ID))),
+                "12e97b0a1af3a70107230296cdb60b8582d87455957f51da89a6499d48aca19c" to ActivationResult.Success(Activation(AppId(CrNoteApp.ID))),
             ),
         ),
     )
@@ -210,6 +219,9 @@ private fun buildHost(
     tools.link?.let { service(LocalLink.Key, it) }
     tools.files?.let { service(FilePicker.Key, it) }
     tools.saver?.let { service(FileSaver.Key, it) }
+    // cr-note's chip key and its files (D654, D662): each app its own, by the caller's id.
+    tools.biometricKey?.let { make -> service(BiometricKey.Key) { caller: AppId -> make(caller) } }
+    tools.privateFiles?.let { make -> service(PrivateFiles.Key) { caller: AppId -> make(caller) } }
 
     // Keys, the vault behind runtime.secrets, and the diagnostics of both (ssh-new 07 §2.2): what
     // the platform brought, handed to the host. A test builds without it and gets a host with none.

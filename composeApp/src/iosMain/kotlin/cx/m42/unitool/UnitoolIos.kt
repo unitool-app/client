@@ -7,6 +7,8 @@ import cx.m42.services.files.IosFileSaver
 import cx.m42.unitool.settings.HostTools
 import cx.m42.services.share.IosFileSharer
 import cx.m42.services.vault.IosKeychainVault
+import cx.m42.services.vault.IosBiometricKey
+import cx.m42.services.vault.IosPrivateFiles
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.ios
 import cx.m42.services.ssh.keyring.FileRecordStore
@@ -88,6 +90,9 @@ object UnitoolIos {
             qr = if (IosQrScanner.available()) IosQrScanner { superizer?.settings?.langTag?.value ?: "en" } else null,
             sharer = IosFileSharer(),
             link = IosLocalLink(),
+            // cr-note (D654, D658): a Secure Enclave key per app, and files excluded from backup.
+            biometricKey = { id -> IosBiometricKey("cx.m42.biometric." + id.value) },
+            privateFiles = { id -> IosPrivateFiles("apps/" + id.value) },
         )
         val built = buildUnitool(scope, debug = Platform.isDebugBinary, security = security, tools = tools) {
             notifier(LocalNotifier)

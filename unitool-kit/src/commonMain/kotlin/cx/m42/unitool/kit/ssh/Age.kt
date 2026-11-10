@@ -57,6 +57,23 @@ public object Age {
     }
 
     /**
+     * SSH keys and age's own `age1…` recipients ([x25519], 32-byte public keys) in one file — what
+     * `age -R keys.txt -r age1…` writes (cr-note D660). Throws when there is no recipient left.
+     */
+    public fun encrypt(
+        plaintext: ByteArray,
+        recipients: List<SshPublicKey>,
+        x25519: List<ByteArray>,
+        random: (Int) -> ByteArray = ::secureRandomBytes,
+    ): ByteArray {
+        val usable = recipients.filter(::supports)
+        require(usable.isNotEmpty() || x25519.isNotEmpty()) { "no recipient age can encrypt to" }
+        return write(plaintext, random) { fileKey ->
+            usable.map { stanza(it, fileKey, random) } + x25519.map { AgeKeys.x25519Stanza(it, fileKey, random) }
+        }
+    }
+
+    /**
      * The file around whatever stanzas [stanzas] makes of a fresh file key — the SSH ones above, and
      * age's own X25519 and scrypt in [AgeKeys]. The key is wiped after.
      */

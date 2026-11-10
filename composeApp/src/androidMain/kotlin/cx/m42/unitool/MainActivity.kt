@@ -15,6 +15,8 @@ import cx.m42.services.files.AndroidFilePicker
 import cx.m42.services.files.AndroidFileSaver
 import cx.m42.unitool.settings.HostTools
 import cx.m42.services.vault.AndroidKeystoreVault
+import cx.m42.services.vault.AndroidBiometricKey
+import cx.m42.services.vault.DirectoryFiles
 import cx.m42.services.ssh.SshKeyringHost
 import cx.m42.services.ssh.android
 import cx.m42.services.ssh.keyring.PrefsRecordStore
@@ -140,6 +142,10 @@ class MainActivity : FragmentActivity() {
             },
             sharer = AndroidFileSharer(applicationContext),
             link = AndroidLocalLink(applicationContext),
+            // cr-note (D654, D658): a Keystore key per app, and files in noBackupFilesDir — out of
+            // Auto Backup and device-to-device transfer.
+            biometricKey = { id -> AndroidBiometricKey(applicationContext, { Holder.activity }, "cx.m42.biometric." + id.value) },
+            privateFiles = { id -> DirectoryFiles(java.io.File(applicationContext.noBackupFilesDir, "apps/" + id.value)) },
         )
         return buildUnitool(scope, debug = BuildConfig.DEBUG, security = security, tools = tools) {
             notifier(notifier)

@@ -184,19 +184,20 @@ public object AgeKeys {
 
     /** `age -r age1…` for each of [recipients] (32-byte X25519 public keys). */
     public fun encryptTo(plaintext: ByteArray, recipients: List<ByteArray>, random: (Int) -> ByteArray = ::secureRandomBytes): ByteArray =
-        Age.write(plaintext, random) { fileKey ->
-            recipients.map { theirs ->
-                val ephemeral = random(32)
-                val share = Curve25519.x25519(ephemeral, Curve25519.BASE)
-                val shared = Curve25519.x25519(ephemeral, theirs)
-                ephemeral.fill(0)
-                check(shared.any { it != 0.toByte() }) { "low-order recipient" }
-                val wrappingKey = hkdfSha256(shared, share + theirs, X25519_LABEL.encodeToByteArray(), 32)
-                shared.fill(0)
-                Age.stanzaText("X25519", listOf(Base64Raw.encode(share)), ChaCha20Poly1305.seal(wrappingKey, ByteArray(12), fileKey))
-                    .also { wrappingKey.fill(0) }
-            }
-        }
+        Age.write(plaintext, random) { fileKey -> recipients.map { x25519Stanza(it, fileKey, random) } }
+
+    /** One `-> X25519` stanza wrapping [fileKey] for [theirs]. */
+    internal fun x25519Stanza(theirs: ByteArray, fileKey: ByteArray, random: (Int) -> ByteArray): String {
+        val ephemeral = random(32)
+        val share = Curve25519.x25519(ephemeral, Curve25519.BASE)
+        val shared = Curve25519.x25519(ephemeral, theirs)
+        ephemeral.fill(0)
+        check(shared.any { it != 0.toByte() }) { "low-order recipient" }
+        val wrappingKey = hkdfSha256(shared, share + theirs, X25519_LABEL.encodeToByteArray(), 32)
+        shared.fill(0)
+        return Age.stanzaText("X25519", listOf(Base64Raw.encode(share)), ChaCha20Poly1305.seal(wrappingKey, ByteArray(12), fileKey))
+            .also { wrappingKey.fill(0) }
+    }
 
     /** `age -p`, with [logN] = 18 as `age` does. */
     public fun encryptWithPassphrase(plaintext: ByteArray, passphrase: ByteArray, logN: Int = DEFAULT_LOG_N, random: (Int) -> ByteArray = ::secureRandomBytes): ByteArray =

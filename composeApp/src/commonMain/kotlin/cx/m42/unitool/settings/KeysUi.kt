@@ -6,6 +6,9 @@ import cx.m42.services.share.FileSharer
 import cx.m42.services.ssh.KnownKey
 import cx.m42.services.ssh.PublicKeyBookAdmin
 import cx.m42.services.files.FileSaver
+import cx.m42.services.vault.BiometricKey
+import cx.m42.services.vault.PrivateFiles
+import cx.m42.superizer.app.AppId
 import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.NetworkService
 import cx.m42.superizer.ssh.KeyId
@@ -63,6 +66,14 @@ public class HostTools(
     public val link: LocalLink? = null,
     /** The platform's "Save as", for what cr-restore decrypted (.ai-notes/cr-restore D603). */
     public val saver: FileSaver? = null,
+    /**
+     * A chip key behind a fresh face, one per app (cr-note D654); null where there is no chip — the
+     * desktop and the web — and there cr-note does nothing at all (D651).
+     */
+    public val biometricKey: ((AppId) -> BiometricKey)? = null,
+    /** A directory of bytes in no backup, one per app (cr-note D658, D662). */
+    public val privateFiles: ((AppId) -> PrivateFiles)? = null,
 ) {
-    internal fun with(network: NetworkService, opened: OpenedSections): HostTools = HostTools(files, qr, sharer, network, opened, link, saver)
+    internal fun with(network: NetworkService, opened: OpenedSections): HostTools =
+        HostTools(files, qr, sharer, network, opened, link, saver, biometricKey, privateFiles)
 }

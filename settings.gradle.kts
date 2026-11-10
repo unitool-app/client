@@ -58,6 +58,7 @@ include(":apps:counters")
 include(":apps:qr-scanner")
 include(":apps:passwords")
 include(":apps:cr-restore")
+include(":apps:cr-note")
 
 // Learning English (.ai-notes/app-learn D640–D641): developed in its own repository, here only as the
 // submodule `external/app-learn`, which a plain clone leaves empty. CI checks it out and the app is in;
