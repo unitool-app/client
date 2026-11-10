@@ -4,6 +4,9 @@ TEAM_ID=5K5GDFV386
 // them equal is only so that "the Unitool app" is one string wherever it is looked up.
 BUNDLE_ID=cx.m42.unitool
 APP_NAME=Unitool
+// The name under the icon on the Home Screen. Only what a person sees: the bundle, the executable,
+// the scheme and CI all stay Unitool (APP_NAME), and a Swift module name cannot start with a digit.
+DISPLAY_NAME=37tool
 // Kotlin builds the simulator framework for Apple silicon only (iosSimulatorArm64, no iosX64), so a
 // build for "any simulator" must not ask for an Intel slice the framework does not have.
 EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64
