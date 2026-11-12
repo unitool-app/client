@@ -4,7 +4,10 @@ v0.2, 2026-11-07. Построено: сабмодуль на app-learn e372bd6,
 desktop и iOS, не в web. Решения D640–D648; Q276 (без web) и Q277 (bump, теперь 0.8.1) отвечены; Q274
 и Q275 сделаны по предложенному (папка, закреплённый коммит), пока владелец не скажет иначе.
 
-Обновить app-learn здесь: `git -C external/app-learn pull` (после `git submodule update --init`) и
+Дальше: [01-all-apps-head.md](01-all-apps-head.md) (v0.1, 2026-11-11, план) — все приложения из
+app-learn и голова `main` в CI; ответ на Q275 «голова», D671–D678, Q289–Q293.
+
+Обновить app-learn здесь (до 01): `git -C external/app-learn pull` (после `git submodule update --init`) и
 коммит изменившегося gitlink'а — «Bump app-learn to <sha>».
 
 ## Что хотим

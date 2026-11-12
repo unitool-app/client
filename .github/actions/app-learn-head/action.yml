@@ -1,0 +1,18 @@
+# The app-learn submodule at the head of its main (.ai-notes/app-learn D674), not at the commit the
+# gitlink pins: every app of that repository goes into this build as it is now, with no "Bump app-learn"
+# commit here. Which commit it was goes into the job summary, so a build can be told apart and repeated.
+name: app-learn-head
+description: Move external/app-learn to the head of its main branch and note the commit in the job summary
+
+runs:
+  using: composite
+  steps:
+    - name: app-learn at the head of main
+      shell: bash
+      run: |
+        git submodule update --init --remote external/app-learn
+        sha=$(git -C external/app-learn rev-parse --short HEAD)
+        apps=$(cd external/app-learn/apps && ls -d */ 2>/dev/null | tr -d / | tr '\n' ' ')
+        echo "APP_LEARN_SHA=$sha" >> "$GITHUB_ENV"
+        echo "app-learn \`$sha\` — $(git -C external/app-learn log -1 --format=%s) — apps: $apps" >> "$GITHUB_STEP_SUMMARY"
+        echo "app-learn $sha, apps: $apps"

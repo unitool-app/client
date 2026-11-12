@@ -152,7 +152,7 @@ private fun buildHost(
     // Secret too (.ai-notes/cr-note): notes behind a face and a PIN, a directory per PIN, 178500 wipes
     // them all. On a phone without a strong biometric — and off the phones — its code opens nothing.
     register(CrNoteApp())
-    // Whatever is in the build only when its module is: Learning English from the app-learn submodule.
+    // Whatever is in the build only when its module is: the apps of the app-learn submodule.
     registerOptionalApps()
 
     // What a fresh install has on Home (D48): the calculator, because that is what Unitool was.

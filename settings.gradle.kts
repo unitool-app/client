@@ -60,15 +60,21 @@ include(":apps:passwords")
 include(":apps:cr-restore")
 include(":apps:cr-note")
 
-// Learning English (.ai-notes/app-learn D640–D641): developed in its own repository, here only as the
-// submodule `external/app-learn`, which a plain clone leaves empty. CI checks it out and the app is in;
-// without it Unitool builds as it always did. Only its `apps/learn` is a project here — the rest of that
-// repository is its own host.
-val learnDir = file("external/app-learn/apps/learn")
-if (learnDir.resolve("build.gradle.kts").exists()) {
-    include(":apps:learn")
-    project(":apps:learn").projectDir = learnDir
-}
+// The apps of app-learn (.ai-notes/app-learn D640–D641, D671): developed in their own repository, here
+// only as the submodule `external/app-learn`, which a plain clone leaves empty. CI checks it out at the
+// head of its main (D674) and every `apps/<name>` with a build file is in, as `:apps:<name>` — the same
+// path it has there; without the submodule Unitool builds as it always did. The rest of that repository
+// is its own host. composeApp registers them (D673).
+file("external/app-learn/apps").listFiles().orEmpty()
+    .filter { it.resolve("build.gradle.kts").isFile }
+    .sortedBy { it.name }
+    .forEach { dir ->
+        check(!file("apps/${dir.name}").exists()) {
+            "external/app-learn/apps/${dir.name} has the name of Unitool's own apps/${dir.name}"
+        }
+        include(":apps:${dir.name}")
+        project(":apps:${dir.name}").projectDir = dir
+    }
 
 // Platform capabilities an app may ask for by key (D19), each with its host-side implementation.
 include(":services:qr-scanner")

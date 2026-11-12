@@ -68,9 +68,11 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
-        # With external/app-learn: Learning English goes into the build (.ai-notes/app-learn D644).
+        # With external/app-learn: its apps go into the build (.ai-notes/app-learn D644).
         with:
           submodules: true
+      # ...at the head of its main, not at the pinned commit (.ai-notes/app-learn D674).
+      - uses: ./.github/actions/app-learn-head
 
       - name: Validate required secrets
         env:

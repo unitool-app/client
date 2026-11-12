@@ -48,9 +48,11 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-        # With external/app-learn: Learning English goes into the build (.ai-notes/app-learn D644).
+        # With external/app-learn: its apps go into the build (.ai-notes/app-learn D644).
         with:
           submodules: true
+      # ...at the head of its main, not at the pinned commit (.ai-notes/app-learn D674).
+      - uses: ./.github/actions/app-learn-head
       - uses: ./.github/actions/ios-prepare
         with:
           superizer_repo: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
@@ -77,9 +79,11 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-        # With external/app-learn: Learning English goes into the build (.ai-notes/app-learn D644).
+        # With external/app-learn: its apps go into the build (.ai-notes/app-learn D644).
         with:
           submodules: true
+      # ...at the head of its main, not at the pinned commit (.ai-notes/app-learn D674).
+      - uses: ./.github/actions/app-learn-head
       - uses: ./.github/actions/ios-prepare
         with:
           superizer_repo: ${{ vars.SUPERIZER_REPO || 'adminization/superizer' }}
@@ -115,9 +119,11 @@ jobs:
       uploaded: ${{ steps.upload.outputs.uploaded }}
     steps:
       - uses: actions/checkout@v4
-        # With external/app-learn: Learning English goes into the build (.ai-notes/app-learn D644).
+        # With external/app-learn: its apps go into the build (.ai-notes/app-learn D644).
         with:
           submodules: true
+      # ...at the head of its main, not at the pinned commit (.ai-notes/app-learn D674).
+      - uses: ./.github/actions/app-learn-head
 
       # Secrets cannot be read in a job-level `if`, so the check is a step with an output. Missing
       # secrets end the job green with a notice: this lane is opt-in, not a gate.

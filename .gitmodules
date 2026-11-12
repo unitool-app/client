@@ -1,3 +1,4 @@
 [submodule "external/app-learn"]
 	path = external/app-learn
 	url = https://github.com/xziy/app-learn.git
+	branch = main
