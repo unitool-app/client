@@ -47,7 +47,10 @@ public interface QrScanner {
     }
 
     public companion object {
-        public val Key: ServiceKey<QrScanner> = ServiceKey("qr-scanner")
+        // Not "qr-scanner": since 0.8.2 that name is Superizer's own, smaller QrScanner, which the
+        // builder makes out of `qrScanner { … }` for apps from outside (app-learn's books). Keys are
+        // equal by name, so the same name here would hand those apps this type and crash the cast.
+        public val Key: ServiceKey<QrScanner> = ServiceKey("unitool.qr-scanner")
     }
 }
 

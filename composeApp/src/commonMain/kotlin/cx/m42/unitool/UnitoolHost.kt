@@ -48,8 +48,10 @@ import cx.m42.services.link.LocalLink
 import cx.m42.services.qr.QrScanner
 import cx.m42.services.share.FileSharer
 import cx.m42.services.files.FileSaver
+import cx.m42.superizer.runtime.FileDownloader
 import cx.m42.superizer.runtime.FilePicker
 import cx.m42.superizer.runtime.NetworkService
+import cx.m42.superizer.host.net.KtorFileDownloader
 import cx.m42.superizer.host.net.KtorNetworkService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.JsonPrimitive
@@ -81,10 +83,15 @@ public fun buildUnitool(
 ): Superizer {
     // Made here rather than left to the library's default, so the host's own screens — the
     // backup's GitHub keys — use the very service the apps do. A test hands in its fake.
-    val net = network ?: KtorNetworkService(KtorNetworkService.defaultClient())
+    val client = if (network == null) KtorNetworkService.defaultClient() else null
+    val net = network ?: KtorNetworkService(client!!)
+    // Superizer 0.8.2 gives apps a FileDownloader only on its own client, and this host brings its
+    // network: the books of app-learn download over the same client (external/app-learn/UNITOOL-BOOKS.md).
+    // A test's fake network has none, so there the apps see no downloader.
+    val downloader = client?.let(::KtorFileDownloader)
     // Signing in to the website with the app (.ai-notes/site/02): Settings → Website.
     val web = WebSignIn(net, server, currentPlatform(), BuildInfo.VERSION)
-    return buildHost(scope, debug, security, tools.with(net, web.opened), net, server, web, extra)
+    return buildHost(scope, debug, security, tools.with(net, web.opened), net, downloader, server, web, extra)
 }
 
 private fun buildHost(
@@ -93,6 +100,7 @@ private fun buildHost(
     security: UnitoolSecurity?,
     tools: HostTools,
     network: NetworkService,
+    downloader: FileDownloader?,
     server: String,
     web: WebSignIn,
     extra: SuperizerBuilder.() -> Unit,
@@ -215,6 +223,7 @@ private fun buildHost(
         qrScanner { camera.scan() }
     }
     tools.sharer?.let { service(FileSharer.Key, it) }
+    downloader?.let { service(FileDownloader.Key, it) }
     // The phone's side of a computer's browser asking for a password (passwords-browser D538).
     tools.link?.let { service(LocalLink.Key, it) }
     tools.files?.let { service(FilePicker.Key, it) }

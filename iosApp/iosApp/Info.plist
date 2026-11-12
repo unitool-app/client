@@ -36,6 +36,12 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Superizer 0.8.2: each app's folder in Documents/<app id> shows in Files › On My iPhone › Unitool
+	     (the books of app-learn: a .book.tgz put there is on the shelf). Without these the apps still use it. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<!-- unitool://activate?… and unitool://app/<id>/<path>, the same two shapes the Android intent filter takes. -->
 	<key>CFBundleURLTypes</key>
 	<array>
