@@ -163,7 +163,7 @@ object UnitoolIos {
 private object LocalNotifier : Notifier {
     override fun show(title: String?, body: String?, link: String) {
         val content = UNMutableNotificationContent().apply {
-            setTitle(title ?: "Unitool")
+            setTitle(title ?: "37tool")
             setBody(body.orEmpty())
             setUserInfo(mapOf<Any?, Any?>("link" to link))
             setSound(UNNotificationSound.defaultSound)

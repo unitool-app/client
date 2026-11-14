@@ -97,7 +97,7 @@ private fun buildHost(
     network(network)
     host(
         HostInfo(
-            name = "Unitool",
+            name = "37tool",
             version = BuildInfo.VERSION,
             build = BuildInfo.COMMIT + if (BuildInfo.DIRTY) "*" else "",
             platform = currentPlatform(),

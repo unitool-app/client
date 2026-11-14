@@ -150,7 +150,7 @@ internal object TwoFaStringsRu : TwoFaStrings {
     override val exportTitle = "Экспорт ключей"
     override val githubAccount = "Аккаунт GitHub"
     override val savedKeys = "Сохранённые ключи"
-    override val savedKeysHint = "Открытые ключи других устройств, сохранённые в Unitool. Открыть файл сможет только устройство с отмеченным ключом — в 2FA через «Импорт из файла»."
+    override val savedKeysHint = "Открытые ключи других устройств, сохранённые в 37tool. Открыть файл сможет только устройство с отмеченным ключом — в 2FA через «Импорт из файла»."
     override val githubHint = "Имя пользователя. Приложение возьмёт открытые SSH-ключи, которые он выложил на GitHub."
     override val findKeys = "Найти ключи"
     override val findingKeys = "Спрашиваем GitHub…"
@@ -225,7 +225,7 @@ internal object TwoFaStringsRu : TwoFaStrings {
     }
 
     override fun shareMessage(audience: String, command: String, transfer: String): String =
-        "Ключи 2FA из Unitool, зашифрованы для: $audience.\nРасшифровать: $command\n" +
+        "Ключи 2FA из 37tool, зашифрованы для: $audience.\nРасшифровать: $command\n" +
             "Перенести на другой телефон одним QR-кодом: $transfer"
 
     override fun importIntro(found: Int, addable: Int): String = when {
@@ -328,7 +328,7 @@ internal object TwoFaStringsEn : TwoFaStrings {
     override val exportTitle = "Export keys"
     override val githubAccount = "GitHub account"
     override val savedKeys = "Saved keys"
-    override val savedKeysHint = "Other devices' public keys, saved in Unitool. Only the device holding a ticked key opens the file — in 2FA, through “Import from a file”."
+    override val savedKeysHint = "Other devices' public keys, saved in 37tool. Only the device holding a ticked key opens the file — in 2FA, through “Import from a file”."
     override val githubHint = "A username. The app takes the public SSH keys that user has put on GitHub."
     override val findKeys = "Find keys"
     override val findingKeys = "Asking GitHub…"
@@ -402,7 +402,7 @@ internal object TwoFaStringsEn : TwoFaStrings {
     }
 
     override fun shareMessage(audience: String, command: String, transfer: String): String =
-        "2FA keys from Unitool, encrypted for $audience.\nTo decrypt: $command\n" +
+        "2FA keys from 37tool, encrypted for $audience.\nTo decrypt: $command\n" +
             "To move them to another phone as one QR code: $transfer"
 
     override fun importIntro(found: Int, addable: Int): String = when {
