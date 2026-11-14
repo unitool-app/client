@@ -1,80 +1,58 @@
 <!--
   Play Console → Main store listing (English). Two fields, both with hard limits Play enforces
   on paste: 80 characters of short description, 4000 of full.
+
+  Every tool named here is one a person can add from "+" in a release build, and nothing else is
+  promised: Play compares the listing with the installed app, and a listing that described tools
+  the app did not have is what got the app suspended in November 2026. Before changing this text,
+  check each line against the app — and the screenshots (screenshots.txt) against the text.
+  No "free", "no ads" or other price words: the Console flags them as promotional.
 -->
 
 ## App name (30 max)
 
 ```
-Unitool Calculator & Currency
+37tool
 ```
 
 ## Short description (80 max)
 
 ```
-Calculator and currency converter. No ads, no account, no tracking, no sign-in.
+Calculator, currency converter, 2FA codes, passwords and a QR scanner in one app
 ```
 
 ## Full description (4000 max)
 
 ```
-Unitool is a calculator and a currency converter, and it opens straight onto the keypad.
+37tool is a set of everyday tools in one app. It opens on the calculator, and the home screen holds only the tools you put there: "+" opens the full list, a tap adds one, a long press takes it off again.
 
-There is no splash to sit through, no account to make and no banner across the bottom. The answer
-is the largest thing on the screen, because it is the thing you came for.
+THE TOOLS
 
-CALCULATOR
+• Calculator — add, subtract, multiply, divide; percent the way a pocket calculator reads it, so 200 + 10% adds ten percent of the 200; sign flip, backspace, clear. Results are rounded so that 0.1 + 0.2 reads as 0.3.
+• Currency converter — rates for over 160 currencies, your own list of currency pairs, and the last table it downloaded kept for when there is no signal.
+• 2FA codes — one-time sign-in codes for your accounts. Add an account by scanning the QR code a site shows, or by pasting its link. The tool opens only after your fingerprint, face or screen lock confirms it is you.
+• Passwords — your logins and passwords, stored encrypted on the phone and behind the same lock. Import a CSV file from a browser or a password manager; export them as an encrypted file.
+• QR scanner — reads what a QR code holds — a link, a Wi-Fi network, a contact or any data — from the camera or from a photo or a file. A file that was split across several codes is put back together.
+• Counters — named counters with plus and minus, for scores or the levels in a board game.
+• Date difference — the number of days between two dates, and the date that is a number of days, months or weekdays away.
+• English — English verbs in rounds of five, with a dictionary, read aloud by the phone's voice.
 
-• Add, subtract, multiply, divide
-• Percent, read the way a pocket calculator reads it — 200 + 10% adds ten percent of the 200
-• Sign flip, backspace, clear
-• Chained sums left to right, so 2 + 3 × 4 keeps going without you re-entering anything
-• Results rounded so that 0.1 + 0.2 reads as 0.3, not as the binary truth about it
+ACTIVATE
 
-CURRENCY CONVERTER
-
-• Rates for over 160 currencies, the ruble and the Vietnamese dong among them
-• The last table it downloaded is kept, so the converter still answers with no signal
-• Your own short list of currencies, instead of every currency there is
-
-ONE APP, SEVERAL TOOLS
-
-Unitool is a host. The home screen holds the tools you put on it: "+" opens the full list, a tap
-adds one, a long press takes it off again. Nothing appears there that you did not put there.
-
-Some tools are not in the list at all: a promo code from an organisation or from the tool's
-author opens them. Type it in the menu under Activate, or let the camera read a QR code that
-carries it. Some codes add the tool to your home screen; others open it for one visit only.
+Some tools are not in the list: a promo code from an organisation or from the tool's author opens them. Type it under Activate in the menu, or let the camera read a QR code that carries it.
 
 SETTINGS
 
-• Language — English or Russian, switched instantly, no restart
-• Vibration — the short tap under each key, on or off
-• The currencies the converter offers you first
+• Language — English or Russian, switched without a restart
+• Vibration under each key, on or off
+• Protection — how long the lock waits before it asks again
+• Backup — your settings and tools in one encrypted file, for moving to another phone
+• Website — sign a browser in to our website with the app, and sign it out again
 • The build number, for when something needs reporting
 
 PRIVACY
 
-Nothing you type leaves the phone. The arithmetic happens on the device, and no calculation and no
-converter input is transmitted anywhere. There is no analytics, no crash reporter, no advertising
-ID and no account.
+There is no account to make and no sign-in to the app, and there is no analytics and no crash reporter. Your accounts, passwords and calculations stay on the phone; the 2FA keys and the passwords are stored encrypted. The app goes online only for what a tool needs: exchange rates for the converter, notifications for the tools that send them, public SSH keys from GitHub when you encrypt an export or a backup to them, and the website sign-in when you start it. The privacy policy describes each of these in full.
 
-The app does use the network, for two things and no others. The converter downloads published
-exchange rates — a whole table, asked for without telling anyone which currency you are looking
-at. And notifications are delivered through Firebase Cloud Messaging and our own server, which give
-this installation an identifier so that a message can find it — but only once you use a tool that
-sends notifications; until then nothing is registered anywhere. The identifier is new again if
-you reinstall the app or clear its data.
-
-On Android 13 and later the app asks whether you want notifications when you start using such a
-tool, not before. Refuse, and everything
-else works exactly the same.
-
-Permissions: internet, vibration (switchable off in Settings), notifications on Android 13 and
-later (yours to refuse), the camera — only when you scan a QR code yourself, in the 2FA app or on
-the Activate screen — and
-biometrics, so the 2FA app can open with your fingerprint or face. Android does the check; the app
-learns only yes or no.
-
-NO ADS. NO IN-APP PURCHASES. NO SUBSCRIPTION. NO SIGN-IN.
+Permissions: internet; vibration; notifications on Android 13 and later, asked only when a tool needs them; the camera, only when you scan a QR code yourself; and biometrics, so the locked tools can open with your fingerprint or face. Android does the check; the app learns only yes or no.
 ```
