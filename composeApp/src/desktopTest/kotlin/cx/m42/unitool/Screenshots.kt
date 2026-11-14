@@ -122,6 +122,7 @@ class Screenshots {
         clock: Clock?,
         device: FakeDeviceAuthenticator,
         kind: HostKind,
+        debug: Boolean,
         drive: DriveScope.() -> Unit,
     ) {
         // A fresh store for every frame: a screenshot must show what a new install looks like,
@@ -138,7 +139,7 @@ class Screenshots {
             val network = if (offline) offlineNetwork() else ratesNetwork()
             val tools = HostTools(qr = PhoneCamera, sharer = PhoneShareSheet, network = network)
             val security = kind.security(scope)
-            val superizer = buildUnitool(scope, debug = true, security = security, tools = tools, network = network) {
+            val superizer = buildUnitool(scope, debug = debug, security = security, tools = tools, network = network) {
                 clock?.let { clock(it) }
                 // A screen lock: the 2FA app is behind it (06), and the finger that answers the
                 // sheet is this fake. A frame of the curtain itself sets it to say no.
@@ -224,6 +225,11 @@ class Screenshots {
         val lock: AuthAvailability = AuthAvailability.Available,
         val answer: AuthOutcome = AuthOutcome.Success,
         val kind: HostKind = HostKind.Phone(),
+        /**
+         * Built as a debug host — the Premium mock-up and the debug doors are there — which every
+         * frame for the README and for review is. The store listing's frames are not (listingScreens).
+         */
+        val debug: Boolean = true,
         val drive: DriveScope.() -> Unit,
     )
 
@@ -425,6 +431,40 @@ class Screenshots {
             tapIcon("Премиум")
             tapTag("premium:subscribe")
         },
+    ) + listingScreens("en") + listingScreens("ru")
+
+    /**
+     * The store listing's frames, one set per language; `play/listing/screenshots.txt` names the
+     * ones that go up. Built with `debug = false`, as a release is: Play compares the listing with
+     * the installed app, and a frame showing the Premium mock-up or anything else a release does
+     * not have is a misleading claim (2026-11, the suspension of the Play app). Every tool on them
+     * is a real one, in the state a person sees it in — nothing is drawn over the screen.
+     */
+    private fun listingScreens(lang: String): List<Screen> = listOf(
+        // Home once a person has put every public tool on it from "+".
+        Screen("store-01-home-$lang", lang = lang, debug = false) {
+            tapTag("home:add")
+            PublicTools.forEach { tapTag("catalog:row-$it") }
+            tapIcon("Назад")
+        },
+        // "+" on a fresh install: the whole list of what the app has.
+        Screen("store-02-all-apps-$lang", lang = lang, debug = false) { tapTag("home:add") },
+        Screen("store-03-calculator-$lang", lang = lang, debug = false) { tapTag(CALCULATOR_TILE) },
+        Screen("store-04-converter-$lang", lang = lang, debug = false) {
+            addConverter()
+            tapTag(CONVERTER_TILE)
+            for ((from, to) in listOf("RUB" to "VND", "VND" to "USD")) {
+                tapTag("currency-converter:add")
+                tapTag("currency-converter:pick-$from")
+                tapTag("currency-converter:pick-$to")
+            }
+        },
+        Screen("store-05-2fa-$lang", lang = lang, clock = TwoFaClock, debug = false) {
+            openTwoFa()
+            TwoFaLinks.forEach { addTwoFa(it) }
+            tapTag("2fa:row-0")
+        },
+        Screen("store-06-settings-$lang", lang = lang, debug = false) { openSettings() },
     )
 
     private fun DriveScope.openSettings() {
@@ -487,7 +527,7 @@ class Screenshots {
             for (screen in screens) {
                 val device = FakeDeviceAuthenticator(screen.lock, screen.answer)
                 val language = if (viewport.store == Store.AppStore) "en" else screen.lang
-                shot(viewport, screen.name, language, screen.offline, screen.clock, device, screen.kind, screen.drive)
+                shot(viewport, screen.name, language, screen.offline, screen.clock, device, screen.kind, screen.debug, screen.drive)
             }
         }
     }
@@ -509,10 +549,16 @@ private object PhoneShareSheet : FileSharer {
     override suspend fun share(fileName: String, text: String, mimeType: String, message: String?): Boolean = true
 }
 
+/**
+ * Every tool a person can add from "+" in a release, by id, in the order they are tapped onto Home.
+ * The calculator is already there (D48); the hidden and secret ones are not listed at all.
+ */
+private val PublicTools = listOf("currency-converter", "2fa", "passwords", "qr-scanner", "counters", "date-diff", "learn")
+
 /** Made-up secrets for made-up accounts: what the screenshots show must not unlock anything. */
 private val TwoFaLinks = listOf(
     "otpauth://totp/GitHub:octocat?secret=JBSWY3DPEHPK3PXP&issuer=GitHub",
-    "otpauth://totp/Google:ivan.petrov@gmail.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Google",
+    "otpauth://totp/Google:ivan.petrov@example.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=Google",
     "otpauth://totp/%D0%93%D0%BE%D1%81%D1%83%D1%81%D0%BB%D1%83%D0%B3%D0%B8:%2B7%20900%20000-00-00" +
         "?secret=KRSXG5CTMVRXEZLUKN2XAZLSKNSWG4TFOQ&issuer=%D0%93%D0%BE%D1%81%D1%83%D1%81%D0%BB%D1%83%D0%B3%D0%B8",
     "otpauth://totp/AWS:admin@example.com?secret=MFRGGZDFMZTWQ2LKNNWG23TPOBYXE43U&issuer=AWS&digits=8&period=60",
