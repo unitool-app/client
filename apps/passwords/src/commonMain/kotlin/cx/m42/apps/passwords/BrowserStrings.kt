@@ -68,7 +68,7 @@ internal object BrowserStringsRu : BrowserStrings {
     override fun confirmForget(name: String) = "Забыть компьютер «$name»"
     override fun listening(port: Int) = "Телефон виден привязанным компьютерам в этой сети, пока «Пароли» открыты."
     override val notListening = "Телефон слушает сеть, только пока «Пароли» открыты на экране."
-    override val listenFailed = "Не получилось открыть порт в сети. Проверьте Wi-Fi и разрешите Unitool доступ к локальной сети."
+    override val listenFailed = "Не получилось открыть порт в сети. Проверьте Wi-Fi и разрешите 37tool доступ к локальной сети."
 
     override fun pairQuestion(name: String) = "Привязать «$name»?"
     override val pairFingerprint = "Ключ SSH компьютера — сверьте с экраном компьютера:"
@@ -81,7 +81,7 @@ internal object BrowserStringsRu : BrowserStrings {
         BrowserLink.PairProblem.NotACode -> "Это не QR-код привязки Unitool."
         BrowserLink.PairProblem.KeyNotSupported -> "Ключ SSH этого компьютера не подходит: нужен ssh-ed25519 или ssh-rsa от 2048 бит."
         BrowserLink.PairProblem.TimedOut -> "Компьютер не подключился за 5 минут. Начните привязку на компьютере заново."
-        BrowserLink.PairProblem.NoNetwork -> "Не получилось слушать сеть. Проверьте Wi-Fi и разрешите Unitool доступ к локальной сети."
+        BrowserLink.PairProblem.NoNetwork -> "Не получилось слушать сеть. Проверьте Wi-Fi и разрешите 37tool доступ к локальной сети."
         BrowserLink.PairProblem.NotSaved -> "Не получилось сохранить: список компьютеров не открыт."
         BrowserLink.PairProblem.Failed -> "Привязка не удалась."
     }
@@ -126,7 +126,7 @@ internal object BrowserStringsEn : BrowserStrings {
     override fun confirmForget(name: String) = "Forget the computer \"$name\""
     override fun listening(port: Int) = "Paired computers in this network can find the phone while Passwords is open."
     override val notListening = "The phone listens to the network only while Passwords is on screen."
-    override val listenFailed = "Couldn't open a port in the network. Check the Wi-Fi and allow Unitool to use the local network."
+    override val listenFailed = "Couldn't open a port in the network. Check the Wi-Fi and allow 37tool to use the local network."
 
     override fun pairQuestion(name: String) = "Pair \"$name\"?"
     override val pairFingerprint = "The computer's SSH key — check it against the computer's screen:"
@@ -139,7 +139,7 @@ internal object BrowserStringsEn : BrowserStrings {
         BrowserLink.PairProblem.NotACode -> "This is not a Unitool pairing code."
         BrowserLink.PairProblem.KeyNotSupported -> "This computer's SSH key won't do: it needs ssh-ed25519, or ssh-rsa of 2048 bits or more."
         BrowserLink.PairProblem.TimedOut -> "The computer didn't connect within 5 minutes. Start pairing on the computer again."
-        BrowserLink.PairProblem.NoNetwork -> "Couldn't listen to the network. Check the Wi-Fi and allow Unitool to use the local network."
+        BrowserLink.PairProblem.NoNetwork -> "Couldn't listen to the network. Check the Wi-Fi and allow 37tool to use the local network."
         BrowserLink.PairProblem.NotSaved -> "Couldn't save it: the list of computers isn't open."
         BrowserLink.PairProblem.Failed -> "Pairing failed."
     }

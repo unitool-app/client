@@ -97,7 +97,7 @@ private fun buildHost(
     network(network)
     host(
         HostInfo(
-            name = "Unitool",
+            name = "37tool",
             version = BuildInfo.VERSION,
             build = BuildInfo.COMMIT + if (BuildInfo.DIRTY) "*" else "",
             platform = currentPlatform(),
@@ -194,8 +194,16 @@ private fun buildHost(
 
     // Premium, above the code on Activate: a mock-up that sells nothing yet (PremiumOffer). The
     // drawer's door to it is a star called Premium, not a QR code.
-    activateBanner(PremiumOffer)
-    activateEntry(PremiumOffer)
+    //
+    // Debug builds only. A release must not show a subscription it cannot sell: a "Subscribe" whose
+    // every tap says "something went wrong", under Google Play's billing small print, is what Play's
+    // policy calls a misleading claim, and the listing says there are no purchases (2026-11, the
+    // suspension of the Play app). A release keeps the library's Activate — the QR glyph, "Activate",
+    // and the code field straight away, which is where the reviewers' promo codes go.
+    if (debug) {
+        activateBanner(PremiumOffer)
+        activateEntry(PremiumOffer)
+    }
 
     // The platform's optional services (D19), for the apps through the registry: the 2FA app draws
     // its scan button from whether the camera is there, its export from whether there is a share

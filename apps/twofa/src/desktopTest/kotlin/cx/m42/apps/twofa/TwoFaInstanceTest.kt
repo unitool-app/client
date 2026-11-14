@@ -393,7 +393,7 @@ class TwoFaExportTest {
             node("2fa:command-0").assertTextEquals("age -d -i ~/.ssh/id_ed25519 unitool-2fa-2023-11-14.age")
             click("2fa:share")
             val shared = sharer.shared.single()
-            assertTrue(shared.message!!.startsWith("Ключи 2FA из Unitool, зашифрованы для: Ivan's phone."), shared.message)
+            assertTrue(shared.message!!.startsWith("Ключи 2FA из 37tool, зашифрованы для: Ivan's phone."), shared.message)
             val opened = JcaAge.decrypt(shared.text, identity).decodeToString().lines().filter { it.isNotEmpty() }
             assertEquals(twofa.accounts.value.map { OtpAuthUri.format(it) }, opened)
             assertTrue(runtime.network.calls.isEmpty(), "GitHub was never asked")

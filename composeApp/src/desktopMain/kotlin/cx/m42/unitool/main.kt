@@ -43,7 +43,7 @@ fun main(args: Array<String>) = application {
         // Phone-shaped on purpose: the layout has no desktop breakpoint, and this is the aspect
         // ratio it is designed against. The shell caps its content at 480 dp anyway (D36).
         state = rememberWindowState(width = 420.dp, height = 820.dp),
-        title = "Unitool",
+        title = "37tool",
     ) {
         UnitoolApp(superizer, security)
     }

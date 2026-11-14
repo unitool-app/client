@@ -24,7 +24,8 @@ on:
         description: 'Upload the bundle to Google Play (off = build and keep the artifact only)'
         required: false
         type: boolean
-        default: true
+        # Off unless asked for, and a push never uploads (see "Publish to Google Play").
+        default: false
       track:
         description: 'Play track to publish to'
         required: false
@@ -209,7 +210,7 @@ jobs:
         run: echo "SUPERIZER_FROM_MAVEN=1" >> "$GITHUB_ENV"
 
       # No tests and no listing check on this path (owner, 2026-10-11): a push to main goes straight
-      # to the internal-testing track. `./gradlew verify` is run by hand — `scripts/verify.sh`, or
+      # to a signed bundle — no longer to a track, see "Publish to Google Play". `./gradlew verify` is run by hand — `scripts/verify.sh`, or
       # `gh workflow run verify.yml --ref main` when the browser, the emulator or real ssh/age
       # matter — and `python3 play/check-listing.py` likewise. What is left here is only what the
       # build itself cannot do without: the secrets, the keystore, the signature on the result.
@@ -279,15 +280,25 @@ jobs:
       # Actions run, and the run knows its own commit. It tracks the versionCode by construction —
       # release `4` is versionCode `1004`.
       #
-      # The track is an API id, not the heading the console shows. A push to main goes to
-      # `internal` — the console's «Внутреннее тестирование» (owner, 2026-10-12): it is out to its
-      # testers within minutes, with no review. Only that track's testers get it, so the list in
+      # The track is an API id, not the heading the console shows. A manual run goes to `internal`
+      # unless told otherwise — the console's «Внутреннее тестирование» (owner, 2026-10-12): it is
+      # out to its testers within minutes. Only that track's testers get it, so the list in
       # Play Console → Testing → Internal testing → Testers must not be empty; a build on a track
       # nobody is on is a failure that looks exactly like success. The PLAY_TRACK repository
       # variable is deliberately not read here any more: it still says `alpha`, and it would win.
       # Closed testing (`alpha`) is a manual run, or a promotion in the console.
+      #
+      # Only a manual run with `upload` ticked publishes; a push to main builds and keeps the
+      # artifact (2026-11-14). An upload is an edit of the app in the Console, and with
+      # changesNotSentForReview it lands next to whatever else is waiting there — the listing, a
+      # declaration — and Play reviews them together. After the app was suspended for repeated
+      # rejections, nothing reaches review unless a person has looked at the whole list on the
+      # Console's publishing overview first. The flag also has to match the Console's state: Play
+      # refuses it outright ("must not be set") when changes there go to review on their own, which
+      # is what failed run 31. So the bundle is uploaded by hand from this run's artifact, or by a
+      # dispatch made with the Console open.
       - name: Publish to Google Play
-        if: github.event_name == 'push' || inputs.upload
+        if: inputs.upload
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -295,6 +306,7 @@ jobs:
           releaseFiles: composeApp/build/outputs/bundle/release/*.aab
           track: ${{ inputs.track || 'internal' }}
           status: completed
+          changesNotSentForReview: true
           releaseName: ${{ github.run_number }}
           # Edited before a release, not generated: Play shows these to a person. One file per
           # locale, no extension — the action reads the locale out of everything after
@@ -308,7 +320,7 @@ jobs:
       # through a run where every single step was green. Failing here turns that into a red run
       # instead of a quiet one.
       - name: Confirm the release is on the track it was sent to
-        if: github.event_name == 'push' || inputs.upload
+        if: inputs.upload
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
@@ -335,5 +347,5 @@ jobs:
             echo "| versionCode | \`$((1000 + GITHUB_RUN_NUMBER))\` |"
             echo "| Superizer | \`${{ steps.superizer.outputs.library }}\` (from mavenLocal) |"
             echo "| Track | \`${{ inputs.track || 'internal' }}\` |"
-            echo "| Uploaded | ${{ github.event_name == 'push' || inputs.upload }} |"
+            echo "| Uploaded | ${{ inputs.upload == true }} |"
           } >> "$GITHUB_STEP_SUMMARY"

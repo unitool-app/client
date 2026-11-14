@@ -1,13 +1,23 @@
 # Which of the generated screenshots go into the Play listing, in the order Play shows them.
 #
-# The generator writes twelve frames into composeApp/build/screenshots/play/ and Play accepts at
+# The generator writes every frame into composeApp/build/screenshots/play/ and Play accepts at
 # most eight, so something has to choose — and a directory listing cannot: it has no way to know
 # that 10-service-menu and 11-test-app are the *hidden* diagnostic surfaces (D8), which a store
 # listing would be advertising. Naming them here makes the choice reviewable, and lets the
 # generator go on producing every frame for the README and for review.
 #
-# Blank lines and # comments are ignored. The four below are the set RELEASING.md §4 records.
-01-home.png
-03-calculator.png
-05-converter.png
-08-settings.png
+# Only the store-* frames belong here. They are built as a release is (debug off: no Premium
+# mock-up, no debug doors), and they show the tools the description names and nothing else —
+# Play compares the listing with the installed app, and a listing picture of tools the app did not
+# have got it suspended in November 2026. Never upload a drawn or edited picture in their place.
+#
+# The listing is English (en-US), so these are the -en frames. The same six exist as -ru for a
+# Russian translation of the listing, if one is added.
+#
+# Blank lines and # comments are ignored.
+store-01-home-en.png
+store-02-all-apps-en.png
+store-03-calculator-en.png
+store-04-converter-en.png
+store-05-2fa-en.png
+store-06-settings-en.png

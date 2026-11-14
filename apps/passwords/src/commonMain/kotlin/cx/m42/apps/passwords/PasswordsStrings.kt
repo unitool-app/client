@@ -183,11 +183,11 @@ internal object PasswordsStringsRu : PasswordsStrings {
 
     override val import = "Импорт"
     override val importTitle = "Импорт"
-    override val importIntroText = "Файл CSV из браузера или менеджера паролей, или экспорт Unitool, показанный на компьютере QR-кодом."
+    override val importIntroText = "Файл CSV из браузера или менеджера паролей, или экспорт 37tool, показанный на компьютере QR-кодом."
     override val scan = "Сканировать QR-код"
-    override val scanHint = "Экспорт Unitool, открытый на компьютере командой со страницы экспорта."
+    override val scanHint = "Экспорт 37tool, открытый на компьютере командой со страницы экспорта."
     override val importFile = "Выбрать файл"
-    override val importFileHint = "CSV из Chrome, Firefox, Safari, Bitwarden, KeePassXC, 1Password — или файл .age экспорта Unitool, если ключ SSH на этом телефоне."
+    override val importFileHint = "CSV из Chrome, Firefox, Safari, Bitwarden, KeePassXC, 1Password — или файл .age экспорта 37tool, если ключ SSH на этом телефоне."
     override val orPaste = "Или вставьте текст CSV"
     override val pasteHint = "Первая строка — заголовок: name,url,username,password,note"
     override val readText = "Прочитать"
@@ -271,7 +271,7 @@ internal object PasswordsStringsRu : PasswordsStrings {
         ExportDone.Via.Copied -> "Скопировано. Сохраните текст как ${done.fileName}"
     }
     override fun shareMessage(audience: String, command: String, transfer: String) =
-        "Пароли из Unitool, зашифрованы для $audience.\nРасшифровать: $command\n" +
+        "Пароли из 37tool, зашифрованы для $audience.\nРасшифровать: $command\n" +
             "Перенести на другой телефон QR-кодом: $transfer"
     override val decryptTitle = "Как открыть на компьютере"
     override val decryptHint = "Пароли выводятся в терминал и на диск не пишутся. Добавьте > passwords.csv, чтобы импортировать их в браузер — и удалите файл после."
@@ -362,11 +362,11 @@ internal object PasswordsStringsEn : PasswordsStrings {
 
     override val import = "Import"
     override val importTitle = "Import"
-    override val importIntroText = "A CSV file from a browser or a password manager, or a Unitool export shown as a QR code on a computer."
+    override val importIntroText = "A CSV file from a browser or a password manager, or a 37tool export shown as a QR code on a computer."
     override val scan = "Scan a QR code"
-    override val scanHint = "A Unitool export, opened on a computer with the command from the export page."
+    override val scanHint = "A 37tool export, opened on a computer with the command from the export page."
     override val importFile = "Choose a file"
-    override val importFileHint = "CSV from Chrome, Firefox, Safari, Bitwarden, KeePassXC, 1Password — or a Unitool .age export, if its SSH key is on this phone."
+    override val importFileHint = "CSV from Chrome, Firefox, Safari, Bitwarden, KeePassXC, 1Password — or a 37tool .age export, if its SSH key is on this phone."
     override val orPaste = "Or paste CSV text"
     override val pasteHint = "The first line is the header: name,url,username,password,note"
     override val readText = "Read"
@@ -440,7 +440,7 @@ internal object PasswordsStringsEn : PasswordsStrings {
         ExportDone.Via.Copied -> "Copied. Save the text as ${done.fileName}"
     }
     override fun shareMessage(audience: String, command: String, transfer: String) =
-        "Passwords from Unitool, encrypted for $audience.\nTo decrypt: $command\n" +
+        "Passwords from 37tool, encrypted for $audience.\nTo decrypt: $command\n" +
             "To move them to another phone as a QR code: $transfer"
     override val decryptTitle = "How to open it on a computer"
     override val decryptHint = "The passwords go to the terminal, not to disk. Add > passwords.csv to import them into a browser — and delete the file afterwards."

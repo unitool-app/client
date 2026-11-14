@@ -11,7 +11,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>$(APP_NAME)</string>
+	<string>$(DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -70,14 +70,14 @@
 	  the app the moment it opens the camera.
 	-->
 	<key>NSCameraUsageDescription</key>
-	<string>Unitool reads a QR code: the one a site shows when you set up two-factor sign-in, or an activation code that opens a tool. The picture is examined on the phone and is never saved or sent.</string>
+	<string>37tool reads a QR code: the one a site shows when you set up two-factor sign-in, or an activation code that opens a tool. The picture is examined on the phone and is never saved or sent.</string>
 	<!--
 	  The 2FA app opens behind Face ID (note 06). A Face ID device kills an app that asks without this
 	  string; the host refuses to offer the lock at all when it is missing, and a debug build crashes
 	  on purpose so that the omission is found on the first run.
 	-->
 	<key>NSFaceIDUsageDescription</key>
-	<string>The 2FA app opens only after Face ID confirms it is you. Unitool learns only yes or no.</string>
+	<string>The 2FA app opens only after Face ID confirms it is you. 37tool learns only yes or no.</string>
 	<!--
 	  Passwords in a computer's browser (passwords-browser D551): while Passwords is on screen and a
 	  computer is paired, the phone listens in the Wi-Fi and announces itself over Bonjour. Without

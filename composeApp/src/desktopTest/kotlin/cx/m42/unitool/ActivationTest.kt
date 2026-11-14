@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertTextEquals
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -218,10 +219,15 @@ class ActivationTest : UnitoolTest() {
     private fun androidx.compose.ui.test.ComposeUiTest.openActivate() {
         onNodeWithContentDescription("Открыть меню").performClick()
         waitForIdle()
-        onNodeWithContentDescription("Премиум").performClick()
+        // A debug host puts the Premium offer in front of the code; a release host has no offer, and
+        // its Activate is the library's own, with the code field straight away.
+        val premium = onAllNodesWithContentDescription("Премиум").fetchSemanticsNodes().isNotEmpty()
+        onNodeWithContentDescription(if (premium) "Премиум" else "Активировать").performClick()
         waitForIdle()
-        // The offer comes first; the code is one link under it.
-        onNodeWithTag("activate:have-code").performScrollTo().performClick()
-        waitForIdle()
+        if (premium) {
+            // The offer comes first; the code is one link under it.
+            onNodeWithTag("activate:have-code").performScrollTo().performClick()
+            waitForIdle()
+        }
     }
 }

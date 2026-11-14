@@ -31,7 +31,7 @@ internal interface PremiumStrings {
 
 internal object PremiumStringsEn : PremiumStrings {
     override val entry = "Premium"
-    override val title = "Unitool Premium"
+    override val title = "37tool Premium"
     override val lead = "Buy Premium here, or enter a promo code below."
     override val monthly = "Monthly"
     override val yearly = "Yearly"
@@ -60,7 +60,7 @@ internal object PremiumStringsEn : PremiumStrings {
 
 internal object PremiumStringsRu : PremiumStrings {
     override val entry = "Премиум"
-    override val title = "Unitool Premium"
+    override val title = "37tool Premium"
     override val lead = "Премиум можно купить здесь или ввести промокод ниже."
     override val monthly = "Месяц"
     override val yearly = "Год"

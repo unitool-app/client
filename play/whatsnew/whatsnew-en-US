@@ -1,8 +1,3 @@
-First public release.
+The app is now called 37tool and has a new icon.
 
-Unitool is a calculator that opens on the keypad: no splash, no account, no banner. A currency
-converter and a settings page live behind the drawer, and the language switch takes effect without
-a restart.
-
-Nothing you type leaves the phone. The converter downloads published exchange rates, and the app
-can receive notifications — on Android 13 and later it asks first, and works the same if you say no.
+Tools in the "+" list: calculator, currency converter, 2FA codes, passwords, QR scanner, counters, date difference and English. The Activate screen in the menu opens straight on the promo code.
