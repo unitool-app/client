@@ -87,6 +87,23 @@ class PremiumOfferTest : UnitoolTest() {
     }
 
     @Test
+    fun aReleaseHostOffersNothingAndOpensActivateOnTheCode() = runComposeUiTest {
+        // A mock-up that cannot sell is not shown in a release (UnitoolHost): Play reads a
+        // subscription that always fails as a misleading claim. The drawer has Activate again.
+        setContent { UnitoolApp(testSuperizer(debug = false)) }
+        waitForIdle()
+        onNodeWithContentDescription("Открыть меню").performClick()
+        waitForIdle()
+        onNodeWithContentDescription("Премиум").assertDoesNotExist()
+        onNodeWithContentDescription("Активировать").performClick()
+        waitForIdle()
+
+        onNodeWithTag("premium:card").assertDoesNotExist()
+        onNodeWithTag("activate:have-code").assertDoesNotExist()
+        onNodeWithTag("activate:promo").assertExists()
+    }
+
+    @Test
     fun androidGetsAGooglePlayOfferAndAMaterialAlert() = runComposeUiTest {
         // Scrollable, as Activate is: under CI's fonts the button can fall below a test window's fold.
         setContent {
